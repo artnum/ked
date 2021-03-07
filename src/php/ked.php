@@ -345,6 +345,7 @@ class ked {
         }
         if ($id === null) {
             $id = uniqid('', true); // should be enough
+            /* look better in base36 */
             $id = base_convert(explode('.', $id)[0], 16, 36) . base_convert(explode('.', $id)[1], 10, 36);
         }
         $ts = time();
