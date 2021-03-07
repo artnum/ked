@@ -1,0 +1,83 @@
+# schema still in dev anything can change
+dn: cn=ked,cn=schema,cn=config
+objectClass: olcSchemaConfig
+olcObjectIdentifier: kedRoot 1.3.6.1.4.1.31204.100.20
+olcObjectIdentifier: kedAttr kedRoot:1.1
+olcObjectIdentifier: kedClass kedRoot:1.2
+olcAttributeTypes: (kedAttr:1 NAME 'kedContent'
+  DESC 'Content/preview in any given format'
+  SYNTAX 1.3.6.1.4.1.1466.115.121.1.15
+  EQUALITY caseIgnoreMatch
+  SUBSTR caseIgnoreSubstringsMatch
+  SINGLE-VALUE )
+olcAttributeTypes: (kedAttr:2 NAME 'kedContentType'
+  DESC 'Type of the content'
+  SUP kedContent
+  SINGLE-VALUE )
+olcAttributeTypes: (kedAttr:3 NAME 'kedTimestamp'
+  DESC 'Typical unix timestamp'
+  EQUALITY integerMatch
+  SYNTAX 1.3.6.1.4.1.1466.115.121.1.27
+  SINGLE-VALUE
+ )
+olcAttributeTypes: (kedAttr:4 NAME 'kedNext'
+  DESC 'An entry in the directory for the next version of the item'
+  EQUALITY distinguishedNameMatch 
+  SYNTAX 1.3.6.1.4.1.1466.115.121.1.12
+  SINGLE-VALUE
+ )
+olcAttributeTypes: (kedAttr:5 NAME 'kedId'
+  DESC 'An identifier for an entry. The id is not unique as each version of
+  the same entry as the same id with a different timestamp'
+  SUP kedContentType
+  SINGLE-VALUE
+ )
+olcAttributeTypes: (kedAttr:6 NAME 'kedName'
+  DESC 'A name for human'
+  SYNTAX 1.3.6.1.4.1.1466.115.121.1.15
+  EQUALITY caseIgnoreMatch
+  SUBSTR caseIgnoreSubstringsMatch
+ )
+olcAttributeTypes: (kedAttr:7 NAME 'kedDeleted'
+  DESC 'Unix timestamp of deletion'
+  SUP kedTimestamp
+  SINGLE-VALUE
+ )
+olcAttributeTypes: (kedAttr:8 NAME 'kedModified'
+  DESC 'Unix timestamp of deletion'
+  SUP kedTimestamp
+  SINGLE-VALUE
+ )
+olcAttributeTypes: (kedAttr:9 NAME 'kedSignature'
+  DESC 'Signature of the content if any'
+  SUP kedContent
+  SINGLE-VALUE
+ )
+olcAttributeTypes: (kedAttr:10 NAME 'kedApplication'
+  DESC 'Application specific information'
+  SYNTAX 1.3.6.1.4.1.1466.115.121.1.15
+  EQUALITY caseIgnoreMatch
+  SUBSTR caseIgnoreSubstringsMatch
+ )
+olcAttributeTypes: (kedAttr:11 NAME 'kedContentReference'
+  DESC 'Reference to the actual/complete content'
+  SYNTAX 1.3.6.1.4.1.1466.115.121.1.15
+  EQUALITY caseIgnoreMatch
+  SUBSTR caseIgnoreSubstringsMatch
+  SINGLE-VALUE
+ )
+olcObjectClasses: (kedClass:1 NAME 'kedEntry'
+  SUP top
+  STRUCTURAL
+  DESC 'An entry, the rdn most likely in form kedUid=...+kedTimestamp=...
+  Empty entry have no content'
+  MUST ( kedTimestamp $ kedId )
+  MAY ( kedContent $ kedContentType $ kedNext $kedDeleted $ kedModified $ kedSignature $ kedApplication $kedContentReference )
+ )
+olcObjectClasses: (kedClass:2 NAME 'kedDocument'
+  SUP top
+  STRUCTURAL
+  DESC 'A document. Basically it contains kedEntry. As many as needed.'
+  MUST ( kedTimestamp $ kedId )
+  MAY ( kedName $ kedContentType $ kedDeleted $ kedModified $ kedApplication )
+ )

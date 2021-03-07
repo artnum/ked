@@ -1,0 +1,20 @@
+# AUTO-GENERATED FILE - DO NOT EDIT!! Use ldapmodify.
+# CRC32 3f8efa77
+dn: olcDatabase={-1}frontend
+objectClass: olcDatabaseConfig
+objectClass: olcFrontendConfig
+olcDatabase: {-1}frontend
+olcAddContentAcl: FALSE
+olcLastMod: TRUE
+olcMaxDerefDepth: 0
+olcReadOnly: FALSE
+olcSchemaDN: cn=Subschema
+olcSyncUseSubentry: FALSE
+olcMonitoring: FALSE
+structuralObjectClass: olcDatabaseConfig
+entryUUID: 18ec3924-1214-103b-8ed6-ff56d211627f
+creatorsName: cn=config
+createTimestamp: 20210305153502Z
+entryCSN: 20210305153502.770849Z#000000#000#000000
+modifiersName: cn=config
+modifyTimestamp: 20210305153502Z
