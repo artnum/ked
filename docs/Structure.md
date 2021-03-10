@@ -20,6 +20,16 @@ A document (kedDocument) is composed of any number of entry (kedEntry). An entry
 
 Updated version keep the same id. From the ldap point of view, the rdn is build with kedId=<id>+kedTimestamp=<time>
 
+## Task
+
+Any kedDocument can be turned into a task by adding the object class kedTask. A task can have more attributes. A task might be processed differently by the application.
+
+An entry is not supposed to be turned into a task. But there is no objective reason to not do it. Except, maybe, that it makes no sense to have, for example, a picture set as a task (maybe if you write a texte, turn it into a picture and then it may start to have a sense ... but it makes no sense to do that). So, from the backend point of view, there is no limitation to turn an entry into a task.
+
+## Event
+
+Any kedDocument can be turned into an event by adding the object class kedDocument. Nothing is clearly defined or implemented yet, just something that would be done.
+
 ### Presentation
 
 No mechanism related to presentation is available. It's up to the application to set values as needed to have a reproducible reprensentation.
