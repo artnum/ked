@@ -4,6 +4,7 @@ namespace ked;
 
 use Exception;
 use Imagick;
+use DateTime;
 
 class high extends ked {
     /* direct key on my keyboard ... tired of shift-7 for path separator 
@@ -60,10 +61,26 @@ class high extends ked {
             $object = $this->getLdapObject($this->conn, $entry);
             $object['+childs'] = $this->countDocumentChilds($object['__dn']);
             $object['+entries'] = $this->countDocumentEntries($object['__dn']);
-            $this->filterResult($object);
+            $this->filterConvertResult($object);
             $documents[] = $object;
         }
         return $documents;
+    }
+
+    function filterConvertResult (array &$entry) {
+        $keys = array_keys($entry);
+        foreach ($keys as $k) {
+            if (substr($k, 0, 2) === '__') { unset($entry[$k]); }
+            switch ($k) {
+                case 'deleted':
+                case 'modified':
+                case 'created':
+                case 'taskEnd':
+                case 'taskDone':
+                    $entry[$k] = (new DateTime("@$entry[$k]"))->format('c');
+                    break;
+            }
+        }
     }
 
     function pathToDn (string $path):?string {
