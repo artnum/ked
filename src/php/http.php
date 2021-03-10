@@ -54,7 +54,7 @@ class http {
             http_response_code(200);
             $this->responseStarted = true;
         }
-        echo $txt;
+        echo Normalizer::normalize($txt, Normalizer::FORM_C);
     }
 
     function run () {
