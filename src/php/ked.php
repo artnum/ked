@@ -3,7 +3,6 @@ declare(strict_types=1);
 namespace ked;
 
 use Normalizer;
-use DateTime;
 
 /* when returning object, attributes are named with the following convention :
   attributeName -> an attribute from data
@@ -16,24 +15,27 @@ class ked {
     protected $rwconn;
     protected $base;
 
-    /* public name => [ ldap name, sanitize string [input only], bin object ] */
+    /* public name => [ ldap name, sanitize string [input only], bin object, dn to other entry ] */
     const attrMap = [
-        'type' => ['kedContentType', true, false],
-        'name' => ['kedName', true, false],
-        'id' => ['kedId', false, false],
-        'created'  => ['kedTimestamp', false, false],
-        'modified' => ['kedModified', false, false],
-        'deleted' => ['kedDeleted', false, false],
-        'signature' => ['kedSignature', false, false],
-        'application' => ['kedApplication', true, false],
-        'content' => ['kedContent', false, false],
+        'type' => ['kedContentType', true, false, false],
+        'name' => ['kedName', true, false, false],
+        'id' => ['kedId', false, false, false],
+        'created'  => ['kedTimestamp', false, false, false],
+        'modified' => ['kedModified', false, false, false],
+        'deleted' => ['kedDeleted', false, false, false],
+        'signature' => ['kedSignature', false, false, false],
+        'application' => ['kedApplication', true, false, false],
+        'content' => ['kedContent', false, false, false],
         /* content ref are, at least, transformed into some URL where client
          * can get the full content of the entry. If this is set, it means
          * the content is preview. Usefull for storing image in smaller size
          * into content and a accessible full size image.
          * Content should be limited to somthing like 2-4k.
          */
-        'contentRef' => ['kedContentReference', false, false]
+        'contentRef' => ['kedContentReference', false, false, false],
+        'taskEnd' => ['kedTaskEnd', false, false, false],
+        'taskDone' => ['kedTaskDone', false, false, false],
+        'taskPrevious' => ['kedTaskPrevious', false, false, true]
     ];
 
     function __construct ($ldapconn, $base)
@@ -70,20 +72,6 @@ class ked {
         error_log(sprintf('ked:%s: LOGIC:<%s>', $function, $message));
     }
 
-    function filterResult (array &$entry) {
-        $keys = array_keys($entry);
-        foreach ($keys as $k) {
-            if (substr($k, 0, 2) === '__') { unset($entry[$k]); }
-            switch ($k) {
-                case 'deleted':
-                case 'modified':
-                case 'created':
-                    $entry[$k] = (new DateTime("@$entry[$k]"))->format('c');
-                    
-            }
-        }
-    }
-
     function getLdapValue ($conn, $entry, string $mapName) {
         if (!isset(self::attrMap[$mapName])) { return null; }
         $lattr = self::attrMap[$mapName];
@@ -101,6 +89,25 @@ class ked {
         return $value;
     }
 
+    function convertToTask (string $dn):bool {
+        $classes = $this->getObjectClasses($dn);
+        if (empty($classes)) { return false; }
+        if (in_array('kedTask', $classes)) { return true; }
+        $classes[] = 'kedTask';
+        $res = @ldap_mod_replace($this->rwconn, $dn, [ 'objectClass' => $classes ]);
+        if (!$res) { $this->ldapFail(__FUNCTION__, $this->rwconn); return false; }
+        return true;
+    }
+
+    function revertFromTask (string $dn):void {
+        $classes = $this->getObjectClasses($dn);
+        if (empty($classes)) { return; }
+        if (!($k = array_search('kedTask', $classes))) { return; }
+        unset($classes[$k]);
+        @ldap_mod_del($this->rwconn, $dn, [ 'kedTaskEnd' => [], 'kedTaskDone' => [], 'kedTaskPrevious' => [] ]);
+        @ldap_mod_replace($this->rwconn, $dn, [ 'objectClass' => $classes ]);
+    }
+
     function createDocument (string $name, array $options = []):?string {
         $rdn = $this->createRdn($options);
         /* fill with options first, then overwrite what shouldn't be touched */
@@ -109,8 +116,6 @@ class ked {
         
         $parent = $this->base;
         if (!empty($options['parent'])) {
-            /* cannot create child of deleted parent */
-            if ($parent === null) { return null; } /* no parent, no creation */
             $parent = $options['parent'];
         }
 
@@ -145,10 +150,8 @@ class ked {
         $this->getCurrentEntry($docId, $entryId);
     }
 
-    function createEntry (string $docId, ?string $content, array $options = []):?string {
+    function createEntry (string $docDn, ?string $content, array $options = []):?string {
         $rdn = $this->createRdn($options);
-        $base = $this->getDocumentDn($docId);
-        if ($base === null) { return null; }
 
         /* fill with options first, then overwrite what shouldn't be touched */
         $entry = [];
@@ -171,7 +174,7 @@ class ked {
         }
 
         /* base is from configuration, rdn is generated, no need to escape */
-        $dn = sprintf('%s,%s', $rdn[0], $base);
+        $dn = sprintf('%s,%s', $rdn[0], $docDn);
         $res = @ldap_add($this->rwconn, $dn, $entry);
         if (!$res) { $this->ldapFail(__FUNCTION__, $this->rwconn); return null; }
         if (isset($options['__update'])) { // when we call from updateEntry, we want to have previous entry full dn
@@ -202,7 +205,30 @@ class ked {
             $value = $this->getLdapValue($conn, $entry, $attr);
             if ($value !== null) { $currentEntry[$attr] = $value; }
         }
+        $objectclasses = ldap_get_values($conn, $entry, 'objectClass');
+        unset($objectclasses['count']);
+        $currentEntry['+class'] = [];
+        foreach($objectclasses as $type) {
+            switch ($type) {
+                case 'kedEntry': $currentEntry['+class'][] = 'entry'; break;
+                case 'kedDocument': $currentEntry['+class'][] = 'document'; break;
+                case 'kedTask': $currentEntry['+class'][] = 'task'; break;
+                case 'kedEvent': $currentEntry['+class'][] = 'event'; break;
+            }
+        }
+
         return $currentEntry;
+    }
+
+    function getObjectClasses ($dn):array {
+        $res = @ldap_read($this->conn, $dn, '(objectclass=*)', [ 'objectclass' ]);
+        if (!$res) { $this->ldapFail(__FUNCTION__, $this->conn); return []; }
+        $entry = @ldap_first_entry($this->conn, $res);
+        if (!$entry) { $this->ldapFail(__FUNCTION__, $this->conn); return []; }
+        $classes = @ldap_get_values($this->conn, $entry, 'objectClass');
+        if (!$classes) { $this->ldapFail(__FUNCTION__, $this->conn); return []; }
+        unset($classes['count']);
+        return $classes;
     }
 
     /* Return document content */
@@ -265,9 +291,7 @@ class ked {
     }
 
     /* Return the entry currently active for given entry and document id */
-    function getCurrentEntry (string $docId, string $entryId):array {
-        $docDn = $this->getDocumentDn($docId);
-        if ($docDn === null) { return null; }
+    function getCurrentEntry (string $docDn, string $entryId):?array {
         $filter = $this->buildFilter('(&(objectclass=kedEntry)(kedId=%s)(!(kedNext=*))(!(kedDeleted=*)))', $entryId);
         $res = @ldap_list($this->conn, $docDn, $filter, [ '*' ]);
         if (!$res) { $this->ldapFail(__FUNCTION__, $this->conn); return null; }
@@ -284,10 +308,8 @@ class ked {
     }
 
     /* Return historic entries for given entry and document id */
-    function getEntryHistory (string $docId, string $entryId):array {
+    function getEntryHistory (string $docDn, string $entryId):array {
         $history = [];
-        $docDn = $this->getDocumentDn($docId);
-        if ($docDn === null) { return $history; }
         $filter = $this->buildFilter('(&(objectclass=kedEntry)(kedId=%s)(!(kedDeleted=*))(kedNext=*))', $entryId);
         $res = @ldap_list($this->conn, $docDn, $filter, [ '*' ]);
         if (!$res) { $this->ldapFail(__FUNCTION__, $this->conn); return $history; }
@@ -322,15 +344,15 @@ class ked {
         return $currentEntry['id'];
     }
 
-    function updateEntry (string $docId, string $entryId, string $content, array $options = []):string {
-        $currentEntry = $this->getCurrentEntry($docId, $entryId);
+    function updateEntry (string $docDn, string $entryId, string $content, array $options = []):?string {
+        $currentEntry = $this->getCurrentEntry($docDn, $entryId);
         if ($currentEntry === null)  { return null; }
         $options['id'] = $currentEntry['id'];
         if (empty($options['type']) && !empty($currentEntry['type'])) {
             $options['type'] = $currentEntry['type']; // type is copied over
         }
         $options['__update'] = true;
-        $newEntryDn = $this->createEntry($docId, $content, $options);
+        $newEntryDn = $this->createEntry($docDn, $content, $options);
         if ($newEntryDn === null) { return null; } 
         $updateCurrent = ['kedModified' => time(), 'kedNext' => $newEntryDn];
         $res = ldap_mod_replace($this->rwconn, $currentEntry['__dn'], $updateCurrent);
