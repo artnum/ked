@@ -42,7 +42,7 @@ olcMonitoring: FALSE
 olcDbDirectory: /tmp/ked/db
 olcDbCheckpoint: 512 30
 olcDbNoSync: FALSE
-olcDbIndex: objectClass eq
+olcDbIndex: objectClass,kedId eq
 olcDbMaxReaders: 0
 olcDbMaxSize: 10485760
 olcDbMode: 0600
