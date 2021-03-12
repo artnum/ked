@@ -72,5 +72,20 @@ function getDocument (event) {
         method: 'POST',
         body: JSON.stringify(body)
     }).then(out)
+}
 
+function addEntry (event) {
+    const path = event.target.nextElementSibling.value
+    const files = event.target.nextElementSibling.nextElementSibling.files
+    if (files.length < 1) { return }
+    const file = files.item(0)
+    let query = new FormData()
+    query.append('operation', 'add-entry')
+    query.append('file', file)
+    query.append('path', path)
+    query.append('_filename', file.name)
+    fetch(url, {
+        method: 'POST',
+        body: query
+    }).then(out)
 }

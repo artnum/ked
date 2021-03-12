@@ -108,6 +108,23 @@ class ked {
         @ldap_mod_replace($this->rwconn, $dn, [ 'objectClass' => $classes ]);
     }
 
+    function sanitizeOptions (&$entry, $options) {
+        foreach (self::attrMap as $attr => $lattr) {
+            if (!empty($options[$attr])) {
+                if (is_array($options[$attr])) {
+                    $entry[$lattr[0]] = [];
+                    foreach ($options[$attr] as $value) {
+                        if (is_scalar($value) && !in_array($value, $entry[$lattr[0]], true)) {
+                            $entry[$lattr[0]][] = $lattr[1] ? $this->sanitizeString((string)$value) : (string)$value;
+                        }
+                    }
+                } else {
+                    $entry[$lattr[0]] = $lattr[1] ? $this->sanitizeString($options[$attr]) : $options[$attr];
+                }
+            }
+        }
+    }
+
     function createDocument (string $name, array $options = []):?string {
         $rdn = $this->createRdn($options);
         /* fill with options first, then overwrite what shouldn't be touched */
@@ -119,20 +136,7 @@ class ked {
             $parent = $options['parent'];
         }
 
-        foreach (self::attrMap as $attr => $lattr) {
-            if (!empty($options[$attr])) {
-                if (is_array($options[$attr])) {
-                    $document[$lattr[0]] = [];
-                    foreach ($options[$attr] as $value) {
-                        if (is_scalar($value) && !in_array($value, $document[$lattr[0]], true)) {
-                            $document[$lattr[0]][] = $lattr[1] ? $this->sanitizeString((string)$value) : (string)$value;
-                        }
-                    }
-                } else {
-                    $document[$lattr[0]] = $lattr[1] ? $this->sanitizeString($options[$attr]) : $options[$attr];
-                }
-            }
-        }
+        $this->sanitizeOptions($document, $options);
         $document['kedId'] = $rdn[1];
         $document['kedTimestamp'] = $rdn[2];
         $document['kedModified'] = $rdn[2];
@@ -155,11 +159,7 @@ class ked {
 
         /* fill with options first, then overwrite what shouldn't be touched */
         $entry = [];
-        foreach (self::attrMap as $attr => $lattr) {
-            if (!empty($options[$attr])) {
-                $entry[$lattr[0]] = $lattr[1] ? $this->sanitizeString($options[$attr]) : $options[$attr];
-            }
-        }
+        $this->sanitizeOptions($entry, $options);
         $entry['kedId'] = $rdn[1];
         $entry['kedTimestamp'] = $rdn[2];
         $entry['kedModified'] = $rdn[2];

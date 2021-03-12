@@ -45,6 +45,21 @@ class high extends ked {
         return true;
     }
 
+    function hash ($content, $isFile = false) {
+        $ctx = sodium_crypto_generichash_init('');
+        if (!$isFile) {
+            sodium_crypto_generichash_update($ctx, $content);
+        } else {
+            $fp = fopen($content, 'r');
+            while (($part = fread($fp, 4096))) {
+                sodium_crypto_generichash_update($ctx, $part);
+            }
+            fclose($fp);
+        }
+
+        return sodium_bin2hex(sodium_crypto_generichash_final($ctx));
+    }
+
     function getFilePath (string $hash):string {
         return sprintf('%s/%s/%s/%s', $this->store, substr($hash, 0, 2), substr($hash, 2, 2), $hash);
     }
@@ -64,6 +79,15 @@ class high extends ked {
             $this->filterConvertResult($object);
             $documents[] = $object;
         }
+        /* specify attribute to avoir reading content while listing */
+        $res = @ldap_list($this->conn, $currentDir, '(&(objectClass=kedEntry)(!(kedDeleted=*))(!(kedNext=*)))', [ 'objectClass', 'dn', 'kedTimestamp', 'kedId', 'kedContentType', 'kedNext', 'kedDeleted', 'kedModified', 'kedSignature', 'kedApplication', 'kedContentReference']);
+        if (!$res) { $this->ldapFail(__FUNCTION__, $this->conn); return null; }
+        for ($entry = @ldap_first_entry($this->conn, $res); $entry; $entry = @ldap_next_entry($this->conn, $entry)) {
+            $object = $this->getLdapObject($this->conn, $entry);
+            $this->filterConvertResult($object);
+            $documents[] = $object;
+        }
+
         return $documents;
     }
 
@@ -103,7 +127,7 @@ class high extends ked {
 
     /* return basic info on path */
     function getInfo (string $path):?array {
-        $dn = $this->pathToDn($path);
+        $dn = $this->pathToDn($path, false);
         if ($dn === null) { return null; }
         $metadata = $this->getMetadata($dn);
         if (empty($metadata['+class'])) {
@@ -168,18 +192,22 @@ class high extends ked {
     }
 
     /* works with utf8 */
-    function addTextEntry (string $docId, string $text, string $type = 'text/plain'):?string {
+    function addTextEntry (string $path, string $text, string $type = 'text/plain', $application = null):?string {
+        $docDn = $this->pathToDn($path);
+        if ($docDn === null) { return null; }
+
         $textSize = strlen($text);
         if ($textSize <= $this->maxTextSize) {
-            return $this->createEntry($docId, $text, ['type' => $type]);
+            return $this->createEntry($docDn, $text, ['type' => $type]);
         } else {
-            /* no need for crypto sercure hash */
-            $hash = sha1($text);
+            $hash = $this->hash($text);
             $filepath = $this->getFilePath($hash);
             if (!$this->createStorePath($filepath)) { return null; }
-            $written = file_put_contents($filepath, $text);
-            if (!$written) { return null; }
-            if ($written < $textSize) { return null; }
+            if (!file_exists($filepath)) {               
+                $written = file_put_contents($filepath, $text);
+                if (!$written) { return null; }
+                if ($written < $textSize) { return null; }
+            }
             $subtext = '';
             switch ($type) {
                 /* default split to a space near the end if possible */
@@ -193,11 +221,30 @@ class high extends ked {
                     }
                     break;                    
             }
-            return $this->createEntry($docId, $subtext, ['type' => $type, 'contentRef' => $hash]);
+            return $this->createEntry($docDn, $subtext, ['type' => $type, 'contentRef' => $hash, 'application' => $application]);
         }
     }
 
-    function addImageEntry (string $docId, string $file):?string {
+    function addBinaryEntry (string $path, string $file, string $filetype = 'application/octet-stream',  array $application = []):?string {
+        $docDn = $this->pathToDn($path);
+        if ($docDn === null) { return null; }
+        if (!$this->store) { return null; }
+        
+        $hash = $this->hash($file, true);
+        $filepath = $this->getFilePath($hash);
+        if (!$this->createStorePath($filepath)) { return null; }
+        if (file_exists($filepath)) {
+            @unlink($file); // already available
+        } else {
+            if (!rename($file, $filepath)) { return null; }
+        }
+
+        return $this->createEntry($docDn, null, [ 'type' => $filetype, 'contentRef' => $hash, 'application' => $application ]);
+    }
+
+    function addImageEntry (string $path, string $file, array $application = []):?string {
+        $docDn = $this->pathToDn($path);
+        if ($docDn === null) { return null; }
         if (!$this->store) { return null; }
         $content = '';
 
@@ -223,13 +270,16 @@ class high extends ked {
             return null;
         }
 
-        /* no need for crypto secure hash, sha1 is good enough */
-        $hash = sha1_file($file);
+        $hash = $this->hash($file, true);
         $filepath = $this->getFilePath($hash);
         if (!$this->createStorePath($filepath)) { return null; }
-        if (!rename($file, $filepath)) { return null; }
+        if (file_exists($filepath)) {
+            @unlink($file); // already available
+        } else {
+            if (!rename($file, $filepath)) { return null; }
+        }
 
-        return $this->createEntry($docId, $content, [ 'type' => $imageType, 'contentRef' => $hash ]);
+        return $this->createEntry($docDn, $content, [ 'type' => $imageType, 'contentRef' => $hash, 'application' => $application ]);
     }
 }
 
