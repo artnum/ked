@@ -83,14 +83,60 @@ class high extends ked {
         }
     }
 
-    function pathToDn (string $path):?string {
+    /* The deeper you go, the slower it gets. But the tree of document is made
+     * made by people, so it won't too deep. 
+     */
+    function pathToDn (string $path, bool $docOnly = true):?string {
+        if ($path === '') { return $this->base; }
         $elements = explode(self::PATH_SEPARATOR, $path);
         $currentDir = $this->base;
         foreach ($elements as $dir) {
-            $currentDir = $this->getDocumentDn($dir, false, ['base' => $currentDir]);
+            if ($docOnly) {
+                $currentDir = $this->getDocumentDn($dir, false, ['parent' => $currentDir]);
+            } else {
+                $currentDir = $this->getDn($dir, false, ['parent' => $currentDir]);
+            }
             if ($currentDir === null)  { return null; }
         }
         return $currentDir;
+    }
+
+    /* return basic info on path */
+    function getInfo (string $path):?array {
+        $dn = $this->pathToDn($path);
+        if ($dn === null) { return null; }
+        $metadata = $this->getMetadata($dn);
+        if (empty($metadata['+class'])) {
+            /* root */
+            $metadata['+class'] = [ 'root', 'document' ];
+            $metadata['name'] = '[root]';
+        }
+        return $metadata;
+    }
+
+    function dnToPath (string $dn, bool $parent = false):string {
+        if ($dn === '') { return ''; }
+        $path = [];
+        $comp = explode(',', $dn);
+        $base = explode(',', $this->base);
+
+        while (($c1 = array_pop($base))) {
+            $c2 = array_pop($comp);
+            if (!$c2) { return ''; }
+            if ($c1 !== $c2) { return ''; }
+        }
+        if ($parent) { array_shift($comp); }
+        if (empty($comp)) { return ''; }
+        while (($c = array_pop($comp))) {
+            $sub = explode('+', $c);
+            $x = '';
+            foreach ($sub as $s) {
+                if (substr($s, 0, 6) === 'kedId=') { $x = $s; break; }
+            }
+            if ($x === '') { return ''; }
+            $path[] = substr($x, 6);
+        }
+        return implode(self::PATH_SEPARATOR, $path);
     }
 
     function addDocument (string $name, ?string $parent, $application = null) {
@@ -112,6 +158,13 @@ class high extends ked {
             $options['parent'] = $parent;
         }
         return $this->createDocument($name, $options);
+    }
+
+    function getDocument (string $docDn):array {
+        $document = parent::getDocument($docDn);
+        $this->filterConvertResult($document);
+
+        return $document;
     }
 
     /* works with utf8 */

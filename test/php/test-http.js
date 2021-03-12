@@ -60,3 +60,17 @@ function listDocument (event) {
         body: JSON.stringify(body)
     }).then(out)
 }
+
+function getDocument (event) {
+    const path = event.target.nextElementSibling.value
+    if (!(path && path !== null)) { return }
+    const body = {
+        operation: 'get-document',
+        path
+    }
+    fetch (url, {
+        method: 'POST',
+        body: JSON.stringify(body)
+    }).then(out)
+
+}
