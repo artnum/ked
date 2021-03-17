@@ -221,6 +221,16 @@ class ked {
     }
 
     function getMetadata (string $dn):?array {
+        $res = @ldap_read($this->conn, $dn, '(objectclass=*)', [ 
+            'kedId', 'kedTimestamp', 'kedDeleted', 'kedModified', 'objectClass', 'kedContentType', 'kedSignature'
+            ]);
+        if (!$res) { $this->ldapFail(__FUNCTION__, $this->conn); return null; }
+        $entry = @ldap_first_entry($this->conn, $res);
+        if (!$entry) { $this->ldapFail(__FUNCTION__, $this->conn); return null; }
+        return $this->getLdapObject($this->conn, $entry);
+    }
+
+    function getAll (string $dn):?array {
         $res = @ldap_read($this->conn, $dn, '(objectclass=*)', [ '*' ]);
         if (!$res) { $this->ldapFail(__FUNCTION__, $this->conn); return null; }
         $entry = @ldap_first_entry($this->conn, $res);
@@ -265,6 +275,18 @@ class ked {
         }
 
         return $document;
+    }
+
+    function listDocumentEntries (string $docDn):array {
+        $entries = [];
+        $res = @ldap_list($this->conn, $docDn, '(&(objectclass=kedEntry)(!(kedNext=*))(!(kedDeleted=*)))', [ 
+            'kedId', 'kedTimestamp', 'kedDeleted', 'kedModified', 'objectClass', 'kedContentType', 'kedSignature'
+        ]);
+        if (!$res) { $this->ldapFail(__FUNCTION__, $this->conn); return $entries; }
+        for ($e = @ldap_first_entry($this->conn, $res); $e; $e = @ldap_next_entry($this->conn, $e)) {
+            $entries[] = $this->getLdapObject($this->conn, $e);
+        }
+        return $entries;
     }
 
     function countDocumentEntries (string $docDn):int {
@@ -418,6 +440,16 @@ class ked {
         if (!$dn) { $this->ldapFail(__FUNCTION__, $this->conn); return null; }
 
         return $dn;
+    }
+
+    function deleteByDn (string $dn):bool {
+        $meta = $this->getMetadata($dn);
+        if (empty($meta['deleted'])) {
+            $mod = ['kedDeleted' => time() ];
+            $res = @ldap_mod_add($this->rwconn, $meta['__dn'], $mod);
+            if (!$res) { $this->ldapFail(__FUNCTION__, $this->rwconn); return false; }
+            return true;
+        }
     }
 }
 

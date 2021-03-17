@@ -139,7 +139,7 @@ class http {
             case 'get':
                 $path = '';
                 if (!empty($_SERVER['PATH_INFO'])) { $path = str_replace('/', '', $_SERVER['PATH_INFO']); }
-                $info = $this->ked->getInfo($path);
+                $info = $this->ked->getAll($path, false);
                 if ($info === null) { $this->errorNotFound(); }
                 if (in_array('document', $info['+class'])) {
                     $childs = $this->ked->listDirectory($info['__dn']);
@@ -184,6 +184,10 @@ class http {
                 }
                 if ($body === null) { $this->errorBodyContent(); }
                 if (empty($body['operation'])) { $this->errorBadRequest(); }
+                /* body path in PATH_INFO is logical */
+                if (empty($body['path'])) {
+                    if (!empty($_SERVER['PATH_INFO'])) { $body['path'] = str_replace('/', '', $_SERVER['PATH_INFO']); }
+                }
                 $this->postOperation($body);
                 break;
             case 'head':
@@ -222,7 +226,11 @@ class http {
                     $parent = $this->ked->pathToDn($body['path']);
                     if ($parent === null) { $this->errorNotFound(); }
                 }
-                $documents = $this->ked->listDirectory($parent);
+                $extended = false;
+                if (!empty($body['format']) && strtolower($body['format']) === 'extended') {
+                    $extended = true;
+                }
+                $documents = $this->ked->listDirectory($parent, $extended);
                 if ($documents === null) { $this->errorUnableToOperate(); }
                 $this->ok(json_encode(['documents' => $documents]));
                 break;
@@ -261,6 +269,13 @@ class http {
                 }
                 if ($id === null) { $this->errorUnableToOperate(); }
                 $this->ok(json_encode(['id' => $id]));
+                break;
+            case 'delete':
+                if (empty($body['path'])) { $this->errorBadRequest(); }
+                $anyDn = $this->ked->pathToDn($body['path'], false);
+                if ($anyDn === NULL) { $this->errorNotFound(); }
+                $deleted = $this->ked->deleteByDn($anyDn);
+                $this->ok(json_encode(['path' => $body['path'], 'deleted' => $deleted]));
                 break;
         }
     }

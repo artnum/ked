@@ -7,7 +7,11 @@
         <textarea id="results" cols="200" rows="48"></textarea><br/>
         <button onclick="createDocument(event)">Créer document</button> Nom : <input type="text" name="name"></input> Parent : <input type="text" name="parent"></input> Étiquettes : <input type="text" name="tags"></input><br/>
         <button onclick="listDocument(event)">Lister les document</button> Chemin : <input type="text" name="path"></input><br />
+        <button onclick="listDocumentExtended(event)">Lister les document [étendu]</button> Chemin : <input type="text" name="path"></input><br />
+
         <button onclick="getDocument(event)">Obtenir un document</button> Chemin : <input type="text" name="path"></input><br />
         <button onclick="addEntry(event)">Ajouter une entrée à un document</button> Chemin : <input type="text" name="path"></input><input type="file" name="file"></input><br />
+        <button onclick="deleteAny(event)">Supprimer l'élément</button> Chemin : <input type="text" name="path"></input><br />
+
     </body>
 </html>

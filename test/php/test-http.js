@@ -74,6 +74,20 @@ function getDocument (event) {
     }).then(out)
 }
 
+function listDocumentExtended (event) {
+    const path = event.target.nextElementSibling.value
+    const body = {
+        operation: 'list-document',
+        format: 'extended'
+    }
+    if (path && path !== '') {
+        body['path'] = path
+    }
+    fetch(url,{
+        method: 'POST',
+        body: JSON.stringify(body)
+    }).then(out)
+}
 function addEntry (event) {
     const path = event.target.nextElementSibling.value
     const files = event.target.nextElementSibling.nextElementSibling.files
@@ -88,4 +102,13 @@ function addEntry (event) {
         method: 'POST',
         body: query
     }).then(out)
+}
+
+function deleteAny (event) {
+    const path = event.target.nextElementSibling.value
+    const body = {
+        operation: 'delete',
+        path
+    }
+    fetch (url, { method: 'POST', body: JSON.stringify(body)}).then(out)
 }

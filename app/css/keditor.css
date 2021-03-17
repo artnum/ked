@@ -1,0 +1,16 @@
+.keditorRoot {
+    width: 800px;
+    max-width: 800px;
+    margin: auto;
+}
+
+.keditorRoot .document img {
+    width: 200px;
+    height: 200px;
+    object-fit: cover;
+    margin: 4px;
+}
+
+.keditorRoot .document .plaintext {
+    font-family: monospace;
+}

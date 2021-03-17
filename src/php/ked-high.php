@@ -64,7 +64,7 @@ class high extends ked {
         return sprintf('%s/%s/%s/%s', $this->store, substr($hash, 0, 2), substr($hash, 2, 2), $hash);
     }
 
-    function listDirectory (?string $path):?array {
+    function listDirectory (?string $path, bool $extended = false):?array {
         $currentDir = $this->base;
         if ($path !== null) {
             $currentDir = $path;
@@ -75,8 +75,15 @@ class high extends ked {
         for ($entry = @ldap_first_entry($this->conn, $res); $entry; $entry = @ldap_next_entry($this->conn, $entry)) {
             $object = $this->getLdapObject($this->conn, $entry);
             $object['+childs'] = $this->countDocumentChilds($object['__dn']);
-            $object['+entries'] = $this->countDocumentEntries($object['__dn']);
-            $this->filterConvertResult($object);
+            if ($extended) {
+                $object['+entries'] = $this->listDocumentEntries($object['__dn']);
+                foreach ($object['+entries'] as $k => $child) {
+                    $object['+entries'][$k] = $this->filterConvertResult($child);
+                }
+            } else {
+                $object['+entries'] = $this->countDocumentEntries($object['__dn']);
+            }
+            $object = $this->filterConvertResult($object);
             $documents[] = $object;
         }
         /* specify attribute to avoir reading content while listing */
@@ -84,14 +91,14 @@ class high extends ked {
         if (!$res) { $this->ldapFail(__FUNCTION__, $this->conn); return null; }
         for ($entry = @ldap_first_entry($this->conn, $res); $entry; $entry = @ldap_next_entry($this->conn, $entry)) {
             $object = $this->getLdapObject($this->conn, $entry);
-            $this->filterConvertResult($object);
+            $object = $this->filterConvertResult($object);
             $documents[] = $object;
         }
 
         return $documents;
     }
 
-    function filterConvertResult (array &$entry) {
+    function filterConvertResult (array $entry) {
         $keys = array_keys($entry);
         foreach ($keys as $k) {
             if (substr($k, 0, 2) === '__') { unset($entry[$k]); }
@@ -105,6 +112,7 @@ class high extends ked {
                     break;
             }
         }
+        return $entry;
     }
 
     /* The deeper you go, the slower it gets. But the tree of document is made
@@ -126,7 +134,7 @@ class high extends ked {
     }
 
     /* return basic info on path */
-    function getInfo (string $path):?array {
+    function getInfo (string $path, $filter = true):?array {
         $dn = $this->pathToDn($path, false);
         if ($dn === null) { return null; }
         $metadata = $this->getMetadata($dn);
@@ -135,7 +143,20 @@ class high extends ked {
             $metadata['+class'] = [ 'root', 'document' ];
             $metadata['name'] = '[root]';
         }
+        if ($filter) { $metadata = $this->filterConvertResult($metadata); }
         return $metadata;
+    }
+
+    function getAll (string $path, $filter = true):?array {
+        $dn = $this->pathToDn($path, false);
+        if ($dn === null) { return null; }
+        $data = parent::getAll($dn);
+        if (empty($data['+class'])) {
+            $data['+class'] = [ 'root', 'document' ];
+            $data['name'] = '[root]';
+        }
+        if ($filter) { $data = $this->filterConvertResult($data); }
+        return $data;
     }
 
     function dnToPath (string $dn, bool $parent = false):string {
@@ -186,7 +207,7 @@ class high extends ked {
 
     function getDocument (string $docDn):array {
         $document = parent::getDocument($docDn);
-        $this->filterConvertResult($document);
+        $document = $this->filterConvertResult($document);
 
         return $document;
     }
