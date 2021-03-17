@@ -222,7 +222,7 @@ class ked {
 
     function getMetadata (string $dn):?array {
         $res = @ldap_read($this->conn, $dn, '(objectclass=*)', [ 
-            'kedId', 'kedTimestamp', 'kedDeleted', 'kedModified', 'objectClass', 'kedContentType', 'kedSignature'
+            'kedId', 'kedTimestamp', 'kedDeleted', 'kedModified', 'objectClass', 'kedContentType', 'kedSignature', 'kedApplication'
             ]);
         if (!$res) { $this->ldapFail(__FUNCTION__, $this->conn); return null; }
         $entry = @ldap_first_entry($this->conn, $res);

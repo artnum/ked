@@ -1,16 +1,68 @@
+@import url('https://fonts.googleapis.com/css?family=B612+Mono&display=swap');
+
 .keditorRoot {
     width: 800px;
     max-width: 800px;
     margin: auto;
 }
 
-.keditorRoot .document img {
+.keditorRoot .kimage {
     width: 200px;
     height: 200px;
     object-fit: cover;
     margin: 4px;
 }
 
+.keditorRoot .document .kmetadata.childs {
+    cursor: pointer;
+}
+
+.keditorRoot .kdropme {
+    border: 6px solid red !important;
+}
+
 .keditorRoot .document .plaintext {
     font-family: monospace;
+}
+
+.keditorRoot .kmetadata {
+    font-family: 'B612 Mono', monospace;
+    background-color: black;
+    color: white;
+    margin-bottom: 1ex;
+    padding: 4px;
+    min-height: 2.6em;
+}
+
+.keditorRoot .klink {
+    display: block;
+    width: 200px;
+    height: 200px;
+    margin: 4px;
+    font-size: 0.8em;
+    font-family: monospace;
+    text-decoration: none;
+    display: flex;
+    justify-content: center;
+    background-image: url('../images/document.png');
+    color: black;
+}
+
+.keditorRoot .klink .name {
+    align-self: flex-end;
+}
+
+@media (width < 860px) {
+    .keditorRoot {
+        width: 100%;
+        max-width: 100%;
+        padding: 4px,
+    }
+
+    .keditorRoot .document img {
+        width: calc(50vw - 16px);
+        height: calc(50vw - 16px);
+    }
+
+
 }

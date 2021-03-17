@@ -86,6 +86,7 @@ KEditor.prototype.interact = function (event) {
     if (!node) { return }
     switch (event.type) {
         case 'click':
+            if (node.dataset.childs <= 0) { return }
             this.cd(node.dataset.pathid)           
             window.history.pushState({path: this.cwd}, '')
             this.ls()
@@ -108,6 +109,7 @@ KEditor.prototype.renderEntry = function (path, entry) {
             case 'image':
                 htmlnode = document.createElement('IMG')
                 htmlnode.src = this.buildPath(path, entry.id)
+                htmlnode.classList.add('kimage')
                 resolve(htmlnode)
                 return
             case 'text':
@@ -140,6 +142,15 @@ KEditor.prototype.renderEntry = function (path, entry) {
                 })
                 .catch(_ => resolve(null))
                 return
+            default: 
+                htmlnode = document.createElement('A')
+                htmlnode.classList.add('klink')
+                htmlnode.href = this.buildPath(path, entry.id)
+                let oname = entry.application?.find(value => value.startsWith('ked:name='))
+                if (oname) { oname = oname.split('=')[1] }
+                htmlnode.innerHTML = `<span class="name">${oname ? oname : ''}</span>`
+                resolve(htmlnode)
+                return
         }
     })
 }
@@ -160,15 +171,45 @@ KEditor.prototype.render = function (root) {
                     (new Promise((resolve, reject) => {
                         let htmlnode
                     
-                        doc.type = 'document'
-                        if (doc['+class'].indexOf('entry') != -1) { doc.type = 'entry' }
+                        doc.class = 'document'
+                        if (doc['+class'].indexOf('entry') != -1) { doc.class = 'entry' }
 
-                        switch (doc.type) {
+                        switch (doc.class) {
                             case 'document':
+                                let date = new Date(doc.created)
                                 htmlnode = document.createElement('DIV')
-                                htmlnode.innerHTML = `<div class="kmetadata">${doc.name} - ${doc['+childs']}</div>`
+                                htmlnode.innerHTML = `<div class="kmetadata ${doc['+childs'] > 0 ? 'childs' : ''}">
+                                    ${new Intl.DateTimeFormat(navigator.language).format(date)} ${doc.name}
+                                    ${doc['+childs'] > 0 ? '<img clas="kicon" src="../images/next.png" />' : ''}
+                                    </div>`
                                 htmlnode.dataset.pathid = doc.id
+                                htmlnode.dataset.childs = doc['+childs']
                                 htmlnode.classList.add('document')
+                                htmlnode.addEventListener('dragover', (event) => { event.preventDefault() })
+                                htmlnode.addEventListener('dragenter', (event) => { 
+                                    let node = event.target
+                                    while (node && ! node.dataset?.pathid) { node = node.parentNode }
+                                    if (node.dataset.kedDrageCounter === undefined) {
+                                        node.dataset.kedDrageCounter = 0
+                                    }
+                                    node.dataset.kedDrageCounter++
+                                    window.requestAnimationFrame(() => {
+                                        node.classList.add('kdropme')
+                                    })
+                                    event.preventDefault() 
+                                })
+                                htmlnode.addEventListener('dragleave', (event) => { 
+                                    let node = event.target
+                                    while (node && ! node.dataset?.pathid) { node = node.parentNode }
+                                    node.dataset.kedDrageCounter--
+                                    window.requestAnimationFrame(() => {
+                                        if (node.dataset.kedDrageCounter <= 0) {
+                                            node.classList.remove('kdropme')
+                                        }
+                                    })
+                                    event.preventDefault() 
+                                })
+
                                 let p = []
                                 for (let j = 0; j < doc['+entries'].length; j++) {
                                     let entry = doc['+entries'][j]
@@ -178,16 +219,18 @@ KEditor.prototype.render = function (root) {
                                 .then(nodes => {
                                     for (let i = 0; i < nodes.length; i++) {
                                         if (nodes[i] === null) { continue; }
-                                        htmlnode.appendChild(nodes[i])
+                                        switch(nodes[i].nodeName) {
+                                            case 'IMG':
+                                            case 'A':
+                                                htmlnode.appendChild(nodes[i])
+                                                break;
+                                            case 'DIV':
+                                                htmlnode.insertBefore(nodes[i], htmlnode.firstChild.nextElementSibling)
+                                                break
+
+                                        }
                                     }
                                     resolve(htmlnode)
-                                })
-                                break;
-                            case 'entry':
-                                this.renderEntry(`${this.baseUrl.toString()}/${this.cwd}`, doc)
-                                .then(node => { 
-                                    node.classList.add('entry')
-                                    resolve(node)
                                 })
                                 break
                         }
