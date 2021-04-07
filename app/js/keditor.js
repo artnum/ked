@@ -3,6 +3,13 @@ function KEditor(container, baseUrl) {
     this.baseUrl = baseUrl
     this.cwd = ''
 
+    this.data = {}
+
+    /* bind edit function to this ... not sure of that but it works */
+    for (let k in this.edit) {
+        this.edit[k] = this.edit[k].bind(this)
+    }
+
     //this.container.addEventListener('click', this.interact.bind(this))
     window.addEventListener('popstate', (event) => {
         if (event.state === null) { 
@@ -102,6 +109,25 @@ KEditor.prototype.buildPath = function (comp0, comp1) {
     if (comp0 !== ',') { return `${comp0},${comp1}`}
 }
 
+KEditor.prototype.edit = {
+    quills: function (contentNode) {
+        contentNode.innerHTML = '<div></div>'
+        let content = this.data[contentNode.dataset.entryid]
+        const quill = new Quill(contentNode.firstElementChild, {
+            theme: 'snow',
+            modules: {
+                toolbar: true
+            }
+        })
+        quill.setContents(content)
+    },
+    text: function (contentNode) {
+        let content = this.data[contentNode.dataset.entryid]
+        contentNode.innerHTML = '<textarea style="width: calc(100% - 8px); height: 380px"></textarea>'
+        contentNode.firstElementChild.value = content
+    }
+}
+
 KEditor.prototype.renderEntry = function (path, entry) {
     return new Promise ((resolve, reject) => {
         if (!entry.type) { resolve(null); return; }
@@ -142,18 +168,25 @@ KEditor.prototype.renderEntry = function (path, entry) {
                                 resolve(htmlnode)
                                 return
                             case 'x-quill-delta':
+                                /* we display a transformed version, so keep data as original form */
+                                this.data[entry.id] = JSON.parse(content)
                                 const tmpContainer = document.createElement('DIV')
                                 const quill = new Quill(tmpContainer)
-                                quill.setContents(JSON.parse(content))
+                                quill.setContents(this.data[entry.id])
                                 htmlnode = document.createElement('DIV')
                                 htmlnode.innerHTML = quill.root.innerHTML
                                 htmlnode.classList.add('quilltext')
+                                htmlnode.dataset.edit = 'quills'
+                                htmlnode.dataset.entryid = entry.id
                                 resolve(htmlnode)
                                 return
                             default:
+                                this.data[entry.id] = content
                                 htmlnode = document.createElement('DIV')
                                 htmlnode.innerHTML = content
                                 htmlnode.classList.add('plaintext')
+                                htmlnode.dataset.edit = 'text'
+                                htmlnode.dataset.entryid = entry.id
                                 resolve(htmlnode)
                                 return
                         }
@@ -330,6 +363,25 @@ KEditor.prototype.clear = function () {
     this.clearOnRender = true
 }
 
+KEditor.prototype.handleToolsEvents = function (event) {
+    let kcontainerNode = event.target
+
+    while (kcontainerNode && !kcontainerNode.classList.contains('kentry-container')) { kcontainerNode = kcontainerNode.parentNode }
+    if (!kcontainerNode) { return }
+
+    let ktoolsNode = event.target
+    while (ktoolsNode && !ktoolsNode.dataset?.action) { ktoolsNode = ktoolsNode.parentNode}
+    if (!ktoolsNode) { return }
+
+    switch(ktoolsNode.dataset.action) {
+        case 'edit-entry':
+            if (!kcontainerNode.firstElementChild.dataset?.edit) { return }
+            if (!this.edit[kcontainerNode.firstElementChild.dataset.edit]) { return }
+            this.edit[kcontainerNode.firstElementChild.dataset.edit](kcontainerNode.firstElementChild)
+            break;
+    }
+}
+
 KEditor.prototype.render = function (root) {
     if (!root.documents) { console.log(root); return }
 
@@ -418,17 +470,26 @@ KEditor.prototype.render = function (root) {
                                 .then(nodes => {
                                     for (let i = 0; i < nodes.length; i++) {
                                         if (nodes[i] === null) { continue; }
+                                        const entryContainer = document.createElement('DIV')
+                                        entryContainer.appendChild(nodes[i])
+                                        entryContainer.classList.add('kentry-container')
                                         switch(nodes[i].nodeName) {
                                             case 'IMG':
                                             case 'VIDEO':
                                             case 'A':
-                                                htmlnode.appendChild(nodes[i])
+                                                htmlnode.appendChild(entryContainer)
+                                                entryContainer.classList.add('squared')
                                                 break;
                                             case 'DIV':
-                                                htmlnode.insertBefore(nodes[i], htmlnode.firstChild.nextElementSibling)
+                                                htmlnode.insertBefore(entryContainer, htmlnode.firstChild.nextElementSibling)
+                                                entryContainer.classList.add('flowed')
                                                 break
-
                                         }
+                                        const entryTools = document.createElement('DIV')
+                                        entryTools.classList.add('kentry-tools')
+                                        entryTools.innerHTML = `<span data-action="edit-entry"><i class="fas fa-edit"></i></span>`
+                                        entryTools.addEventListener('click', this.handleToolsEvents.bind(this))
+                                        entryContainer.appendChild(entryTools)
                                     }
                                     resolve(htmlnode)
                                 })

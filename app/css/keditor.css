@@ -10,7 +10,6 @@
     width: 200px;
     height: 200px;
     object-fit: cover;
-    margin: 4px;
 }
 
 .keditorRoot .document .kmetadata.childs {
@@ -24,6 +23,37 @@
 .keditorRoot .document .plaintext {
     font-family: monospace;
 }
+
+.kentry-container {
+    font-size: 0;
+}
+
+.kentry-tools {
+    background-color: hsla(245, 20%, 96%, 1);
+    border-top: 2px solid hsla(245, 20%, 80%, 1);
+    padding: 4px;
+    padding-top: 0px;
+    margin: 0;
+    font-size: 16px;
+}
+
+.kentry-container.squared .kentry-tools {
+    border-top: 2px solid hsla(245, 20%, 60%, 1);
+}
+
+.kentry-container.squared {
+    display: inline-block;
+    width: 200px;
+    margin: 4px;
+    overflow: hidden;
+}
+
+.kentry-container.flowed div {
+    font-size: 12pt;
+    max-height: 400px;
+    overflow-y: auto;
+}
+
 
 .keditorRoot .kmetadata {
     font-family: 'B612 Mono', monospace;
