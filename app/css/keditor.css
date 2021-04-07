@@ -6,7 +6,7 @@
     margin: auto;
 }
 
-.keditorRoot .kimage {
+.keditorRoot .kimage, .keditorRoot .kvideo {
     width: 200px;
     height: 200px;
     object-fit: cover;
@@ -61,17 +61,15 @@
     font-size: 36px;
 }
 
-@media (width < 860px) {
+@media only screen and (max-width: 860px) {
     .keditorRoot {
         width: 100%;
         max-width: 100%;
         padding: 4px,
     }
 
-    .keditorRoot .document img {
-        width: calc(50vw - 16px);
-        height: calc(50vw - 16px);
+    .keditorRoot .document img, .keditorRoot .document video {
+        width: calc(50vw - 18px);
+        height: calc(50vw - 18px);
     }
-
-
 }

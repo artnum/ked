@@ -4,13 +4,13 @@ window.addEventListener('load', (event) => {
 
     const scripts = [
         '../js/keditor.js',
-        '//cdn.quilljs.com/1.3.6/quill.js'
+        '../node_modules/quill/dist/quill.min.js'
     ]
 
     const csss = [
         '../css/keditor.css',
         '../node_modules/@fortawesome/fontawesome-free/css/all.min.css',
-        '//cdn.quilljs.com/1.3.6/quill.snow.css'
+        '../node_modules/quill/dist/quill.snow.css'
     ]
     
     const allLoaded = []

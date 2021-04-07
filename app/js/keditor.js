@@ -108,6 +108,15 @@ KEditor.prototype.renderEntry = function (path, entry) {
         let htmlnode;
         let subtype = entry.type.split('/', 2)
         switch(subtype[0]) {
+            case 'video':
+                htmlnode = document.createElement('VIDEO')
+                htmlnode.src = this.buildPath(path, entry.id)
+                htmlnode.classList.add('kvideo')
+                htmlnode.setAttribute('width', '200px')
+                htmlnode.setAttribute('height', '200px')
+                htmlnode.setAttribute('controls', '')
+                resolve(htmlnode)
+                return
             case 'image':
                 htmlnode = document.createElement('IMG')
                 htmlnode.src = this.buildPath(path, entry.id)
@@ -130,6 +139,15 @@ KEditor.prototype.renderEntry = function (path, entry) {
                                 htmlnode = document.createElement('DIV')
                                 htmlnode.innerHTML = x.getElementsByTagName('BODY')[0].innerHTML
                                 htmlnode.classList.add('htmltext')
+                                resolve(htmlnode)
+                                return
+                            case 'x-quill-delta':
+                                const tmpContainer = document.createElement('DIV')
+                                const quill = new Quill(tmpContainer)
+                                quill.setContents(JSON.parse(content))
+                                htmlnode = document.createElement('DIV')
+                                htmlnode.innerHTML = quill.root.innerHTML
+                                htmlnode.classList.add('quilltext')
                                 resolve(htmlnode)
                                 return
                             default:
@@ -272,13 +290,11 @@ KEditor.prototype.uploadFile = function (docNode, event) {
     .then(_ => {
         this.ls()
     })
-
-    console.log(event)
 }
 
 KEditor.prototype.addTextInteract = function (docNode) {
     const quillNode = document.createElement('div')
-    quillNode.innerHTML = `<div></div>`
+    quillNode.innerHTML = `<div></div><button>Sauver</button>`
     new Promise((resolve, reject) => {
         window.requestAnimationFrame(() => {
           docNode.insertBefore(quillNode, docNode.firstElementChild.nextElementSibling)
@@ -286,10 +302,26 @@ KEditor.prototype.addTextInteract = function (docNode) {
         })
     })
     .then(() => {
-        const quill = new Quill(quillNode.firstElementChild, {theme: 'snow'})
-        quillNode.addEventListener('blur', event => {
-            console.log(event)
-            console.log(quill.getContents())
+        const quill = new Quill(quillNode.firstElementChild, {
+            theme: 'snow',
+            modules: {
+                toolbar: true
+            }
+        })
+        quillNode.lastElementChild.addEventListener('click', event => {
+            clearInterval(quill.editor.timer)
+            const htmlContent = quill.root.innerHTML
+            const deltaContent = quill.getContents()
+            delete quill
+            quillNode.innerHTML = htmlContent
+            const formData = new FormData()
+            const name = `${new Date().toISOString()}`
+            formData.append('operation', 'add-entry')
+            formData.append('path', this.buildPath(this.cwd, docNode.dataset.pathid))
+            formData.append('file', new File([JSON.stringify(deltaContent)], name, {type: "text/x-quill-delta;charset=utf-8"}))
+            formData.append('_filename', name)
+            this.fetch('', formData)
+            .then(_ => {this.ls()})
         })
     })
 }
@@ -388,6 +420,7 @@ KEditor.prototype.render = function (root) {
                                         if (nodes[i] === null) { continue; }
                                         switch(nodes[i].nodeName) {
                                             case 'IMG':
+                                            case 'VIDEO':
                                             case 'A':
                                                 htmlnode.appendChild(nodes[i])
                                                 break;
