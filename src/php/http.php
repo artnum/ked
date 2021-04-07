@@ -48,6 +48,14 @@ class http {
         exit();
     }
 
+    function getBaseName () {
+        $base = $_SERVER['REQUEST_URI'];
+        if (basename($_SERVER['SCRIPT_NAME']) !== basename($base)) {
+            $base .= substr($base, -1) === '/' ? basename($_SERVER['SCRIPT_NAME']) : '/' . basename($_SERVER['SCRIPT_NAME']);
+        }
+        return $base;
+    }
+
     function printDir ($dir, $childs) {
         header('Content-Type: text/html');
         $root = false;
@@ -113,7 +121,7 @@ class http {
                 }
             }
             $this->ok('<div class="entry"><span class="type"><i class="' . $class . '"> </i></span>');
-            $this->ok('<span class="name"><a href="' . ($root ? basename($_SERVER['REQUEST_URI']) . '/' : $this->ked->dnToPath($dir['__dn']) . ',') . $child['id'] . '">' . ($child['name'] ?? $child['id']) . '</a></span>');
+            $this->ok('<span class="name"><a href="' . ($root ? $this->getBaseName() . '/' : $this->ked->dnToPath($dir['__dn']) . ',') . $child['id'] . '">' . ($child['name'] ?? $child['id']) . '</a></span>');
             $this->ok('<span class="childs">' . (!$file ? ($child['+childs'] + $child['+entries']) : '') . '</span>');
             $this->ok('<span class="created">' . $child['created'] . '</span>');
             $this->ok('<span class="modified">' . $child['modified'] . '</span>');
