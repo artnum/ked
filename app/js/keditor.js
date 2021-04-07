@@ -3,7 +3,7 @@ function KEditor(container, baseUrl) {
     this.baseUrl = baseUrl
     this.cwd = ''
 
-    this.container.addEventListener('click', this.interact.bind(this))
+    //this.container.addEventListener('click', this.interact.bind(this))
     window.addEventListener('popstate', (event) => {
         if (event.state === null) { 
             this.cwd = ''
@@ -21,7 +21,9 @@ KEditor.prototype.fetch = function (path, content) {
     return new Promise((resolve, reject) => {
         if (path.length > 0) { path = `/${path}` }
         let url = new URL(`${this.baseUrl.toString()}${path}`)
-        fetch(url, {'method': 'POST', body: JSON.stringify(content)})
+        fetch(url, {'method': 'POST',
+            body: content instanceof FormData ? content : JSON.stringify(content)
+        })
         .then(response => {
             if (!response.ok) {
                 const ret = { 
@@ -80,7 +82,7 @@ KEditor.prototype.cd = function (id) {
 
 KEditor.prototype.interact = function (event) {
     let node = event.target
-    while (node && !node.dataset.pathid) {
+    while (node && !node.dataset?.pathid) {
         node = node.parentNode
     }
     if (!node) { return }
@@ -155,12 +157,167 @@ KEditor.prototype.renderEntry = function (path, entry) {
     })
 }
 
+KEditor.prototype.deleteDocument = function (docNode) {
+    const operation = {
+        operation: 'delete',
+        path: this.buildPath(this.cwd, docNode.dataset.pathid)
+    }
+    this.fetch('', operation)
+}
+
+KEditor.prototype.addDocument = function (title = null, path = null) {
+    const operation = {
+        operation: 'create-document',
+        name: title ? title : 'Sans titre',
+        path: path ? path : this.cwd
+    }
+    this.fetch('', operation)
+    .then(result => {
+        if (!result.ok) { return }
+        if (result.data.id) {
+            this.ls()
+        }
+
+    }) 
+}
+
+KEditor.prototype.dropEntry = function (event) {
+    event.preventDefault()
+    let docNode  = event.target
+    while (docNode && !docNode.dataset?.pathid) { docNode = docNode.parentNode }
+    if (!docNode) { return }
+    const files = event.dataTransfer
+    let allTransfers = []
+    for (let i = 0; i < files.items.length; i++) {
+        if (files.items[i].kind === 'file') {
+            allTransfers.push(new Promise ((resolve, reject) => {
+                const formData = new FormData()
+                const file = files.items[i].getAsFile()
+                formData.append('operation', 'add-entry')
+                formData.append('file', file)
+                formData.append('_filename', file.name)
+                formData.append('path', this.buildPath(this.cwd, docNode.dataset.pathid))
+                this.fetch('', formData)
+                .then(_ => {
+                    resolve()
+                })
+            }))
+        }
+    }
+
+    Promise.all(allTransfers)
+    .then(_ => {
+        this.ls()
+    })
+}
+
+KEditor.prototype.menuEvents = function (event) {
+    let actionNode = event.target
+
+    while (actionNode && !actionNode.dataset?.action) { actionNode = actionNode.parentNode }
+    if (!actionNode) { return }
+
+    switch(actionNode.dataset.action) {
+        case 'add-doc': this.addDocument(); break
+
+    }
+}
+
+KEditor.prototype.submenuEvents = function (event) {
+    let actionNode = event.target
+
+    while (actionNode && !actionNode.dataset?.action) { actionNode = actionNode.parentNode }
+    if (!actionNode) { return }
+
+    let docNode = event.target
+    while (docNode && !docNode.dataset?.pathid) { docNode = docNode.parentNode}
+    if (!docNode) { return }
+
+    switch (actionNode.dataset.action) {
+        case 'delete-document': this.deleteDocument(docNode); this.clear(); this.ls(); break;
+        case 'add-subdocument':  this.addDocument(null, this.buildPath(this.cwd, docNode.dataset.pathid)); break
+        case 'open-document': this.cd(docNode.dataset.pathid); this.clear(); this.ls(); break
+        case 'add-text': this.addTextInteract(docNode); break
+        case 'upload-file': this.uploadFileInteract(docNode); break
+    }
+}
+
+KEditor.prototype.uploadFileInteract = function (docNode) {
+    const input = document.createElement('input')
+    input.type = 'file'
+    input.multiple = 'multiple'
+    input.addEventListener('change', (event) => { this.uploadFile(docNode, event) })
+    input.click()
+}
+
+KEditor.prototype.uploadFile = function (docNode, event) {
+    event.preventDefault()
+    const files = event.target.files
+    let allTransfers = []
+    for (let i = 0; i < files.length; i++) {
+        allTransfers.push(new Promise ((resolve, reject) => {
+            const formData = new FormData()
+            formData.append('operation', 'add-entry')
+            formData.append('file', files[i])
+            formData.append('_filename', files[i].name)
+            formData.append('path', this.buildPath(this.cwd, docNode.dataset.pathid))
+            this.fetch('', formData)
+            .then(_ => {
+                resolve()
+            })
+        }))
+    }
+
+    Promise.all(allTransfers)
+    .then(_ => {
+        this.ls()
+    })
+
+    console.log(event)
+}
+
+KEditor.prototype.addTextInteract = function (docNode) {
+    const quillNode = document.createElement('div')
+    quillNode.innerHTML = `<div></div>`
+    new Promise((resolve, reject) => {
+        window.requestAnimationFrame(() => {
+          docNode.insertBefore(quillNode, docNode.firstElementChild.nextElementSibling)
+          resolve()
+        })
+    })
+    .then(() => {
+        const quill = new Quill(quillNode.firstElementChild, {theme: 'snow'})
+        quillNode.addEventListener('blur', event => {
+            console.log(event)
+            console.log(quill.getContents())
+        })
+    })
+}
+
+KEditor.prototype.clear = function () {
+    this.clearOnRender = true
+}
+
 KEditor.prototype.render = function (root) {
     if (!root.documents) { console.log(root); return }
 
     (new Promise((resolve, reject) => {
+        if (!this.clearOnRender) {
+            if (this.container.firstChild && this.container.firstChild.classList.contains('kmenu')) {
+                resolve();
+                return
+            }
+        }
+        const menu = document.createElement('DIV')
+        menu.classList.add('kmenu')
+        menu.innerHTML = `
+            <span class="kemu-item" data-action="add-doc"><i class="fas fa-passport"></i></span>
+        `
+        menu.addEventListener('click', this.menuEvents.bind(this))
         window.requestAnimationFrame(_ => {
-            this.container.innerHTML = ''
+            if (this.clearOnRender) { this.container.innerHTML = '' }
+            this.clearOnRender = false
+            this.container.appendChild(menu)
             resolve()
         })
     })).then(_ => {
@@ -180,9 +337,18 @@ KEditor.prototype.render = function (root) {
                                 htmlnode = document.createElement('DIV')
                                 htmlnode.innerHTML = `<div class="kmetadata ${doc['+childs'] > 0 ? 'childs' : ''}">
                                     ${new Intl.DateTimeFormat(navigator.language).format(date)} ${doc.name}
-                                    ${doc['+childs'] > 0 ? '<img clas="kicon" src="../images/next.png" />' : ''}
+                                    <div class="ksubmenu">
+                                    <span data-action="add-text"><i class="fas fa-file-alt"></i><span>
+                                    <span data-action="upload-file"><i class="fas fa-cloud-upload-alt"></i><span>
+                                    <span data-action="add-subdocument"><i class="fas fa-passport"></i><span>
+                                    ${doc['+childs'] > 0 ? '<span data-action="open-document"><i class="fas fa-caret-square-right"></i></span>' : ''}
+                                    <span data-action="delete-document"><i class="fas fa-trash"></i><span>
+                                    </div>
                                     </div>`
+                                htmlnode.addEventListener('click', this.submenuEvents.bind(this))
                                 htmlnode.dataset.pathid = doc.id
+                                htmlnode.dataset.created = doc.created
+                                htmlnode.dataset.modified = doc.modified
                                 htmlnode.dataset.childs = doc['+childs']
                                 htmlnode.classList.add('document')
                                 htmlnode.addEventListener('dragover', (event) => { event.preventDefault() })
@@ -209,6 +375,7 @@ KEditor.prototype.render = function (root) {
                                     })
                                     event.preventDefault() 
                                 })
+                                htmlnode.addEventListener('drop', this.dropEntry.bind(this))
 
                                 let p = []
                                 for (let j = 0; j < doc['+entries'].length; j++) {
@@ -237,13 +404,32 @@ KEditor.prototype.render = function (root) {
                     })).then(node => {    
                         if (node === null) { return }
                         window.requestAnimationFrame(() => {
-                            this.container.appendChild(node)
+                            const insCreated = new Date(node.dataset.created)
+                            let insert = null
+                            let replace = false
+                            for (let n = this.container.firstElementChild; n; n = n.nextElementSibling) {
+                                if (n.dataset.created === undefined) { continue; }
+                                if (n.dataset.pathid === node.dataset.pathid) {
+                                    insert = n;
+                                    replace = true
+                                    break;
+                                }
+                                const curCreated = new Date(n.dataset.created) 
+                                if (curCreated.getTime() < insCreated.getTime()) {
+                                    insert = n
+                                }
+                            }
+                        
+                            if (replace) {
+                                this.container.replaceChild(node, insert)
+                            } else {
+                                this.container.insertBefore(node, insert)
+                            }
                             resolve()
                         })
                     })
                 })
             }
-
             chain = chain.then(nextDoc(root.documents[i]))
         }
     })

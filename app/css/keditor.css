@@ -31,7 +31,7 @@
     color: white;
     margin-bottom: 1ex;
     padding: 4px;
-    min-height: 2.6em;
+    min-height: 64px;
 }
 
 .keditorRoot .klink {
@@ -50,6 +50,15 @@
 
 .keditorRoot .klink .name {
     align-self: flex-end;
+}
+
+.kmenu {
+    font-size: 36px;
+}
+
+.ksubmenu {
+    float: right;
+    font-size: 36px;
 }
 
 @media (width < 860px) {

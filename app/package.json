@@ -1,0 +1,11 @@
+{
+  "name": "ked",
+  "version": "1.0.0",
+  "main": "index.js",
+  "repository": "https://github.com/artnum/ked",
+  "author": "Etienne Bagnoud",
+  "license": "MIT",
+  "dependencies": {
+    "@fortawesome/fontawesome-free": "^5.15.3"
+  }
+}
