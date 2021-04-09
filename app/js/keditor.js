@@ -130,6 +130,14 @@ KEditor.prototype.edit = {
 
 KEditor.prototype.renderEntry = function (path, entry) {
     return new Promise ((resolve, reject) => {
+        const subresolve = function (htmlnode) {
+            htmlnode.dataset.entryid = entry.id
+            if (entry['+class'].indexOf('task') !== -1) {
+                htmlnode.dataset.task = '1'
+            }
+            resolve(htmlnode)
+        }
+
         if (!entry.type) { resolve(null); return; }
         let htmlnode;
         let subtype = entry.type.split('/', 2)
@@ -141,13 +149,13 @@ KEditor.prototype.renderEntry = function (path, entry) {
                 htmlnode.setAttribute('width', '200px')
                 htmlnode.setAttribute('height', '200px')
                 htmlnode.setAttribute('controls', '')
-                resolve(htmlnode)
+                subresolve(htmlnode)
                 return
             case 'image':
                 htmlnode = document.createElement('IMG')
                 htmlnode.src = this.buildPath(path, entry.id)
                 htmlnode.classList.add('kimage')
-                resolve(htmlnode)
+                subresolve(htmlnode)
                 return
             case 'text':
                 fetch(new URL(this.buildPath(path, entry.id)))
@@ -165,7 +173,7 @@ KEditor.prototype.renderEntry = function (path, entry) {
                                 htmlnode = document.createElement('DIV')
                                 htmlnode.innerHTML = x.getElementsByTagName('BODY')[0].innerHTML
                                 htmlnode.classList.add('htmltext')
-                                resolve(htmlnode)
+                                subresolve(htmlnode)
                                 return
                             case 'x-quill-delta':
                                 /* we display a transformed version, so keep data as original form */
@@ -177,8 +185,7 @@ KEditor.prototype.renderEntry = function (path, entry) {
                                 htmlnode.innerHTML = quill.root.innerHTML
                                 htmlnode.classList.add('quilltext')
                                 htmlnode.dataset.edit = 'quills'
-                                htmlnode.dataset.entryid = entry.id
-                                resolve(htmlnode)
+                                subresolve(htmlnode)
                                 return
                             default:
                                 this.data[entry.id] = content
@@ -186,8 +193,7 @@ KEditor.prototype.renderEntry = function (path, entry) {
                                 htmlnode.innerHTML = content
                                 htmlnode.classList.add('plaintext')
                                 htmlnode.dataset.edit = 'text'
-                                htmlnode.dataset.entryid = entry.id
-                                resolve(htmlnode)
+                                subresolve(htmlnode)
                                 return
                         }
                     })
@@ -202,7 +208,7 @@ KEditor.prototype.renderEntry = function (path, entry) {
                 let oname = entry.application?.find(value => value.startsWith('ked:name='))
                 if (oname) { oname = oname.split('=')[1] }
                 htmlnode.innerHTML = `<span class="name">${oname ? oname : ''}</span>`
-                resolve(htmlnode)
+                subresolve(htmlnode)
                 return
         }
     })
@@ -290,6 +296,10 @@ KEditor.prototype.submenuEvents = function (event) {
         case 'open-document': this.cd(docNode.dataset.pathid); this.clear(); this.ls(); break
         case 'add-text': this.addTextInteract(docNode); break
         case 'upload-file': this.uploadFileInteract(docNode); break
+        case 'to-task': this.convertToTaskInteract(docNode); break
+        case 'to-not-task': this.convertToNotTaskInteract(docNode); break
+        case 'set-task-done': this.updateTask(docNode, [[ 'taskDone', new Date().toISOString() ]]); break
+        case 'set-task-undone': this.updateTask(docNode, [[ 'taskDone', '' ]]); break
     }
 }
 
@@ -299,6 +309,58 @@ KEditor.prototype.uploadFileInteract = function (docNode) {
     input.multiple = 'multiple'
     input.addEventListener('change', (event) => { this.uploadFile(docNode, event) })
     input.click()
+}
+
+KEditor.prototype.convertToTaskInteract = function (docNode) {
+    const formData = new FormData()
+    formData.append('operation', 'to-task')
+    if (docNode.dataset.entryid) {
+        formData.append('path', this.buildPath(this.cwd, this.buildPath(docNode.dataset.parentid, docNode.dataset.entryid)))
+    } else {
+        formData.append('path', this.buildPath(this.cwd, docNode.dataset.pathid))
+    }
+
+    this.fetch('', formData)
+    .then(_ => {
+        this.ls()
+    })
+}
+
+KEditor.prototype.convertToNotTaskInteract = function (docNode) {
+    const formData = new FormData()
+    formData.append('operation', 'to-not-task')
+    if (docNode.dataset.entryid) {
+        formData.append('path', this.buildPath(this.cwd, this.buildPath(docNode.dataset.parentid, docNode.dataset.entryid)))
+    } else {
+        formData.append('path', this.buildPath(this.cwd, docNode.dataset.pathid))
+    }
+
+    this.fetch('', formData)
+    .then(_ => {
+        this.ls()
+    })
+}
+
+KEditor.prototype.updateTask = function (docNode, values = []) {
+    if (values.length === 0) { return }
+
+    const formData = new FormData()
+    formData.append('operation', 'update-task')
+    formData.append('path', this.buildPath(this.cwd, docNode.dataset.pathid))
+    values.forEach(v => {
+        switch(v[0]) {
+            case 'taskDone':
+            case 'taskPrevious':
+            case 'taskEnd':
+                formData.append(v[0], v[1])
+                break;
+        }
+    })
+    this.fetch('', formData)
+    .then(_ => {
+        console.log(formData)
+        this.ls()
+    })
 }
 
 KEditor.prototype.uploadFile = function (docNode, event) {
@@ -364,6 +426,7 @@ KEditor.prototype.clear = function () {
 }
 
 KEditor.prototype.handleToolsEvents = function (event) {
+    event.stopPropagation()
     let kcontainerNode = event.target
 
     while (kcontainerNode && !kcontainerNode.classList.contains('kentry-container')) { kcontainerNode = kcontainerNode.parentNode }
@@ -378,6 +441,12 @@ KEditor.prototype.handleToolsEvents = function (event) {
             if (!kcontainerNode.firstElementChild.dataset?.edit) { return }
             if (!this.edit[kcontainerNode.firstElementChild.dataset.edit]) { return }
             this.edit[kcontainerNode.firstElementChild.dataset.edit](kcontainerNode.firstElementChild)
+            break;
+        case 'to-task':
+            this.convertToTaskInteract(kcontainerNode.firstElementChild)
+            break;
+        case 'to-not-task':
+            this.convertToNotTaskInteract(kcontainerNode.firstElementChild)
             break;
     }
 }
@@ -410,21 +479,35 @@ KEditor.prototype.render = function (root) {
             const nextDoc = (doc) => {
                 return new Promise((resolve, reject) => {
                     (new Promise((resolve, reject) => {
-                        let htmlnode
-                    
+                        let htmlnode     
                         doc.class = 'document'
                         if (doc['+class'].indexOf('entry') != -1) { doc.class = 'entry' }
+                        const task = {
+                            is: doc['+class'].indexOf('task') === -1 ? false : true,
+                            done: false,
+                            end: null,
+                            previous: null
+                        }
+                        if (task.is) {
+                            if (doc['taskDone'] !== undefined) {
+                                task.done = true
+                            }
+                        }
 
                         switch (doc.class) {
                             case 'document':
+                              
                                 let date = new Date(doc.created)
                                 htmlnode = document.createElement('DIV')
                                 htmlnode.innerHTML = `<div class="kmetadata ${doc['+childs'] > 0 ? 'childs' : ''}">
+                                    ${task.is ? (task.done ? '<i data-action="set-task-undone" class="fas fa-clipboard-check"></i>' : '<i data-action="set-task-done" class="fas fa-clipboard"></i>'): ''}
                                     ${new Intl.DateTimeFormat(navigator.language).format(date)} ${doc.name}
                                     <div class="ksubmenu">
-                                    <span data-action="add-text"><i class="fas fa-file-alt"></i><span>
+                                    <span data-action="add-text"><i class="fas fa-file-alt"></i></span>
                                     <span data-action="upload-file"><i class="fas fa-cloud-upload-alt"></i><span>
                                     <span data-action="add-subdocument"><i class="fas fa-passport"></i><span>
+                                    ${!task.is ? '<span data-action="to-task"><i class="fas fa-tasks"></i></span>' : 
+                                        '<span data-action="to-not-task" class="fa-stack"><i class="fas fa-tasks fa-stack-1x"></i><i class="fas fa-slash fa-stack-1x"></i></span>'}
                                     ${doc['+childs'] > 0 ? '<span data-action="open-document"><i class="fas fa-caret-square-right"></i></span>' : ''}
                                     <span data-action="delete-document"><i class="fas fa-trash"></i><span>
                                     </div>
@@ -470,6 +553,7 @@ KEditor.prototype.render = function (root) {
                                 .then(nodes => {
                                     for (let i = 0; i < nodes.length; i++) {
                                         if (nodes[i] === null) { continue; }
+                                        nodes[i].dataset.parentid = doc.id
                                         const entryContainer = document.createElement('DIV')
                                         entryContainer.appendChild(nodes[i])
                                         entryContainer.classList.add('kentry-container')
@@ -487,7 +571,8 @@ KEditor.prototype.render = function (root) {
                                         }
                                         const entryTools = document.createElement('DIV')
                                         entryTools.classList.add('kentry-tools')
-                                        entryTools.innerHTML = `<span data-action="edit-entry"><i class="fas fa-edit"></i></span>`
+                                        entryTools.innerHTML = `<span data-action="edit-entry"><i class="fas fa-edit"></i></span>
+                                            ${nodes[i].dataset.task ? '<span data-action="to-not-task" class="fa-stack"><i class="fas fa-tasks fa-stack-1x"></i><i class="fas fa-slash fa-stack-1x"></i></span>' : '<span data-action="to-task"><i class="fas fa-tasks"></i></span>'}`
                                         entryTools.addEventListener('click', this.handleToolsEvents.bind(this))
                                         entryContainer.appendChild(entryTools)
                                     }

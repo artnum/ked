@@ -38,6 +38,11 @@ class ked {
         'taskPrevious' => ['kedTaskPrevious', false, false, true]
     ];
 
+    const classAttrMap = [
+        'kedTask' => [ 'kedTaskEnd', 'kedTaskDone', 'kedTaskPrevious' ],
+        'kedEvent' => [ 'kedEventStart' , 'kedEventStop', 'kedEventAttendee', 'kedEventOrganizer' ]
+    ];
+
     function __construct ($ldapconn, $base)
     {
         $this->conn = $ldapconn;
@@ -64,8 +69,8 @@ class ked {
         return call_user_func_array('sprintf', $args);
     }
 
-    function ldapFail(string $function, $conn):void {
-        error_log(sprintf('ked:%s: LDAP:<%s>', $function, ldap_error($conn)));
+    function ldapFail(string $function, $conn, $message = ''):void {
+        error_log(sprintf('ked:%s: LDAP:<%s> "%s"', $function, ldap_error($conn), $message));
     }
     
     function logicFail(string $function, string $message):void {
@@ -87,25 +92,6 @@ class ked {
         if ($value['count'] === 1) { return $value[0]; }
         unset($value['count']);
         return $value;
-    }
-
-    function convertToTask (string $dn):bool {
-        $classes = $this->getObjectClasses($dn);
-        if (empty($classes)) { return false; }
-        if (in_array('kedTask', $classes)) { return true; }
-        $classes[] = 'kedTask';
-        $res = @ldap_mod_replace($this->rwconn, $dn, [ 'objectClass' => $classes ]);
-        if (!$res) { $this->ldapFail(__FUNCTION__, $this->rwconn); return false; }
-        return true;
-    }
-
-    function revertFromTask (string $dn):void {
-        $classes = $this->getObjectClasses($dn);
-        if (empty($classes)) { return; }
-        if (!($k = array_search('kedTask', $classes))) { return; }
-        unset($classes[$k]);
-        @ldap_mod_del($this->rwconn, $dn, [ 'kedTaskEnd' => [], 'kedTaskDone' => [], 'kedTaskPrevious' => [] ]);
-        @ldap_mod_replace($this->rwconn, $dn, [ 'objectClass' => $classes ]);
     }
 
     function sanitizeOptions (&$entry, $options) {
@@ -374,6 +360,66 @@ class ked {
         $res = ldap_mod_replace($this->rwconn, $currentEntry['__dn'], $updateCurrent);
         if (!$res) { $this->ldapFail(__FUNCTION__, $this->rwconn); return null; }
         return $currentEntry['id']; // update do not change the id
+    }
+
+    function updateInPlaceAny (string $dn, array $params = []):bool {
+        $attributes = [];
+        $delAttributes = [];
+        foreach (self::attrMap as $attr => $lattr) {
+            if (isset($params['-' . $attr])) {
+                $delAttributes[$lattr[0]] = [];
+                continue;
+            }
+            if (!isset($params[$attr])) { continue; }
+            $attributes[$lattr[0]] = $lattr[1] ? $this->sanitizeString($params[$attr]) : $params[$attr];
+        }
+        if (empty($delAttributes) && empty($attributes)) { return true; }
+        
+        $attributes['kedModified'] = time();
+        print_r($attributes);
+        if (!empty($delAttributes)) {
+            $res = @ldap_mod_del($this->rwconn, $dn, $delAttributes);
+            if (!$res) { $this->ldapFail($this->rwconn, $dn); return false; }
+        }
+        /* we must do replace as, at least, we have modified timestamp to update */
+        $res = @ldap_mod_replace($this->rwconn, $dn, $attributes);
+        if (!$res) { $this->ldapFail(__FUNCTION__, $this->rwconn); return false; }
+        return true;
+    }
+
+    function addClasses (string $dn, array $classes):bool {
+        $currentClasses = $this->getObjectClasses($dn);
+        if (empty($currentClasses)) { return false; }
+        foreach ($classes as $c) {
+            if (!in_array($c, $currentClasses)) {
+                $currentClasses[] = $c;
+            }
+        }
+        $res = @ldap_mod_replace($this->rwconn, $dn, [ 'objectClass' => $currentClasses, 'kedModified' => time() ]);
+        if (!$res) { $this->ldapFail(__FUNCTION__, $this->rwconn); }
+        return $res;
+    }
+
+    function removeClasses (string $dn, array $classes):void {
+        $currentClasses = $this->getObjectClasses($dn);
+        if (empty($currentClasses)) { return; }
+        $attributes = [];
+        if (empty($classes)) { return; }
+        foreach ($classes as $c) {
+            if (($k = array_search($c, $currentClasses))) {
+                foreach (self::classAttrMap[$c] as $attr) {
+                    $attributes[$attr] = [];
+                }
+            }
+            unset($currentClasses[$k]);
+        }
+        
+        $res = @ldap_mod_replace($this->rwconn, $dn, $attributes);
+        if (!$res) { $this->ldapFail(__FUNCTION__, $this->rwconn); }
+        if ($res) {
+            $res = @ldap_mod_replace($this->rwconn, $dn, [ 'objectClass' => $currentClasses, 'kedModified' => time() ]);
+            if (!$res) { $this->ldapFail(__FUNCTION__, $this->rwconn, var_dump($currentClasses, true)); }
+        }
     }
 
     function createRdn (array $options = []):array {

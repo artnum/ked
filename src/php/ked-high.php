@@ -212,6 +212,64 @@ class high extends ked {
         return $document;
     }
 
+    function anyToTask (string $path, array $details = []):bool {
+        $anyDn = $this->pathToDn($path, false);
+        if ($anyDn === null) { return false; }
+        $params = [];
+
+        if (!empty($details['previous'])) {
+            $prevDn = $this->pathToDn($details['previous']);
+            if ($prevDn === null) { return false; }
+            $params['taskPrevious'] = $prevDn;
+        }
+        if (!empty($details['end'])) {
+            try {
+                $endDt = new DateTime($details['end']);
+            } catch(Exception $e) {
+                return null;
+            }
+            $params['taskEnd'] = $endDt->format('U');
+        }
+        if (!empty($details['done'])) {
+            try {
+                $doneDt = new DateTime($details['done']);
+            } catch(Exception $e) {
+                return null;
+            }
+            $params['taskDone'] = $doneDt->format('U');
+        }
+        if (!$this->addClasses($anyDn, ['kedTask'])) { return false; }
+        return $this->updateInPlaceAny($anyDn, $params);
+    }
+
+    function anyToNotTask (string $path):bool {
+        $anyDn = $this->pathToDn($path, false);
+        if ($anyDn === null) { return false; }
+        $this->removeClasses($anyDn, ['kedTask']);
+        return true;
+    }
+
+    function updateTask (string $path, $params):bool {
+        $docInfo = $this->getInfo($path, false);
+        if (!in_array('task', $docInfo['+class'])) { return false; }
+        $updateValues = [];
+        foreach ($params as $k => $v) {
+            switch ($k) {
+                case 'taskDone':
+                case 'taskEnd':
+                    if (empty($v)) { $updateValues['-' . $k] = ''; continue 2; }
+                    try {
+                        $dt = new DateTime($v);
+                    } catch (Exception $e) {
+                        return false;
+                    }
+                    $updateValues[$k] = $dt->format('U');
+                    break;
+            }
+        }
+        return $this->updateInPlaceAny($docInfo['__dn'], $updateValues);
+    }
+
     /* works with utf8 */
     function addTextEntry (string $path, string $text, string $type = 'text/plain', $application = null):?string {
         $docDn = $this->pathToDn($path);

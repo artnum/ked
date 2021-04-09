@@ -37,6 +37,7 @@ class http {
     }
 
     function errorUnableToOperate() {
+        $this->logTrace();
         $this->responseHeaders();
         http_response_code(500);
         exit();
@@ -46,6 +47,19 @@ class http {
         $this->responseHeaders();
         http_response_code(404);
         exit();
+    }
+
+    function logTrace () {
+        $traces = debug_backtrace();
+        while ($trace = array_shift($traces)) {
+            if ($trace['function'] === 'logTrace') { continue; }
+            break;
+        }
+        error_log('[Respond Error Begin]');
+        do {
+            error_log("<$trace[function]> $trace[file]:$trace[line] ");
+        } while($trace = array_shift($traces));
+        error_log('[Respond Error End]');
     }
 
     function getBaseName () {
@@ -64,7 +78,7 @@ class http {
         $this->ok('<!DOCTYPE html><html><head><title>Index of ' . $dir['name'] . '</title><style>');
         $this->ok('.header span, .entry span { min-width: 42ch; max-width: 42ch; text-overflow: ellipsis; display: inline-block; }');
         $this->ok('.type, .type i { max-width: 16px; min-width: 16px !important; width: 16px; min-height: 16px; max-height: 16px; height: 16px; display: inline-block; }');
-        $this->ok('.childs { max-width: 8ch; min-width: 8ch !important; width: 8ch; }');
+        $this->ok('.childs, .events, .tasks { max-width: 8ch; min-width: 8ch !important; width: 8ch; }');
         $this->ok('.entry { line-height: 2.8ex; }');  
         $this->ok('.created, .deleted { max-width: 28ch; min-width: 28ch !important; width: 28ch; }');
         $this->ok('.type i.directory { background-image: url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAABHNCSVQICAgIfAhkiAAAAAlwSFlzAAAN1wAADdcBQiibeAAAABl0RVh0U29mdHdhcmUAd3d3Lmlua3NjYXBlLm9yZ5vuPBoAAAAOdEVYdFRpdGxlAEZvbGRlcnMhVKpgQQAAABd0RVh0QXV0aG9yAExhcG8gQ2FsYW1hbmRyZWnfkRoqAAAAKXRFWHREZXNjcmlwdGlvbgBCYXNlZCBvZiBKYWt1YiBTdGVpbmVyIGRlc2lnbqCEBXMAAAGuSURBVDiNpZG/alRBFMZ/M3v3T0xioltsCguFSCIiaBmICGJjIWhaO4s0LvgAgr0PoM8gKBJfQEUbURAjKirEwhVUNCxmvffOnZl7jsUmq0U2cPGDYeCcMz++M59RVf5Hpnvx2DWsvQmm+W9DVfsqrN5ae3NvT8DVS8e3zq2sTteSOlKWiAxPng548XgtC0W+dPvB+9fjAIkxTIgKH9efjYoNUzDX3GRpcXIfTK7fubG86+NBrg8TiyH7vTUq1kzgYPKTo6evMNOZH2s9+oznd6+fTdozDeN7j2iXDoB6a5rF5cu09nf41vswFtA5NE+IQtI+0KydOt9lanYOABUhHfTp/+ixV0IxOHwUkjJEGhOzfPn0duzwbvLOEaKS+CiEIqeMoRIgFPnQQYiCdxkx+EqAwqXDPwhRKFxOGao58Hk2BPigFC4lVlzB5Sk+6M4KjrKMGMywa3bGDLCdxCgQRYHCbTuIiuR5ZhutKayxGFvD2r+3qqJSIiKIlKgKIsKvze9ERRKR2pONdy/PHF44Yaigr583VMU+Nd0LC0dss3k/BH+yCqBeb7ySolj5A0Ys6Y3vGnPVAAAAAElFTkSuQmCC); }');
@@ -76,7 +90,7 @@ class http {
         $this->ok('.type i.audio { background-image: url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAABHNCSVQICAgIfAhkiAAAAAlwSFlzAAAN1wAADdcBQiibeAAAABl0RVh0U29mdHdhcmUAd3d3Lmlua3NjYXBlLm9yZ5vuPBoAAAItSURBVDiNpZI9aBRhEIaf+Xb3Lnu7SYwJuZiggkhE7CyihZ2QQoIgGIxG1EIwqI2FjYKkEqysVQQLO9FSGwVBLCzURgshYCTmTEwuudzf7t3ufmMRK8nZZMoZ3od34BFVZTtjtpUG3K2WF6/veiLCYVUMog4qgqhRiyNgVBBQBzUrWwKyTM9MTBzvGuwfpSccIfD78bwQYxyytEXcrlCPlnj4+P7AlgCAocHdFHyfMAzpDoqE/jA5r5u4VabWWKDghyBoR0ClNk9iq7STGvVmiXyuF8EhSRu0kg1a7XWwKh0BSdrg+Yt39ahpBatiFQOIqhovb9LJ0+O+VdsZAEq1koYp7l7cpO1mXpoSJTF+0h2nG2pB/9dA1SIiPHtQWtB/ZJmeKWI1Q1Hp6IHVFBCdnUU637WzSNamiMDbDrJZm2D17wvTM4MnPM/cck1wxMsXxPWcTCVFQEdLyNSV4njOlbtBoW+fiHFc11irMSjinr06ci7vmUenTk4WRvcfoxGVWC5/dNZrcyhQM0M3Bnb03rkwdTPY2TdMI1rmV/kD1cbcJiBn7OUDh4JCrF/49mORuLVG1FrFbJZTg709dnRP8Lv6hqVKStQukyQNjPFQMK6i77/PRWM9PaXAD5ZJE0u9nlGvNbHWGteTlcXFn925rkREDK24RXmtSXm1mQBGVJXz14r3jMqlzGq/IInjyryin7K2vgT96njmaZbpQWOkrVYzxzWf08S+xphXfwBrnhE3TbuG6AAAAABJRU5ErkJggg==); }');
         $this->ok('.type i.pdf { background-image: url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAABHNCSVQICAgIfAhkiAAAAAlwSFlzAAAN1wAADdcBQiibeAAAABl0RVh0U29mdHdhcmUAd3d3Lmlua3NjYXBlLm9yZ5vuPBoAAAASdEVYdFRpdGxlAFBhcGVyIFNoZWV0c7mvkfkAAAAXdEVYdEF1dGhvcgBMYXBvIENhbGFtYW5kcmVp35EaKgAAACd0RVh0RGVzY3JpcHRpb24Ad2l0aCBhIEhVR0UgaGVscCBmcm9tIEpha3VihlQHswAAAkhJREFUOI2Fk89LVFEUxz/nzZtyFtmMKSnRIohWRYuKtBG1Nv2AClpE1n9gSG1cVAhtCiKIMEgswskspR8kKLpxFeNUf0el6ajDqJXjffeeFs+nowYdOPceLpfP+Z5z7hVVZWRs6KyI9Fjr9oKiqqgCKMAfkHHnbNeli5fH2WyqytDw++9z87PqnNviKyslnZz6ocOjQ78H372+FcLX3QMolUp7Uskqln4tUVwoMFfIMzM7xeTPb0znp1goFjl3+nyiprqms38g01EuwAMwJgDAWkNvb4aXmT76+l7R3/8GExhmZqfxPI+WplOJ7dsq7r7IPGuMAH4IMAAENuDqtVastVhnsTZYi99+GKQinuDQwcOJidynDiC7BgiMARRrLdlsFnWKU4t1jqPHjlBbV0sqlSSwDs/zZHl5+cyTp49j7W037ZoCXW1off1xnCrqHM6F2VWERCKBiLB/3wFGx0ZiTl0ciADBhskIoAKIIOLh+154LkKU0Kkr60FgoqHy5fNXlA3vYM0aGuqJ7qvTrU0EjxPpBnRVRbSub2EQBAHOuo0AATzPo/PObQrFRQBSO3dw7/4DcrkcAOl0mqhkZ205IAAE349RKC4ycCUPQOsg+H6cpubmUIEKIkJgDLYcEKyWEIv5VCcraR0MJVcnK/F9n4nsRKigMVJgsJtLAIh5MR4+6kJE1h2h5WRL1ON/A0RkqlCYr6uq2sX/bGGhCMi8CUwpLEuV9hvXL/hxv9usrOxWBUVh9UuXx6DE49vyxpi2nu7nHwH+Amz1X9YNE8s/AAAAAElFTkSuQmCC); }');
         $this->ok('</style></head><body><h1>Index of '. $dir['name'] . '</h1>');
-        $this->ok('<div class="header"><span class="type"><i></i></span><span class="name">Name</span><span class="childs">Childs</span>');
+        $this->ok('<div class="header"><span class="type"><i></i></span><span class="name">Name</span><span class="tasks">Tasks</span><span class="events">Events</span><span class="childs">Childs</span>');
         $this->ok('<span class="created">Created</span><span class="modified">Modified</span></span></div>');
         $this->ok('<hr>');
         if (!$root) {
@@ -92,13 +106,7 @@ class http {
         foreach ($childs as $child) {
             $class = 'file';
             $file = true;
-            if (in_array('event', $child['+class'])) {
-                $class = 'event';
-                $file = false;
-            } else if (in_array('task', $child['+class'])) {
-                $class = 'task';
-                $file = false;
-            } else if (in_array('document', $child['+class'])) {
+            if (in_array('document', $child['+class'])) {
                 $class = 'directory';
                 $file = false;
             } else if (!empty($child['type'])) {
@@ -120,8 +128,19 @@ class http {
                     }
                 }
             }
+            $event = false;
+            $task = false;
+            if (in_array('event', $child['+class'])) {
+                $event = true;
+            } 
+            if (in_array('task', $child['+class'])) {
+                $task = true;
+            }
+
             $this->ok('<div class="entry"><span class="type"><i class="' . $class . '"> </i></span>');
             $this->ok('<span class="name"><a href="' . ($root ? $this->getBaseName() . '/' : $this->ked->dnToPath($dir['__dn']) . ',') . $child['id'] . '">' . ($child['name'] ?? $child['id']) . '</a></span>');
+            $this->ok('<span class="tasks">' . ($task ? '+' : '') . '</span>');
+            $this->ok('<span class="events">' . ($event ? '+' : '') . '</span>');
             $this->ok('<span class="childs">' . (!$file ? ($child['+childs'] + $child['+entries']) : '') . '</span>');
             $this->ok('<span class="created">' . $child['created'] . '</span>');
             $this->ok('<span class="modified">' . $child['modified'] . '</span>');
@@ -277,6 +296,33 @@ class http {
                 }
                 if ($id === null) { $this->errorUnableToOperate(); }
                 $this->ok(json_encode(['id' => $id]));
+                break;
+            case 'to-not-task':
+                if (empty($body['path'])) { $this->errorBadRequest(); }
+                if (!$this->ked->anyToNotTask($body['path'])) { $this->errorUnableToOperate(); }
+                return $this->ok(json_encode(['path' => $body['path'], 'modified' => true]));
+                break;
+            case 'update-task':
+                // fall through
+            case 'to-task':
+                if (empty($body['path'])) { $this->errorBadRequest(); }
+                $params = [];
+                foreach ([ 'taskPrevious', 'taskEnd', 'taskDone' ] as $key) {
+                    if (!empty($body[$key])) {
+                        if (!is_string($body[$key])) { $this->errorBadRequest(); }
+                        $params[$key] = $body[$key];
+                    } else {
+                        if (isset($body[$key])) { $params[$key] = ''; }
+                    }
+                }
+                $modified = false;
+                if ($body['operation'] === 'update-task') {
+                    $modified = $this->ked->updateTask($body['path'], $params);
+                } else {
+                    $modified = $this->ked->anyToTask($body['path'], $params);
+                }
+                if (!$modified) { $this->errorUnableToOperate(); }
+                $this->ok(json_encode(['path' => $body['path'], 'modified' => $modified]));
                 break;
             case 'delete':
                 if (empty($body['path'])) { $this->errorBadRequest(); }
