@@ -5,7 +5,7 @@ fetch = function (url, options) {
     return _fetch(url, options)
 }
 
-const url = new URL('test-http.php', window.location)
+const url = new URL('../../web/index.php', window.location)
 function out (response) {
     const out = document.getElementById('results')
     out.value += `HTTP Code : ${response.status}\n`
