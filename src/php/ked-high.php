@@ -91,6 +91,11 @@ class high extends ked {
         if (!$res) { $this->ldapFail(__FUNCTION__, $this->conn); return null; }
         for ($entry = @ldap_first_entry($this->conn, $res); $entry; $entry = @ldap_next_entry($this->conn, $entry)) {
             $object = $this->getLdapObject($this->conn, $entry);
+            $h = $this->getEntryHistory($currentDir, $object['id']);
+            $object['+history'] = [];
+            foreach ($h as $_h) {
+                $object['+history'][] = $this->filterConvertResult($_h);
+            }
             $object = $this->filterConvertResult($object);
             $documents[] = $object;
         }
@@ -123,10 +128,11 @@ class high extends ked {
         $elements = explode(self::PATH_SEPARATOR, $path);
         $currentDir = $this->base;
         foreach ($elements as $dir) {
+            $hpart = explode('-', $dir, 2);
             if ($docOnly) {
-                $currentDir = $this->getDocumentDn($dir, false, ['parent' => $currentDir]);
+                $currentDir = $this->getDocumentDn($hpart[0], false, ['parent' => $currentDir, 'timestamp' => $hpart[1] ?? null]);
             } else {
-                $currentDir = $this->getDn($dir, false, ['parent' => $currentDir]);
+                $currentDir = $this->getDn($hpart[0], false, ['parent' => $currentDir, 'timestamp' => $hpart[1] ?? null]);
             }
             if ($currentDir === null)  { return null; }
         }
@@ -270,6 +276,40 @@ class high extends ked {
         return $this->updateInPlaceAny($docInfo['__dn'], $updateValues);
     }
 
+    /**** UPDATE and ADD functions should be kind of fuse together ****/
+    function updateTextEntry (string $path, string $text, string $type = 'text/plain', $application = null):?string {
+        $entryDn = $this->pathToDn($path, false);
+        if ($entryDn === null) { return null; }
+
+        $textSize = strlen($text);
+        if ($textSize <= $this->maxTextSize) {
+            return $this->updateEntryByDn($entryDn, $text, ['type' => $type]);
+        } else {
+            $hash = $this->hash($text);
+            $filepath = $this->getFilePath($hash);
+            if (!$this->createStorePath($filepath)) { return null; }
+            if (!file_exists($filepath)) {               
+                $written = file_put_contents($filepath, $text);
+                if (!$written) { return null; }
+                if ($written < $textSize) { return null; }
+            }
+            $subtext = '';
+            switch ($type) {
+                /* default split to a space near the end if possible */
+                default:
+                case 'text/plain':
+                    $subtext = mb_substr($text, 0, $this->maxTextSize, 'UTF-8');
+                    $lastSpace = mb_strripos($subtext, ' ', 0, 'UTF-8');
+                    /* last space is near the end of the text */
+                    if ($lastSpace !== false && $lastSpace + 100 >= $this->maxTextSize) {
+                        $subtext = mb_substr($subtext, 0, $lastSpace, 'UTF-8');
+                    }
+                    break;                    
+            }
+            return $this->updateEntryByDn($entryDn, $subtext, ['type' => $type, 'contentRef' => $hash, 'application' => $application]);
+        }
+    }
+
     /* works with utf8 */
     function addTextEntry (string $path, string $text, string $type = 'text/plain', $application = null):?string {
         $docDn = $this->pathToDn($path);
@@ -302,6 +342,23 @@ class high extends ked {
             }
             return $this->createEntry($docDn, $subtext, ['type' => $type, 'contentRef' => $hash, 'application' => $application]);
         }
+    }
+
+    function updateBinaryEntry (string $path, string $file, string $filetype = 'application/octet-stream',  array $application = []):?string {
+        $entryDn = $this->pathToDn($path, false);
+        if ($entryDn === null) { return null; }
+        if (!$this->store) { return null; }
+
+        $hash = $this->hash($file, true);
+        $filepath = $this->getFilePath($hash);
+        if (!$this->createStorePath($filepath)) { return null; }
+        if (file_exists($filepath)) {
+            @unlink($file); // already available
+        } else {
+            if (!rename($file, $filepath)) { return null; }
+        }
+
+        return $this->updateEntryByDn($entryDn, null, ['type' => $filetype, 'contentRef' => $hash, 'application' => $application]);
     }
 
     function addBinaryEntry (string $path, string $file, string $filetype = 'application/octet-stream',  array $application = []):?string {

@@ -80,6 +80,8 @@ class http {
         $this->ok('.type, .type i { max-width: 16px; min-width: 16px !important; width: 16px; min-height: 16px; max-height: 16px; height: 16px; display: inline-block; }');
         $this->ok('.childs, .events, .tasks { max-width: 8ch; min-width: 8ch !important; width: 8ch; }');
         $this->ok('.entry { line-height: 2.8ex; }');  
+        $this->ok('.history { margin-left: 2ch; color: gray; }');
+        $this->ok('.history a { color: lightblue; }');
         $this->ok('.created, .deleted { max-width: 28ch; min-width: 28ch !important; width: 28ch; }');
         $this->ok('.type i.directory { background-image: url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAABHNCSVQICAgIfAhkiAAAAAlwSFlzAAAN1wAADdcBQiibeAAAABl0RVh0U29mdHdhcmUAd3d3Lmlua3NjYXBlLm9yZ5vuPBoAAAAOdEVYdFRpdGxlAEZvbGRlcnMhVKpgQQAAABd0RVh0QXV0aG9yAExhcG8gQ2FsYW1hbmRyZWnfkRoqAAAAKXRFWHREZXNjcmlwdGlvbgBCYXNlZCBvZiBKYWt1YiBTdGVpbmVyIGRlc2lnbqCEBXMAAAGuSURBVDiNpZG/alRBFMZ/M3v3T0xioltsCguFSCIiaBmICGJjIWhaO4s0LvgAgr0PoM8gKBJfQEUbURAjKirEwhVUNCxmvffOnZl7jsUmq0U2cPGDYeCcMz++M59RVf5Hpnvx2DWsvQmm+W9DVfsqrN5ae3NvT8DVS8e3zq2sTteSOlKWiAxPng548XgtC0W+dPvB+9fjAIkxTIgKH9efjYoNUzDX3GRpcXIfTK7fubG86+NBrg8TiyH7vTUq1kzgYPKTo6evMNOZH2s9+oznd6+fTdozDeN7j2iXDoB6a5rF5cu09nf41vswFtA5NE+IQtI+0KydOt9lanYOABUhHfTp/+ixV0IxOHwUkjJEGhOzfPn0duzwbvLOEaKS+CiEIqeMoRIgFPnQQYiCdxkx+EqAwqXDPwhRKFxOGao58Hk2BPigFC4lVlzB5Sk+6M4KjrKMGMywa3bGDLCdxCgQRYHCbTuIiuR5ZhutKayxGFvD2r+3qqJSIiKIlKgKIsKvze9ERRKR2pONdy/PHF44Yaigr583VMU+Nd0LC0dss3k/BH+yCqBeb7ySolj5A0Ys6Y3vGnPVAAAAAElFTkSuQmCC); }');
         $this->ok('.type i.parent { background-image: url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAABHNCSVQICAgIfAhkiAAAAAlwSFlzAAAN1wAADdcBQiibeAAAABl0RVh0U29mdHdhcmUAd3d3Lmlua3NjYXBlLm9yZ5vuPBoAAAATdEVYdFRpdGxlAE9wdGljYWwgRHJpdmU+Z7oMAAACA0lEQVQ4jWP8//8/Ay7Q2dPmzfCPoe8/I8NLxn//K8rLq4+hq2HCpbmrqz2Em4tnQ1pahpqPp48tAxPjRGzqWHBp5uLhXp4Yn8TCysrGwMLCzMDwn+EbNrUYLkDX/Oz5E4Zde3b/YfjP0EbQAGyaN23e9OfHt++R5eVVO7H69f///wz///9n6OxsC5k8deLvL18+///58+f/+w/u/p84uf93Z2dbCEwNNszCwMDA0NbWHMbNy70UbvOzxwzrN67/8/Xb18iayvo1/RN7G//+/VPMzMzSW5hfXI/MZ6pprZH9/efXIitLKxZWVjYGBgYGhh07tzN8+vhxak1l/RoGBgaGv3//FJcUlXP//funGJ3PfGjvoU+79+669fjx40A5WTkmPj5+Bm1tXYZz58+abNux9bqzk+u1k6dOsh89dtiEmZml19LC6gAyH+6XsrLikIamut937t76//Pnz/+fP3/639TS8LusrBhvGKBwCopzQ2pqq37fuXMTbkhdfc3vguJcnIZgCGTlZoWUV5b+vn37BtyQyury35m5md7YDMBISFMnTV3z4d37yBkzZ/55+PA+AysrK0NsdCzL3z+/+4hKiQwMDAwzZsxe8+7D28gp06b+uXr1MsPrN28Yfv/6/RKbWkZ8uTEuLtr9PxNDFSMDA9d/pn/5i+ctx8iNeA0gBgAABBZ17IHKRIMAAAAASUVORK5CYII=); }');
@@ -136,7 +138,6 @@ class http {
             if (in_array('task', $child['+class'])) {
                 $task = true;
             }
-
             $this->ok('<div class="entry"><span class="type"><i class="' . $class . '"> </i></span>');
             $this->ok('<span class="name"><a href="' . ($root ? $this->getBaseName() . '/' : $this->ked->dnToPath($dir['__dn']) . ',') . $child['id'] . '">' . ($child['name'] ?? $child['id']) . '</a></span>');
             $this->ok('<span class="tasks">' . ($task ? '+' : '') . '</span>');
@@ -145,6 +146,17 @@ class http {
             $this->ok('<span class="created">' . $child['created'] . '</span>');
             $this->ok('<span class="modified">' . $child['modified'] . '</span>');
             $this->ok('</div>');
+            for ($i = 0; $i < count($child['+history']); $i++) {
+                $c = $child['+history'][$i];
+                $this->ok('<div class="entry history"><span class="type"><i class="' . $class . '"> </i></span>');
+                $this->ok('<span class="name"><a href="' . ($root ? $this->getBaseName() . '/' : $this->ked->dnToPath($dir['__dn']) . ',') . $c['id'] . '">' . ($child['name'] ?? $child['id']) . '</a></span>');
+                $this->ok('<span class="tasks"></span>');
+                $this->ok('<span class="events"></span>');
+                $this->ok('<span class="childs"></span>');
+                $this->ok('<span class="created">' . $c['created'] . '</span>');
+                $this->ok('<span class="modified">' . $c['modified'] . '</span>');
+                $this->ok('</div>');
+            }
         }
         $this->ok('</body></html>');
     }
@@ -305,7 +317,7 @@ class http {
                         break;
                     default:
                         if ($update) {
-                            //$id = $this->ked->updateBinaryEntry($body['path'], $body['_file']['tmp_name'], $body['_file']['type'], $application);
+                            $id = $this->ked->updateBinaryEntry($body['path'], $body['_file']['tmp_name'], $body['_file']['type'], $application);
                         } else {
                             $id = $this->ked->addBinaryEntry($body['path'], $body['_file']['tmp_name'], $body['_file']['type'], $application);
                         }

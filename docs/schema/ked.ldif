@@ -34,70 +34,98 @@ olcAttributeTypes: (kedAttr:4 NAME 'kedNext'
 olcAttributeTypes: (kedAttr:5 NAME 'kedId'
   DESC 'An identifier for an entry. The id is not unique as each version of
   the same entry as the same id with a different timestamp'
-  SUP kedContent
+  SYNTAX 1.3.6.1.4.1.1466.115.121.1.15
+  EQUALITY caseExactMatch
+  SUBSTR caseExactSubstringsMatch
+  ORDERING caseExactOrderingMatch
   SINGLE-VALUE
  )
 olcAttributeTypes: (kedAttr:6 NAME 'kedName'
   DESC 'A name for human'
   SYNTAX 1.3.6.1.4.1.1466.115.121.1.15
-  SUP kedContentType
+  EQUALITY caseIgnoreMatch
+  SUBSTR caseIgnoreSubstringsMatch
+  ORDERING caseIgnoreOrderingMatch
  )
 olcAttributeTypes: (kedAttr:7 NAME 'kedDeleted'
   DESC 'Unix timestamp of deletion'
-  SUP kedTimestamp
+  EQUALITY integerMatch
+  ORDERING integerOrderingMatch
+  SYNTAX 1.3.6.1.4.1.1466.115.121.1.27
   SINGLE-VALUE
  )
 olcAttributeTypes: (kedAttr:8 NAME 'kedModified'
   DESC 'Unix timestamp of modification'
-  SUP kedTimestamp
+  EQUALITY integerMatch
+  ORDERING integerOrderingMatch
+  SYNTAX 1.3.6.1.4.1.1466.115.121.1.27 
   SINGLE-VALUE
  )
 olcAttributeTypes: (kedAttr:9 NAME 'kedSignature'
   DESC 'Signature of the content if any. Use text representation'
-  SUP kedContent
+  SYNTAX 1.3.6.1.4.1.1466.115.121.1.15
+  EQUALITY caseExactMatch
+  SUBSTR caseExactSubstringsMatch
+  ORDERING caseExactOrderingMatch
   SINGLE-VALUE
  )
 olcAttributeTypes: (kedAttr:10 NAME 'kedApplication'
   DESC 'Application specific information'
   SYNTAX 1.3.6.1.4.1.1466.115.121.1.15
-  SUP kedContentType
+  EQUALITY caseIgnoreMatch
+  SUBSTR caseIgnoreSubstringsMatch
+  ORDERING caseIgnoreOrderingMatch
  )
 olcAttributeTypes: (kedAttr:11 NAME 'kedContentReference'
   DESC 'Reference to the actual/complete content'
-  SUP kedContent
+  SYNTAX 1.3.6.1.4.1.1466.115.121.1.15
+  EQUALITY caseExactMatch
+  SUBSTR caseExactSubstringsMatch
+  ORDERING caseExactOrderingMatch
   SINGLE-VALUE
  )
 olcAttributeTypes: (kedAttr:12 NAME 'kedTaskEnd'
   DESC 'Unix time when the task should end'
-  SUP kedTimestamp
+  EQUALITY integerMatch
+  ORDERING integerOrderingMatch
+  SYNTAX 1.3.6.1.4.1.1466.115.121.1.27
   SINGLE-VALUE
  ) 
 olcAttributeTypes: (kedAttr:13 NAME 'kedTaskDone'
   DESC 'Unix time when the task ended'
-  SUP kedTimestamp
+  EQUALITY integerMatch
+  ORDERING integerOrderingMatch
+  SYNTAX 1.3.6.1.4.1.1466.115.121.1.27
   SINGLE-VALUE
  )
 olcAttributeTypes: (kedAttr:14 NAME 'kedTaskPrevious'
   DESC 'Tasks that should be ended before this one can be done'
-  SUP kedNext
+  EQUALITY distinguishedNameMatch
+  SYNTAX 1.3.6.1.4.1.1466.115.121.1.12
  )
 olcAttributeTypes: (kedAttr:15 NAME 'kedEventStart'
   DESC 'Unix time when an event start'
-  SUP kedTimestamp
+  EQUALITY integerMatch
+  ORDERING integerOrderingMatch
+  SYNTAX 1.3.6.1.4.1.1466.115.121.1.27
   SINGLE-VALUE
  )
 olcAttributeTypes: (kedAttr:16 NAME 'kedEventStop'
   DESC 'Unix time when an event stop'
-  SUP kedTimestamp
+  EQUALITY integerMatch
+  ORDERING integerOrderingMatch
+  SYNTAX 1.3.6.1.4.1.1466.115.121.1.27
   SINGLE-VALUE
  )
 olcAttributeTypes: (kedAttr:17 NAME 'kedEventAttendee'
   DESC 'People that attend to the event (DN of an address entry)'
-  SUP kedNext
+  EQUALITY distinguishedNameMatch
+  SYNTAX 1.3.6.1.4.1.1466.115.121.1.12
  )
 olcAttributeTypes: (kedAttr:18 NAME 'kedEventOrganizer'
   DESC 'People that organize the event (DN of an address entry)'
-  SUP kedNext
+  EQUALITY distinguishedNameMatch
+  SYNTAX 1.3.6.1.4.1.1466.115.121.1.12
  ) 
 olcObjectClasses: (kedClass:1 NAME 'kedEntry'
   SUP top

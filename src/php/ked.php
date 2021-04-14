@@ -342,6 +342,7 @@ class ked {
                 $value = $this->getLdapValue($this->conn, $entry, $attr);
                 if ($value !== null) { $currentEntry[$attr] = $value; }
             }
+            $currentEntry['id'] = $currentEntry['id'] . '-' . $currentEntry['created'];
             $history[] = $currentEntry;
         }
         return $history;
@@ -383,6 +384,7 @@ class ked {
 
     function updateEntryByDn (string $dn, ?string $content, array $options = []):?string {
         $currentEntry = $this->getCurrentEntryByDn($dn);
+        var_dump($currentEntry);
         if ($currentEntry === null) { return null; }
         $options['id'] = $currentEntry['id'];
         if (empty($options['type']) && !empty($currentEntry['type'])) {
@@ -480,11 +482,19 @@ class ked {
     /* Return document DN for given id */
     function getDocumentDn (string $docId, bool $includeDeleted = false, array $options = []):?string {
         $filter = '';
-
+        if (!isset($options['timestamp'])) { $options['timestamp'] = null; }
         if ($includeDeleted) {
-            $filter = $this->buildFilter('(&(objectclass=kedDocument)(kedId=%s))', $docId);
+            if ($options['timestamp']) {
+                $filter = $this->buildFilter('(&(objectclass=kedDocument)(kedId=%s)(kedTimestamp=%s))', $docId, $options['timestamp']);
+            } else {
+                $filter = $this->buildFilter('(&(objectclass=kedDocument)(kedId=%s))', $docId);
+            }
         } else {
-            $filter = $this->buildFilter('(&(objectclass=kedDocument)(kedId=%s)(!(kedDeleted=*)))', $docId);
+            if ($options['timestamp']) {
+                $filter = $this->buildFilter('(&(objectclass=kedDocument)(kedId=%s)(!(kedDeleted=*))(kedTimestamp=%s))', $docId, $options['timestamp']);
+            } else {
+                $filter = $this->buildFilter('(&(objectclass=kedDocument)(kedId=%s)(!(kedDeleted=*)))', $docId);
+            }
         }
         if (empty($options['parent'])) {
             $res = @ldap_search($this->conn, $this->base, $filter, [ 'dn' ]);
@@ -506,11 +516,21 @@ class ked {
 
     function getDn (string $id, bool $includeDeleted = false, array $options = []):?string {
         $filter = '';
+        if (!isset($options['timestamp'])) { $options['timestamp'] = null; }
         if ($includeDeleted) {
-            $filter = $this->buildFilter('(&(kedId=%s)(!(kedNext=*)))', $id);
+            if ($options['timestamp']) {
+                $filter = $this->buildFilter('(&(kedId=%s)(kedTimestamp=%s))', $id, $options['timestamp']);
+            } else {
+                $filter = $this->buildFilter('(&(kedId=%s)(!(kedNext=*)))', $id);
+            }
         } else {
-            $filter = $this->buildFilter('(&(kedId=%s)(!(kedDeleted=*))(!(kedNext=*)))', $id);
+            if ($options['timestamp']) {
+                $filter = $this->buildFilter('(&(kedId=%s)(kedTimestamp=%s)(!(kedDeleted=*)))', $id, $options['timestamp']);
+            } else {
+                $filter = $this->buildFilter('(&(kedId=%s)(!(kedDeleted=*))(!(kedNext=*)))', $id);
+            }
         }
+        
         if (empty($options['parent'])) {
             $res = @ldap_search($this->conn, $this->base, $filter, [ 'dn' ]);
         } else {
