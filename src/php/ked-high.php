@@ -321,12 +321,8 @@ class high extends ked {
         return $this->createEntry($docDn, null, [ 'type' => $filetype, 'contentRef' => $hash, 'application' => $application ]);
     }
 
-    function addImageEntry (string $path, string $file, array $application = []):?string {
-        $docDn = $this->pathToDn($path);
-        if ($docDn === null) { return null; }
-        if (!$this->store) { return null; }
-        $content = '';
-
+    function convertImageToContent (string $file):?array {
+        $content = null;
         try {
             /* generate a thumbnail 400x400 max */
             $im = new Imagick($file);
@@ -358,7 +354,41 @@ class high extends ked {
             if (!rename($file, $filepath)) { return null; }
         }
 
-        return $this->createEntry($docDn, $content, [ 'type' => $imageType, 'contentRef' => $hash, 'application' => $application ]);
+        return [ 'raw' => $content, 'contentRef' => $hash, 'type' => $imageType ];
+    }
+
+    function _imageEntry (string $file, array $application = []):?array {
+        $img = $this->convertImageToContent($file);
+        if ($img === null) { return null; }
+        $content = null;
+        if ($img['raw']) { $content = $img['raw']; unset($img['raw']); }
+        $options = $img;
+        $options['application'] = $application;
+        return [$content, $options];        
+    }
+
+    function addImageEntry (string $path, string $file, array $application = []):?string {
+        $docDn = $this->pathToDn($path);
+
+        if ($docDn === null) { return null; }
+        if (!$this->store) { return null; }
+        
+        $imgEntry = $this->_imageEntry($file, $application);
+        if ($imgEntry === NULL) { return null; }
+
+        return $this->createEntry($docDn, $imgEntry[0], $imgEntry[1]);
+    }
+
+    function updateImageEntry (string $path, string $file, array $application = []):?string {
+        $entryDn = $this->pathToDn($path, false);
+
+        if ($entryDn === null) { return null; }
+        if (!$this->store) { return null; }
+
+        $imgEntry = $this->_imageEntry($file, $application);
+        if ($imgEntry === NULL) { return null; }
+
+        return $this->updateEntryByDn($entryDn, $imgEntry[0], $imgEntry[1]);
     }
 }
 

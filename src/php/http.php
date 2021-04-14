@@ -269,6 +269,10 @@ class http {
                 $this->ok(json_encode($document));
                 break;
             case 'add-entry':
+            case 'update-entry':
+                $update = false;
+                if ($body['operation'] === 'update-entry') { $update = true; }
+
                 if (empty($body['path'])) { $this->errorBadRequest(); }
                 if (empty($body['_file']) || !is_array($body['_file'])) { $this->errorBadRequest(); }
 
@@ -281,17 +285,30 @@ class http {
                 if (!empty($body['_file']['size'])) {
                     $application[] = 'ked:size=' . $body['_file']['size'];
                 }
+                $id;
                 switch($mimeparts[0]) {
                     case 'text':
                         $content = file_get_contents($body['_file']['tmp_name']);
                         if ($content === false) { $this->errorBadRequest(); }
-                        $id = $this->ked->addTextEntry($body['path'], $content, $body['_file']['type'], $application);
+                        if ($update) {
+                            //$id = $this->ked->updateTextEntry($body['path'], $content, $body['_file']['type'], $application);
+                        } else {
+                            $id = $this->ked->addTextEntry($body['path'], $content, $body['_file']['type'], $application);
+                        }
                         break;
                     case 'image':
-                        $id = $this->ked->addImageEntry($body['path'], $body['_file']['tmp_name'], $application);
+                        if ($update) {
+                            $id = $this->ked->updateImageEntry($body['path'], $body['_file']['tmp_name'], $application);
+                        } else {
+                            $id = $this->ked->addImageEntry($body['path'], $body['_file']['tmp_name'], $application);
+                        }
                         break;
                     default:
-                        $id = $this->ked->addBinaryEntry($body['path'], $body['_file']['tmp_name'], $body['_file']['type'], $application);
+                        if ($update) {
+                            //$id = $this->ked->updateBinaryEntry($body['path'], $body['_file']['tmp_name'], $body['_file']['type'], $application);
+                        } else {
+                            $id = $this->ked->addBinaryEntry($body['path'], $body['_file']['tmp_name'], $body['_file']['type'], $application);
+                        }
                         break;
                 }
                 if ($id === null) { $this->errorUnableToOperate(); }

@@ -3,6 +3,13 @@ function KEditor(container, baseUrl) {
     this.baseUrl = baseUrl
     this.cwd = ''
 
+    this.quillOpts = {
+        theme: 'snow',
+        modules: {
+            toolbar: true
+        }
+    }
+
     this.data = {}
 
     /* bind edit function to this ... not sure of that but it works */
@@ -71,6 +78,11 @@ KEditor.prototype.ls = function () {
     })
 }
 
+KEditor.prototype.getInfo = function (docId) {
+    return new Promise((resolve, reject) => {
+    })
+}
+
 KEditor.prototype.cd = function (id) {
     if (id === '.') { return }
     if (id === '..') {
@@ -113,18 +125,16 @@ KEditor.prototype.edit = {
     quills: function (contentNode) {
         contentNode.innerHTML = '<div></div>'
         let content = this.data[contentNode.dataset.entryid]
-        const quill = new Quill(contentNode.firstElementChild, {
-            theme: 'snow',
-            modules: {
-                toolbar: true
-            }
-        })
+        const quill = new Quill(contentNode.firstElementChild, this.quillOpts)
         quill.setContents(content)
     },
     text: function (contentNode) {
         let content = this.data[contentNode.dataset.entryid]
         contentNode.innerHTML = '<textarea style="width: calc(100% - 8px); height: 380px"></textarea>'
         contentNode.firstElementChild.value = content
+    },
+    file: function (contentNode) {
+        this.uploadFileInteract(contentNode)
     }
 }
 
@@ -149,12 +159,14 @@ KEditor.prototype.renderEntry = function (path, entry) {
                 htmlnode.setAttribute('width', '200px')
                 htmlnode.setAttribute('height', '200px')
                 htmlnode.setAttribute('controls', '')
+                htmlnode.dataset.edit = 'file'
                 subresolve(htmlnode)
                 return
             case 'image':
                 htmlnode = document.createElement('IMG')
                 htmlnode.src = this.buildPath(path, entry.id)
                 htmlnode.classList.add('kimage')
+                htmlnode.dataset.edit = 'file'
                 subresolve(htmlnode)
                 return
             case 'text':
@@ -208,6 +220,7 @@ KEditor.prototype.renderEntry = function (path, entry) {
                 let oname = entry.application?.find(value => value.startsWith('ked:name='))
                 if (oname) { oname = oname.split('=')[1] }
                 htmlnode.innerHTML = `<span class="name">${oname ? oname : ''}</span>`
+                htmlnode.dataset.edit = 'file'
                 subresolve(htmlnode)
                 return
         }
@@ -363,17 +376,18 @@ KEditor.prototype.updateTask = function (docNode, values = []) {
     })
 }
 
-KEditor.prototype.uploadFile = function (docNode, event) {
-    event.preventDefault()
+KEditor.prototype.uploadFile = function (node, event) {
     const files = event.target.files
+    const op = node.dataset.entryid ? 'update-entry' : 'add-entry'
+    const path = op === 'update-entry' ? this.buildPath(this.cwd, this.buildPath(node.dataset.parentid, node.dataset.entryid)) :  this.buildPath(this.cwd, node.dataset.pathid)
     let allTransfers = []
     for (let i = 0; i < files.length; i++) {
         allTransfers.push(new Promise ((resolve, reject) => {
             const formData = new FormData()
-            formData.append('operation', 'add-entry')
-            formData.append('file', files[i])
+            formData.append('operation', op)
             formData.append('_filename', files[i].name)
-            formData.append('path', this.buildPath(this.cwd, docNode.dataset.pathid))
+            formData.append('path', path)
+            formData.append('file', files[i])
             this.fetch('', formData)
             .then(_ => {
                 resolve()
@@ -397,12 +411,7 @@ KEditor.prototype.addTextInteract = function (docNode) {
         })
     })
     .then(() => {
-        const quill = new Quill(quillNode.firstElementChild, {
-            theme: 'snow',
-            modules: {
-                toolbar: true
-            }
-        })
+        const quill = new Quill(quillNode.firstElementChild, this.quillOpts)
         quillNode.lastElementChild.addEventListener('click', event => {
             clearInterval(quill.editor.timer)
             const htmlContent = quill.root.innerHTML
@@ -455,23 +464,30 @@ KEditor.prototype.render = function (root) {
     if (!root.documents) { console.log(root); return }
 
     (new Promise((resolve, reject) => {
-        if (!this.clearOnRender) {
-            if (this.container.firstChild && this.container.firstChild.classList.contains('kmenu')) {
-                resolve();
-                return
-            }
-        }
         const menu = document.createElement('DIV')
         menu.classList.add('kmenu')
-        menu.innerHTML = `
-            <span class="kemu-item" data-action="add-doc"><i class="fas fa-passport"></i></span>
-        `
-        menu.addEventListener('click', this.menuEvents.bind(this))
-        window.requestAnimationFrame(_ => {
-            if (this.clearOnRender) { this.container.innerHTML = '' }
-            this.clearOnRender = false
-            this.container.appendChild(menu)
-            resolve()
+        let p = Promise.resolve()
+        if (this.cwd === '') {
+            menu.innerHTML = `
+                <span class="kemu-item" data-action="add-doc"><i class="fas fa-passport"></i></span>
+            `
+        } else {
+            p = new Promise((resolve, reject) => {
+                menu.innerHTML = `SUB`
+            })
+        }
+        p.then(_ => {
+            menu.addEventListener('click', this.menuEvents.bind(this))
+            window.requestAnimationFrame(_ => {
+                if (this.clearOnRender) { this.container.innerHTML = '' }
+                this.clearOnRender = false
+                if (this.container.firstChild && this.container.firstChild.classList.contains('kmenu')) {
+                    this.container.replaceChild(menu, this.container.firstChild)
+                } else {
+                    this.container.appendChild(menu)
+                }
+                resolve()
+            })
         })
     })).then(_ => {
         let chain = Promise.resolve()
@@ -495,8 +511,7 @@ KEditor.prototype.render = function (root) {
                         }
 
                         switch (doc.class) {
-                            case 'document':
-                              
+                            case 'document': 
                                 let date = new Date(doc.created)
                                 htmlnode = document.createElement('DIV')
                                 htmlnode.innerHTML = `<div class="kmetadata ${doc['+childs'] > 0 ? 'childs' : ''}">
@@ -594,7 +609,7 @@ KEditor.prototype.render = function (root) {
                                     break;
                                 }
                                 const curCreated = new Date(n.dataset.created) 
-                                if (curCreated.getTime() < insCreated.getTime()) {
+                                if (curCreated.getTime() > insCreated.getTime()) {
                                     insert = n
                                 }
                             }

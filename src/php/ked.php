@@ -136,10 +136,6 @@ class ked {
         return $rdn[1];
     }
 
-    function deleteEntry (string $docId, string $entryId) {
-        $this->getCurrentEntry($docId, $entryId);
-    }
-
     function createEntry (string $docDn, ?string $content, array $options = []):?string {
         $rdn = $this->createRdn($options);
 
@@ -309,6 +305,29 @@ class ked {
         return $currentEntry;
     }
 
+    function getParentDn (string $dn):string {
+        $parts = ldap_explode_dn($dn, 0);
+        unset($parts['count']);
+        array_shift($parts);
+        return implode(',', $parts);
+    }
+
+    function getCurrentEntryByDn(string $entryDn):?array {
+        $entry = $this->getMetadata($entryDn);
+        $filter = $this->buildFilter('(&(objectClass=kedEntry)(kedId=%s)(!(kedNext=*))(!(kedDeleted=*)))', $entry['id']);
+
+        $res = @ldap_list($this->conn, $this->getParentDn($entry['__dn']), $filter, [ '*' ]);
+        if (!$res) { $this->ldapFail(__FUNCTION__, $this->conn); return null; }
+        $entriesCount = @ldap_count_entries($this->conn, $res);
+        if ($entriesCount === false) { $this->ldapFail(__FUNCTION__, $this->conn); return null; }
+        if ($entriesCount > 1) { $this->logicFail(__FUNCTION__, 'Too many entries'); return null; }
+        if ($entriesCount < 1) { return null; }
+        
+        $entry = @ldap_first_entry($this->conn, $res);
+        if (!$entry) { $this->ldapFail(__FUNCTION__, $this->conn); return null; }
+        return $this->getLdapObject($this->conn, $entry);
+    }
+
     /* Return historic entries for given entry and document id */
     function getEntryHistory (string $docDn, string $entryId):array {
         $history = [];
@@ -346,7 +365,7 @@ class ked {
         return $currentEntry['id'];
     }
 
-    function updateEntry (string $docDn, string $entryId, string $content, array $options = []):?string {
+    function updateEntry (string $docDn, string $entryId, ?string $content, array $options = []):?string {
         $currentEntry = $this->getCurrentEntry($docDn, $entryId);
         if ($currentEntry === null)  { return null; }
         $options['id'] = $currentEntry['id'];
@@ -360,6 +379,29 @@ class ked {
         $res = ldap_mod_replace($this->rwconn, $currentEntry['__dn'], $updateCurrent);
         if (!$res) { $this->ldapFail(__FUNCTION__, $this->rwconn); return null; }
         return $currentEntry['id']; // update do not change the id
+    }
+
+    function updateEntryByDn (string $dn, ?string $content, array $options = []):?string {
+        $currentEntry = $this->getCurrentEntryByDn($dn);
+        if ($currentEntry === null) { return null; }
+        $options['id'] = $currentEntry['id'];
+        if (empty($options['type']) && !empty($currentEntry['type'])) {
+            $options['type'] = $currentEntry['type'];
+        }
+        $options['__update'] = true;
+        $newEntryDn = $this->createEntry($this->getParentDn($currentEntry['__dn']), $content, $options);
+        if ($newEntryDn === null) { return null; }
+        $updateCurrent = [ 'kedModified' => time(), 'kedNext' => $newEntryDn ];
+        $res = @ldap_mod_replace($this->rwconn, $currentEntry['__dn'], $updateCurrent);
+        if (!$res) {
+            /* rollback operation */
+            $this->ldapFail(__FUNCTION__, $this->rwconn);
+            if (!@ldap_delete($this->rwconn, $newEntryDn)) {
+                $this->ldapFail(__FUNCTION__, $this->rwconn, 'Directory must be in bad state for this to happen');
+            }
+            return null;
+        }
+        return $newEntryDn;
     }
 
     function updateInPlaceAny (string $dn, array $params = []):bool {
@@ -376,7 +418,6 @@ class ked {
         if (empty($delAttributes) && empty($attributes)) { return true; }
         
         $attributes['kedModified'] = time();
-        print_r($attributes);
         if (!empty($delAttributes)) {
             $res = @ldap_mod_del($this->rwconn, $dn, $delAttributes);
             if (!$res) { $this->ldapFail($this->rwconn, $dn); return false; }
@@ -466,9 +507,9 @@ class ked {
     function getDn (string $id, bool $includeDeleted = false, array $options = []):?string {
         $filter = '';
         if ($includeDeleted) {
-            $filter = $this->buildFilter('(kedId=%s)', $id);
+            $filter = $this->buildFilter('(&(kedId=%s)(!(kedNext=*)))', $id);
         } else {
-            $filter = $this->buildFilter('(&(kedId=%s)(!(kedDeleted=*)))', $id);
+            $filter = $this->buildFilter('(&(kedId=%s)(!(kedDeleted=*))(!(kedNext=*)))', $id);
         }
         if (empty($options['parent'])) {
             $res = @ldap_search($this->conn, $this->base, $filter, [ 'dn' ]);
