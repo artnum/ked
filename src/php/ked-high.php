@@ -83,6 +83,7 @@ class high extends ked {
             } else {
                 $object['+entries'] = $this->countDocumentEntries($object['__dn']);
             }
+            $object['+history'] = [];
             $object = $this->filterConvertResult($object);
             $documents[] = $object;
         }
