@@ -20,11 +20,11 @@ trait kedInode {
         $parts = explode('.', $name);
         if (count($parts) > 1) {
             $ext = array_pop($parts);
-            $parts[count($parts) - 1] .= ' [id:' . $id . ']';
+            $parts[count($parts) - 1] .= ' [id ' . $id . ']';
             $parts[] = $ext;
             return join('.', $parts);
         }
-        return $name . ' [id:' . $id . ']';
+        return $name . ' [id ' . $id . ']';
     }
 
     function getName() {
@@ -104,7 +104,7 @@ class KDirectory extends DAV\Collection {
 
         $parts = explode(high::PATH_SEPARATOR, $path);
         foreach($parts as &$part) {
-            if (preg_match('/.*\[id:([^\]]+)\].*/', $part, $matches)) {
+            if (preg_match('/.*\[id ([^\]]+)\].*/', $part, $matches)) {
                 $part = $matches[1];
             }
         }
