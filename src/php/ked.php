@@ -208,7 +208,7 @@ class ked {
 
     function getMetadata (string $dn):?array {
         $res = @ldap_read($this->conn, $dn, '(objectclass=*)', [ 
-            'kedId', 'kedTimestamp', 'kedDeleted', 'kedModified', 'objectClass', 'kedContentType', 'kedSignature', 'kedApplication'
+            'kedId', 'kedTimestamp', 'kedDeleted', 'kedModified', 'objectClass', 'kedContentType', 'kedSignature', 'kedApplication', 'kedContentReference'
             ]);
         if (!$res) { $this->ldapFail(__FUNCTION__, $this->conn); return null; }
         $entry = @ldap_first_entry($this->conn, $res);
@@ -515,6 +515,20 @@ class ked {
         $dn = @ldap_get_dn($this->conn, $entry);
         if (!$dn) { $this->ldapFail(__FUNCTION__, $this->conn); return null; }
 
+        return $dn;
+    }
+
+    function getDnByName (string $name, string $parentDn):?string {
+        $filter = $this->buildFilter('(&(|(kedName=%s)(kedApplication=%s))(!(kedNext=*)))', $name, 'ked:name=' . $name);
+        $res = @ldap_list($this->conn, $parentDn, $filter, [ 'dn' ]);
+        if (!$res) { $this->ldapFail(__FUNCTION__, $this->conn); return null; }
+        $countEntries = @ldap_count_entries($this->conn, $res);
+        if ($countEntries === false) { $this->ldapFail(__FUNCTION__, $this->conn); return null; }
+        if ($countEntries !== 1) { return null; }
+        $entry = @ldap_first_entry($this->conn, $res);
+        if (!$entry) { $this->ldapFail(__FUNCTION__, $this->conn); return null;}
+        $dn = @ldap_get_dn($this->conn, $entry);
+        if (!$dn) { $this->ldapFail(__FUNCTION__, $this->conn); return null; }
         return $dn;
     }
 

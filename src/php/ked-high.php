@@ -140,6 +140,23 @@ class high extends ked {
         return $currentDir;
     }
 
+    function searchDnByAny (string $path):?string {
+        if ($path === '' || $path === '[root]') { return $this->base; }
+        $elements = explode(self::PATH_SEPARATOR, $path);
+        $currentDir = $this->base;
+        foreach ($elements as $fname) {
+            /* first by dn */
+            $newCurrentDir = $this->getDnByName($fname, $currentDir);
+            if ($newCurrentDir === null) {
+                $hpart = explode('-', $fname, 2);
+                $newCurrentDir = $this->getDn($hpart[0], false, ['parent' => $currentDir, 'timestamp' => $hpart[1] ?? null]);
+            } 
+            if ($newCurrentDir === null) { return null;}
+            $currentDir = $newCurrentDir;
+        }
+        return $currentDir;
+    }
+
     /* return basic info on path */
     function getInfo (string $path, $filter = true):?array {
         $dn = $this->pathToDn($path, false);
@@ -321,13 +338,7 @@ class high extends ked {
             return $this->createEntry($docDn, $text, ['type' => $type]);
         } else {
             $hash = $this->hash($text);
-            $filepath = $this->getFilePath($hash);
-            if (!$this->createStorePath($filepath)) { return null; }
-            if (!file_exists($filepath)) {               
-                $written = file_put_contents($filepath, $text);
-                if (!$written) { return null; }
-                if ($written < $textSize) { return null; }
-            }
+            if (!$this->createFile($text, $hash)) { return null; }
             $subtext = '';
             switch ($type) {
                 /* default split to a space near the end if possible */
@@ -345,19 +356,34 @@ class high extends ked {
         }
     }
 
+    function moveFile (string $file, string $hash):bool {
+        $filepath = $this->getFilePath($hash);
+        if (!$this->createStorePath($filepath)) { return false; }
+        if (file_exists($filepath)) {
+            @unlink($file);
+        } else {
+            if (!rename($file, $filepath)) { return false; }
+        }
+        return true;
+    }
+
+    function createFile (string $content, string $hash):bool {
+        $filepath = $this->getFilePath($hash);
+        if (!$this->createStorePath($filepath)) { return false; }
+        if (file_exists($filepath)) { return true; }
+        $written = file_put_contents($filepath, $content);
+        if (!$written) { return false; }
+        if ($written !== strlen($content)) { @unlink($filepath); return false; }
+        return true;
+    }
+
     function updateBinaryEntry (string $path, string $file, string $filetype = 'application/octet-stream',  array $application = []):?string {
         $entryDn = $this->pathToDn($path, false);
         if ($entryDn === null) { return null; }
         if (!$this->store) { return null; }
 
         $hash = $this->hash($file, true);
-        $filepath = $this->getFilePath($hash);
-        if (!$this->createStorePath($filepath)) { return null; }
-        if (file_exists($filepath)) {
-            @unlink($file); // already available
-        } else {
-            if (!rename($file, $filepath)) { return null; }
-        }
+        if (!$this->moveFile($file, $hash)) { return null; }
 
         return $this->updateEntryByDn($entryDn, null, ['type' => $filetype, 'contentRef' => $hash, 'application' => $application]);
     }
@@ -368,13 +394,7 @@ class high extends ked {
         if (!$this->store) { return null; }
         
         $hash = $this->hash($file, true);
-        $filepath = $this->getFilePath($hash);
-        if (!$this->createStorePath($filepath)) { return null; }
-        if (file_exists($filepath)) {
-            @unlink($file); // already available
-        } else {
-            if (!rename($file, $filepath)) { return null; }
-        }
+        if (!$this->moveFile($file, $hash)) { return null; }
 
         return $this->createEntry($docDn, null, [ 'type' => $filetype, 'contentRef' => $hash, 'application' => $application ]);
     }
@@ -404,13 +424,7 @@ class high extends ked {
         }
 
         $hash = $this->hash($file, true);
-        $filepath = $this->getFilePath($hash);
-        if (!$this->createStorePath($filepath)) { return null; }
-        if (file_exists($filepath)) {
-            @unlink($file); // already available
-        } else {
-            if (!rename($file, $filepath)) { return null; }
-        }
+        if (!$this->moveFile($file, $hash)) { return null; }
 
         return [ 'raw' => $content, 'contentRef' => $hash, 'type' => $imageType ];
     }
