@@ -184,10 +184,15 @@ class http {
                     $childs = $this->ked->listDirectory($info['__dn']);
                     $this->printDir($info, $childs);
                 } else {
-                    header('Content-Type: ' . $info['type']);
                     if (!empty($info['contentRef'])) {
-                        $this->ok(null);
-                        readfile($this->ked->getFilePath($info['contentRef']));
+                        $filePath = $this->ked->getFilePath($info['contentRef']);
+                        if (is_readable($filePath)) {
+                            header('Content-Type: ' . $info['type']);
+                            $this->ok(null);
+                            readfile($this->ked->getFilePath($info['contentRef']));
+                        } else {
+                            $this->errorNotFound();
+                        }
                     } else {
                         $this->ok($info['content']);
                     }
