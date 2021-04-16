@@ -80,15 +80,19 @@ class ked {
     function getLdapValue ($conn, $entry, string $mapName) {
         if (!isset(self::attrMap[$mapName])) { return null; }
         $lattr = self::attrMap[$mapName];
+        $entryAttributes = @ldap_get_attributes($conn, $entry);
+        if ($entryAttributes === false) { $this->ldapFail(__FUNCTION__, $conn); return null; }
+        unset($entryAttributes['count']);
+        if (!in_array($lattr[0], $entryAttributes)) { return null; }
         if ($lattr[2]) {
             $value = @ldap_get_values_len($conn, $entry, $lattr[0]);
-            if (!$value) { return null; }
+            if (!$value) { $this->ldapFail(__FUNCTION__, $conn); return null; }
             if ($value['count'] === 1) { return $value[0]; }
             unset($value['count']);
             return $value;
         }
         $value = @ldap_get_values($conn, $entry, $lattr[0]);
-        if (!$value) { return null; }
+        if (!$value) { $this->ldapFail(__FUNCTION__, $conn); return null; }
         if ($value['count'] === 1) { return $value[0]; }
         unset($value['count']);
         return $value;
