@@ -16,14 +16,27 @@ trait kedInode {
         return $ked->getMetadata($dn);
     }
 
+    function uniqueName ($name, $id) {
+        $parts = explode('.', $name);
+        if (count($parts) > 1) {
+            $ext = array_pop($parts);
+            $parts[count($parts) - 1] .= ' [id:' . $id . ']';
+            $parts[] = $ext;
+            return join('.', $parts);
+        }
+        return $name . ' [id:' . $id . ']';
+    }
+
     function getName() {
         $meta = $this->_getMeta();
         if (empty($meta['+class'])) { return ''; }
-        if (isset($meta['name'])) { return $meta['name']; }
+        if (isset($meta['name'])) { 
+            return $this->uniqueName($meta['name'], $meta['id']); 
+        }
         if (isset($meta['application'])) {
             foreach ($meta['application'] as $appData) {
                 if (substr($appData, 0, 8) === 'ked:name') {
-                    return substr($appData, 9);
+                    return $this->uniqueName(substr($appData, 9), $meta['id']);
                 }
             }
         }
@@ -47,7 +60,7 @@ class KDirectory extends DAV\Collection {
     private $ked;
     private $path;
     private $dn;
-    private $meta;
+    protected $meta;
 
     function __construct (high $ked, string $path = '', $meta = null) {
         $this->ked = $ked;
@@ -86,15 +99,20 @@ class KDirectory extends DAV\Collection {
     }
 
     function getChild($name) {
-        $path = '';
-        if (empty($this->path)) {
-            $path = $name;
-        } else {
-            $path = $this->path . high::PATH_SEPARATOR . $path;
+
+        $path = $this->childPath($name);
+
+        $parts = explode(high::PATH_SEPARATOR, $path);
+        foreach($parts as &$part) {
+            if (preg_match('/.*\[id:([^\]]+)\].*/', $part, $matches)) {
+                $part = $matches[1];
+            }
         }
-        $dn = $this->ked->pathToDn($this->childPath($name), false);
+        $path = implode(high::PATH_SEPARATOR, $parts);
+
+        $dn = $this->ked->pathToDn($path, false);
         if (!$dn) {
-            $dn = $this->ked->searchDnByAny($this->childPath($name));
+            $dn = $this->ked->searchDnByAny($name);
         }
         if (!$dn) { throw new DAV\Exception('Can\'t load'); }
 
@@ -119,7 +137,7 @@ class KFile extends DAV\File {
     use kedInode;
     private $path;
     private $ked;
-    private $meta;
+    protected $meta;
     private $dn;
 
     function _getKed():high { return $this->ked; }
@@ -149,7 +167,7 @@ class KFile extends DAV\File {
             if (is_readable($path)) {
                 return fopen($path, 'r');
             }
-            throw new DAV\Exception('Unreadable');
+            return '';
         }
         $object = $this->ked->getAll($this->path, false);
         if ($object) {
@@ -168,7 +186,7 @@ class KFile extends DAV\File {
             return strlen($this->get());
         }
 
-        throw new DAV\Exception('You can\'t get always what you want');
+        return 0;
     }
 
     function getETag() {
