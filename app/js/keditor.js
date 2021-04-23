@@ -9,7 +9,7 @@ function KEditor(container, baseUrl) {
             toolbar: [
                 ['bold', 'italic', 'underline', 'strike'],        // toggled buttons
               
-                [{ 'header': 1 }, { 'header': 2 }, {'header': 3}],               // custom button values
+                [{ 'header': 1 }, { 'header': 2 }],
                 [{ 'list': 'ordered'}, { 'list': 'bullet' }],
                 [{ 'script': 'sub'}, { 'script': 'super' }],      // superscript/subscript
                 [{ 'indent': '-1'}, { 'indent': '+1' }],          // outdent/indent
@@ -52,6 +52,7 @@ KEditor.prototype.fetch = function (path, content) {
     return new Promise((resolve, reject) => {
         if (path.length > 0) { path = `/${path}` }
         let url = new URL(`${this.baseUrl.toString()}${path}`)
+        console.trace()
         fetch(url, {'method': 'POST',
             body: content instanceof FormData ? content : JSON.stringify(content)
         })
@@ -515,7 +516,8 @@ KEditor.prototype.render = function (root) {
             `
         } else {
             p = new Promise((resolve, reject) => {
-                menu.innerHTML = `SUB`
+                menu.innerHTML = ''
+                resolve()
             })
         }
         p.then(_ => {
