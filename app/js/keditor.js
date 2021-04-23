@@ -6,11 +6,28 @@ function KEditor(container, baseUrl) {
     this.quillOpts = {
         theme: 'snow',
         modules: {
-            toolbar: true
+            toolbar: [
+                ['bold', 'italic', 'underline', 'strike'],        // toggled buttons
+              
+                [{ 'header': 1 }, { 'header': 2 }, {'header': 3}],               // custom button values
+                [{ 'list': 'ordered'}, { 'list': 'bullet' }],
+                [{ 'script': 'sub'}, { 'script': 'super' }],      // superscript/subscript
+                [{ 'indent': '-1'}, { 'indent': '+1' }],          // outdent/indent
+              
+                [{ 'size': ['small', false, 'large', 'huge'] }],  // custom dropdown
+                [{ 'header': [1, 2, 3, 4, 5, 6, false] }],
+              
+                [{ 'color': [] }, { 'background': [] }],          // dropdown with defaults from theme
+                [{ 'font': [] }],
+                [{ 'align': [] }],
+              
+                ['clean']                                         // remove formatting button
+              ]
         }
     }
 
-    this.data = {}
+    this.data = new Map()
+    this.editors = new Map()
 
     /* bind edit function to this ... not sure of that but it works */
     for (let k in this.edit) {
@@ -123,13 +140,23 @@ KEditor.prototype.buildPath = function (comp0, comp1) {
 
 KEditor.prototype.edit = {
     quills: function (contentNode) {
+        if (contentNode.dataset.edition) {
+            const quill = this.editors.get(contentNode.dataset.entryid)
+            this.uploadText(contentNode, JSON.stringify(quill.getContents()), 'text/x-quill-delta')
+            this.editors.delete(contentNode.dataset.entryid)
+            delete quill
+            delete contentNode.dataset.edition
+            return;
+        }
         contentNode.innerHTML = '<div></div>'
-        let content = this.data[contentNode.dataset.entryid]
+        contentNode.dataset.edition = '1'
+        let content = this.data.get(contentNode.dataset.entryid)
         const quill = new Quill(contentNode.firstElementChild, this.quillOpts)
         quill.setContents(content)
+        this.editors.set(contentNode.dataset.entryid, quill)
     },
     text: function (contentNode) {
-        let content = this.data[contentNode.dataset.entryid]
+        let content = this.data.get(contentNode.dataset.entryid)
         contentNode.innerHTML = '<textarea style="width: calc(100% - 8px); height: 380px"></textarea>'
         contentNode.firstElementChild.value = content
     },
@@ -145,6 +172,7 @@ KEditor.prototype.renderEntry = function (path, entry) {
             if (entry['+class'].indexOf('task') !== -1) {
                 htmlnode.dataset.task = '1'
             }
+            htmlnode.classList.add('content')
             resolve(htmlnode)
         }
 
@@ -189,10 +217,10 @@ KEditor.prototype.renderEntry = function (path, entry) {
                                 return
                             case 'x-quill-delta':
                                 /* we display a transformed version, so keep data as original form */
-                                this.data[entry.id] = JSON.parse(content)
+                                this.data.set(entry.id, JSON.parse(content))
                                 const tmpContainer = document.createElement('DIV')
                                 const quill = new Quill(tmpContainer)
-                                quill.setContents(this.data[entry.id])
+                                quill.setContents(this.data.get(entry.id))
                                 htmlnode = document.createElement('DIV')
                                 htmlnode.innerHTML = quill.root.innerHTML
                                 htmlnode.classList.add('quilltext')
@@ -200,7 +228,7 @@ KEditor.prototype.renderEntry = function (path, entry) {
                                 subresolve(htmlnode)
                                 return
                             default:
-                                this.data[entry.id] = content
+                                this.data.set(entry.id, content)
                                 htmlnode = document.createElement('DIV')
                                 htmlnode.innerHTML = content
                                 htmlnode.classList.add('plaintext')
@@ -399,6 +427,20 @@ KEditor.prototype.uploadFile = function (node, event) {
     .then(_ => {
         this.ls()
     })
+}
+
+KEditor.prototype.uploadText = function (node, content, type = 'text/plain') {
+    const op = node.dataset.entryid ? 'update-entry' : 'add-entry'
+    console.log(node)
+    const path = op === 'update-entry' ? this.buildPath(this.cwd, this.buildPath(node.dataset.parentid, node.dataset.entryid)) :  this.buildPath(this.cwd, node.dataset.pathid)
+    const formData = new FormData()
+    const name = `${new Date().toISOString()}`
+    formData.append('operation', op)
+    formData.append('path', path)
+    formData.append('file', new File([content], name, {type: `${type};charset=utf-8`}))
+    formData.append('_filename', name)
+    this.fetch('', formData)
+    .then(_ => {this.ls()})
 }
 
 KEditor.prototype.addTextInteract = function (docNode) {

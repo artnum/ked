@@ -48,12 +48,21 @@
     overflow: hidden;
 }
 
-.kentry-container.flowed div {
-    font-size: 12pt;
+.kentry-container.flowed .content {
     max-height: 400px;
+    font-size: 16px;
     overflow-y: auto;
+    font-family: Arial, Helvetica, sans-serif;
 }
 
+.kentry-container.flowed .content[data-edition='1'] {
+    max-height: none;
+    font-size: 13px;
+}
+
+.kentry-container.flowed .ql-container {
+    height: 400px;
+}
 
 .keditorRoot .kmetadata {
     font-family: 'B612 Mono', monospace;

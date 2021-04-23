@@ -1,9 +1,10 @@
 <?php
-
 namespace ked;
 
-use Exception;
 use Sabre\DAV;
+
+include 'formats.php';
+
 
 trait kedInode {
     abstract public function _getKed():high;
@@ -163,15 +164,17 @@ class KFile extends DAV\File {
     
     function get() {
         if (isset($this->meta['contentRef'])) {
-            $path = $this->ked->getFilePath($this->meta['contentRef']);
-            if (is_readable($path)) {
-                return fopen($path, 'r');
-            }
-            return '';
+            $path = $path = $this->ked->getFilePath($this->meta['contentRef']);
+            if (!is_readable($path)) { return ''; }
+            $format = Format($path, $this->meta['type']);
+            $format->setMedium('dav');
+            return $format->get();
         }
         $object = $this->ked->getAll($this->path, false);
         if ($object) {
-            return $object['content'];
+            $format = Format($object['content'], $this->meta['type'], false);
+            $format->setMedium('dav');
+            return $format->get();
         }
         throw new DAV\Exception('Unreadable');
     }

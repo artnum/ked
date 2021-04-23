@@ -2,7 +2,6 @@
 namespace ked;
 
 use Normalizer;
-use Exception;
 
 class http {
     protected $ked;
@@ -308,7 +307,7 @@ class http {
                         $content = file_get_contents($body['_file']['tmp_name']);
                         if ($content === false) { $this->errorBadRequest(); }
                         if ($update) {
-                            //$id = $this->ked->updateTextEntry($body['path'], $content, $body['_file']['type'], $application);
+                            $id = $this->ked->updateTextEntry($body['path'], $content, $body['_file']['type'], $application);
                         } else {
                             $id = $this->ked->addTextEntry($body['path'], $content, $body['_file']['type'], $application);
                         }

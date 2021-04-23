@@ -1,8 +1,8 @@
 <?PHP
 
-use ked\ked;
 use ked\high;
 use ked\http;
+
 include ('../src/php/ked.php');
 include ('../src/php/ked-high.php');
 include ('../src/php/http.php');
