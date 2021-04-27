@@ -201,7 +201,6 @@ KEditor.prototype.renderEntry = function (path, entry) {
                 subresolve(htmlnode)
                 return
             case 'text':
-            case 'message':
                 fetch(new URL(this.buildPath(path, entry.id)))
                 .then(response => {
                     if (!response.ok) { resolve(null); return; }
@@ -211,7 +210,6 @@ KEditor.prototype.renderEntry = function (path, entry) {
                         subtype = type.split('/', 2)
                         if (subtype[1] === undefined) { resolve(null); return }
                         switch (subtype[1]) {
-                            case 'rf822':
                             case 'html':
                                 let x = document.createElement('HTML')
                                 x.innerHTML = content
@@ -264,6 +262,23 @@ KEditor.prototype.renderEntry = function (path, entry) {
                         htmlnode.dataset.edit = 'file'
                         subresolve(htmlnode)
                         return                       
+                    case 'message/rfc822':
+                        fetch(new URL(`${this.buildPath(path, entry.id)}?format=browser`))
+                        .then(response => {
+                            if (!response.ok) { return null; }
+                            return response.text()
+                        })      
+                        .then(content => {
+                            if (content === null) { return; }
+                            let x = document.createElement('HTML')
+                            x.innerHTML = content
+                            htmlnode = document.createElement('DIV')
+                            htmlnode.innerHTML = x.getElementsByTagName('BODY')[0].innerHTML
+                            htmlnode.classList.add('htmltext')
+                            subresolve(htmlnode)
+                            return
+                        })
+                        break;
                 }
         }
     })
