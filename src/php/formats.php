@@ -12,6 +12,8 @@ namespace ked {
 }
 
 namespace ked\formats {
+    require_once __DIR__ . '/vendor/autoload.php';
+
     class file {
         protected $in;
         protected $filepath;
@@ -56,49 +58,8 @@ namespace ked\formats {
                 $content = file_get_contents($this->path);
             }
             if ($content === false) { return ''; }
-            $delta = json_decode($content, true);
-            if ($delta === null) { return ''; }
-            $outcontent = '';
-            $bullet = null;
-            $currentline = '';
-            foreach ($delta['ops'] as $ops) {
-                if (isset($ops['insert'])) {
-                    if (!empty($ops['attributes'])) {
-                        foreach(array_keys($ops['attributes']) as $attr) {
-                            switch ($attr) {
-                                case 'header': 
-                                    $str = str_repeat('#', $ops['attributes'][$attr]) . ' ';
-                                    if (strchr($ops['insert'], "\n")) {
-                                        $currentline = $str . $currentline;   
-                                    }
-                                    break;
-                                case 'list':
-                                    if ($ops['attributes'][$attr] === 'bullet') {
-                                        $bullet = '* ';
-                                    } else {
-                                        if ($bullet === null) {
-                                            $bullet = 1;
-                                        } else {
-                                            $bullet++;
-                                        }
-                                    }
-                                    $str = '    ' . ($bullet === '* ' ? $bullet : strval($bullet) . ' ');
-                                    if (strchr($ops['insert'], "\n")) {
-                                        $currentline = $str . $currentline;   
-                                    }
-                                    break;
-
-                            }
-                        }
-                    }
-                    if (strchr($ops['insert'], "\n")) {
-                        $outcontent .= $currentline . $ops['insert'];
-                    } else {
-                        $currentline = $ops['insert'];
-                    }
-                }
-            }    
-            return $outcontent;
+            $quill = new \DBlackborough\Quill\Render($content, \DBlackborough\Quill\Options::FORMAT_GITHUB_MARKDOWN);
+            return $quill->render();
         }
 
         function output () {

@@ -266,7 +266,7 @@ class ked {
     function listDocumentEntries (string $docDn):array {
         $entries = [];
         $res = @ldap_list($this->conn, $docDn, '(&(objectclass=kedEntry)(!(kedNext=*))(!(kedDeleted=*)))', [ 
-            'kedId', 'kedTimestamp', 'kedDeleted', 'kedModified', 'objectClass', 'kedContentType', 'kedSignature'
+            'kedId', 'kedTimestamp', 'kedDeleted', 'kedModified', 'objectClass', 'kedContentType', 'kedSignature', 'kedApplication'
         ]);
         if (!$res) { $this->ldapFail(__FUNCTION__, $this->conn); return $entries; }
         for ($e = @ldap_first_entry($this->conn, $res); $e; $e = @ldap_next_entry($this->conn, $e)) {

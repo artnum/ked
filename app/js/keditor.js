@@ -12,13 +12,11 @@ function KEditor(container, baseUrl) {
                 [{ 'header': 1 }, { 'header': 2 }],
                 [{ 'list': 'ordered'}, { 'list': 'bullet' }],
                 [{ 'script': 'sub'}, { 'script': 'super' }],      // superscript/subscript
-                [{ 'indent': '-1'}, { 'indent': '+1' }],          // outdent/indent
               
                 [{ 'size': ['small', false, 'large', 'huge'] }],  // custom dropdown
                 [{ 'header': [1, 2, 3, 4, 5, 6, false] }],
               
                 [{ 'color': [] }, { 'background': [] }],          // dropdown with defaults from theme
-                [{ 'font': [] }],
                 [{ 'align': [] }],
               
                 ['clean']                                         // remove formatting button
@@ -167,6 +165,11 @@ KEditor.prototype.edit = {
 }
 
 KEditor.prototype.renderEntry = function (path, entry) {
+    console.log(entry)
+    let oname = entry.application?.find(value => value.startsWith('ked:name='))
+    if (oname) { oname = oname.split('=')[1] }
+    const EntryName = oname ?? ''
+    console.log(EntryName)
     return new Promise ((resolve, reject) => {
         const subresolve = function (htmlnode) {
             htmlnode.dataset.entryid = entry.id
@@ -174,6 +177,7 @@ KEditor.prototype.renderEntry = function (path, entry) {
                 htmlnode.dataset.task = '1'
             }
             htmlnode.classList.add('content')
+            htmlnode.dataset.name = EntryName
             resolve(htmlnode)
         }
 
@@ -248,9 +252,7 @@ KEditor.prototype.renderEntry = function (path, entry) {
                 htmlnode = document.createElement('A')
                 htmlnode.classList.add('klink')
                 htmlnode.href = this.buildPath(path, entry.id)
-                let oname = entry.application?.find(value => value.startsWith('ked:name='))
-                if (oname) { oname = oname.split('=')[1] }
-                htmlnode.innerHTML = `<span class="name">${oname ? oname : ''}</span>`
+                htmlnode.innerHTML = `<span class="name">${EntryName}</span>`
                 htmlnode.dataset.edit = 'file'
                 subresolve(htmlnode)
                 return
@@ -633,7 +635,10 @@ KEditor.prototype.render = function (root) {
                                         const entryTools = document.createElement('DIV')
                                         entryTools.classList.add('kentry-tools')
                                         entryTools.innerHTML = `<span data-action="edit-entry"><i class="fas fa-edit"></i></span>
-                                            ${nodes[i].dataset.task ? '<span data-action="to-not-task" class="fa-stack"><i class="fas fa-tasks fa-stack-1x"></i><i class="fas fa-slash fa-stack-1x"></i></span>' : '<span data-action="to-task"><i class="fas fa-tasks"></i></span>'}`
+                                            ${nodes[i].dataset.task ? 
+                                                '<span data-action="to-not-task" class="fa-stack"><i class="fas fa-tasks fa-stack-1x"></i><i class="fas fa-slash fa-stack-1x"></i></span>' 
+                                                : '<span data-action="to-task"><i class="fas fa-tasks"></i></span>'}`
+                                            + `<span class="name">${nodes[i].dataset.name}</span>`
                                         entryTools.addEventListener('click', this.handleToolsEvents.bind(this))
                                         entryContainer.appendChild(entryTools)
                                     }
@@ -644,27 +649,20 @@ KEditor.prototype.render = function (root) {
                     })).then(node => {    
                         if (node === null) { return }
                         window.requestAnimationFrame(() => {
-                            const insCreated = new Date(node.dataset.created)
+                            const insCreated = new Date(node.dataset.modified)
                             let insert = null
-                            let replace = false
                             for (let n = this.container.firstElementChild; n; n = n.nextElementSibling) {
                                 if (n.dataset.created === undefined) { continue; }
                                 if (n.dataset.pathid === node.dataset.pathid) {
-                                    insert = n;
-                                    replace = true
-                                    break;
+                                    this.container.removeChild(n)
+                                    continue
                                 }
-                                const curCreated = new Date(n.dataset.created) 
-                                if (curCreated.getTime() > insCreated.getTime()) {
+                                const curCreated = new Date(n.dataset.modified) 
+                                if (curCreated.getTime() < insCreated.getTime()) {
                                     insert = n
                                 }
                             }
-                        
-                            if (replace) {
-                                this.container.replaceChild(node, insert)
-                            } else {
-                                this.container.insertBefore(node, insert)
-                            }
+                            this.container.insertBefore(node, insert)
                             resolve()
                         })
                     })

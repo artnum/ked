@@ -1,5 +1,11 @@
 @import url('https://fonts.googleapis.com/css?family=B612+Mono&display=swap');
 
+
+:root {
+    --bg-color: hsl(333, 49%, 49%);
+    --light-bg-color: rgb(255, 232, 242);
+}
+
 .keditorRoot {
     width: 800px;
     max-width: 800px;
@@ -26,19 +32,22 @@
 
 .kentry-container {
     font-size: 0;
+    border-bottom: 2px solid var(--bg-color);
+    box-shadow: 5px 6px 8px 0px var(--light-bg-color);
+    margin: 10px 0;
 }
 
 .kentry-tools {
-    background-color: hsla(245, 20%, 96%, 1);
-    border-top: 2px solid hsla(245, 20%, 80%, 1);
+    background-color: var(--light-bg-color);
     padding: 4px;
     padding-top: 0px;
     margin: 0;
     font-size: 16px;
 }
 
-.kentry-container.squared .kentry-tools {
-    border-top: 2px solid hsla(245, 20%, 60%, 1);
+.kentry-tools .name {
+    float: right;
+    font-family: monospace;
 }
 
 .kentry-container.squared {
@@ -66,7 +75,7 @@
 
 .keditorRoot .kmetadata {
     font-family: 'B612 Mono', monospace;
-    background-color: black;
+    background-color: var(--bg-color);
     color: white;
     margin-bottom: 1ex;
     padding: 4px;
