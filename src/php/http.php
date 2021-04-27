@@ -1,6 +1,8 @@
 <?PHP
 namespace ked;
 
+require ('formats.php');
+
 use Normalizer;
 
 class http {
@@ -188,12 +190,21 @@ class http {
                         if (is_readable($filePath)) {
                             header('Content-Type: ' . $info['type']);
                             $this->ok(null);
-                            readfile($this->ked->getFilePath($info['contentRef']));
+                            $formatted = Format($this->ked->getFilePath($info['contentRef']), $info['type']);
+                            if (isset($_GET['format'])) {
+                                $formatted->setMedium($_GET['format']);
+                            }
+                            $formatted->output();
                         } else {
                             $this->errorNotFound();
                         }
                     } else {
-                        $this->ok($info['content']);
+                        $this->ok(null);
+                        $formatted = Format($info['content'], $info['type'], false);
+                        if (isset($_GET['format'])) {
+                            $formatted->setMedium($_GET['format']);
+                        }
+                        $formatted->output();
                     }
                 }
                 break;

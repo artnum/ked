@@ -165,11 +165,9 @@ KEditor.prototype.edit = {
 }
 
 KEditor.prototype.renderEntry = function (path, entry) {
-    console.log(entry)
     let oname = entry.application?.find(value => value.startsWith('ked:name='))
     if (oname) { oname = oname.split('=')[1] }
     const EntryName = oname ?? ''
-    console.log(EntryName)
     return new Promise ((resolve, reject) => {
         const subresolve = function (htmlnode) {
             htmlnode.dataset.entryid = entry.id
@@ -249,13 +247,24 @@ KEditor.prototype.renderEntry = function (path, entry) {
                 .catch(_ => resolve(null))
                 return
             default: 
-                htmlnode = document.createElement('A')
-                htmlnode.classList.add('klink')
-                htmlnode.href = this.buildPath(path, entry.id)
-                htmlnode.innerHTML = `<span class="name">${EntryName}</span>`
-                htmlnode.dataset.edit = 'file'
-                subresolve(htmlnode)
-                return
+                switch (entry.type) {
+                    default:
+                        htmlnode = document.createElement('A')
+                        htmlnode.classList.add('klink')
+                        htmlnode.href = this.buildPath(path, entry.id)
+                        htmlnode.innerHTML = `<span class="name">${EntryName}</span>`
+                        htmlnode.dataset.edit = 'file'
+                        subresolve(htmlnode)
+                        return
+                    case 'application/pdf':
+                        htmlnode = document.createElement('A')
+                        htmlnode.src = this.buildPath(path, entry.id)
+                        htmlnode.style.backgroundImage = `url('${htmlnode.src}?format=preview')`
+                        htmlnode.classList.add('klink')
+                        htmlnode.dataset.edit = 'file'
+                        subresolve(htmlnode)
+                        return                       
+                }
         }
     })
 }
@@ -404,7 +413,6 @@ KEditor.prototype.updateTask = function (docNode, values = []) {
     })
     this.fetch('', formData)
     .then(_ => {
-        console.log(formData)
         this.ls()
     })
 }
@@ -436,7 +444,6 @@ KEditor.prototype.uploadFile = function (node, event) {
 
 KEditor.prototype.uploadText = function (node, content, type = 'text/plain') {
     const op = node.dataset.entryid ? 'update-entry' : 'add-entry'
-    console.log(node)
     const path = op === 'update-entry' ? this.buildPath(this.cwd, this.buildPath(node.dataset.parentid, node.dataset.entryid)) :  this.buildPath(this.cwd, node.dataset.pathid)
     const formData = new FormData()
     const name = `${new Date().toISOString()}`

@@ -7,12 +7,17 @@ namespace ked {
                 return new formats\file($in, $filepath);
             case 'text/x-quill-delta':
                 return new formats\quillsDelta($in, $filepath);
+            case 'application/pdf':
+                return new formats\pdf($in, $filepath);
         }
     }
 }
 
 namespace ked\formats {
-    require_once __DIR__ . '/vendor/autoload.php';
+
+use Exception;
+
+require_once __DIR__ . '/vendor/autoload.php';
 
     class file {
         protected $in;
@@ -48,6 +53,30 @@ namespace ked\formats {
         }
     }
 
+    class pdf extends file {
+        function get () {
+            if ($this->medium !== 'preview') {
+                return parent::get();
+            }
+            if (!$this->filepath) { return parent::get(); }
+            try {
+                $img = new \Imagick();
+                $img->readImage($this->in . '[0]');
+                $img->setResolution(300, 300);
+                $img->setImageFormat('png');
+                return $img->getImagesBlob();
+            } catch (\Exception $e) {
+                return parent::get();
+            }
+        }
+        function output() {
+            if ($this->medium === 'preview') {
+                header('Content-Type: image/png', true);
+            }
+            file_put_contents('php://output', $this->get());
+        }
+    }
+
     class quillsDelta extends file {
         function get () {
             if ($this->medium === 'raw') {
@@ -55,11 +84,20 @@ namespace ked\formats {
             }
             $content = $this->in;
             if ($this->filepath) {
-                $content = file_get_contents($this->path);
+                $content = file_get_contents($this->in);
             }
             if ($content === false) { return ''; }
-            $quill = new \DBlackborough\Quill\Render($content, \DBlackborough\Quill\Options::FORMAT_GITHUB_MARKDOWN);
-            return $quill->render();
+            switch($this->medium) {
+                default: return $content;
+                case 'dav':
+                case 'md':
+                    $qrender = new \DBlackborough\Quill\Render($content, \DBlackborough\Quill\Options::FORMAT_GITHUB_MARKDOWN);
+                    break;
+                case 'html':
+                    $qrender = new \DBlackborough\Quill\Render($content);
+                    break;
+            }
+            return $qrender->render();
         }
 
         function output () {
