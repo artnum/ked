@@ -93,6 +93,7 @@ require_once __DIR__ . '/vendor/autoload.php';
                 case 'md':
                     $qrender = new \DBlackborough\Quill\Render($content, \DBlackborough\Quill\Options::FORMAT_GITHUB_MARKDOWN);
                     break;
+                case 'browser':
                 case 'html':
                     $qrender = new \DBlackborough\Quill\Render($content);
                     break;

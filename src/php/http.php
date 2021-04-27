@@ -140,7 +140,7 @@ class http {
                 $task = true;
             }
             $this->ok('<div class="entry"><span class="type"><i class="' . $class . '"> </i></span>');
-            $this->ok('<span class="name"><a href="' . ($root ? $this->getBaseName() . '/' : $this->ked->dnToPath($dir['__dn']) . ',') . $child['id'] . '">' . ($child['name'] ?? $child['id']) . '</a></span>');
+            $this->ok('<span class="name"><a href="' . ($root ? $this->getBaseName() . '/' : $this->ked->dnToPath($dir['__dn']) . ',') . $child['id'] . '?format=browser">' . ($child['name'] ?? $child['id']) . '</a></span>');
             $this->ok('<span class="tasks">' . ($task ? '+' : '') . '</span>');
             $this->ok('<span class="events">' . ($event ? '+' : '') . '</span>');
             $this->ok('<span class="childs">' . (!$file ? ($child['+childs'] + $child['+entries']) : '') . '</span>');
@@ -150,7 +150,7 @@ class http {
             for ($i = 0; $i < count($child['+history']); $i++) {
                 $c = $child['+history'][$i];
                 $this->ok('<div class="entry history"><span class="type"><i class="' . $class . '"> </i></span>');
-                $this->ok('<span class="name"><a href="' . ($root ? $this->getBaseName() . '/' : $this->ked->dnToPath($dir['__dn']) . ',') . $c['id'] . '">' . ($child['name'] ?? $child['id']) . '</a></span>');
+                $this->ok('<span class="name"><a href="' . ($root ? $this->getBaseName() . '/' : $this->ked->dnToPath($dir['__dn']) . ',') . $c['id'] . '?format=browser">' . ($child['name'] ?? $child['id']) . '</a></span>');
                 $this->ok('<span class="tasks"></span>');
                 $this->ok('<span class="events"></span>');
                 $this->ok('<span class="childs"></span>');
