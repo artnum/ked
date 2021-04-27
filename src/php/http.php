@@ -140,7 +140,11 @@ class http {
                 $task = true;
             }
             $this->ok('<div class="entry"><span class="type"><i class="' . $class . '"> </i></span>');
-            $this->ok('<span class="name"><a href="' . ($root ? $this->getBaseName() . '/' : $this->ked->dnToPath($dir['__dn']) . ',') . $child['id'] . '?format=browser">' . ($child['name'] ?? $child['id']) . '</a></span>');
+            if (!$file) {
+                $this->ok('<span class="name"><a href="' . ($root ? $this->getBaseName() . '/' : $this->ked->dnToPath($dir['__dn']) . ',') . $child['id'] . '">' . ($child['name'] ?? $child['id']) . '</a></span>');
+            } else {
+                $this->ok('<span class="name"><a href="' . ($root ? $this->getBaseName() . '/' : $this->ked->dnToPath($dir['__dn']) . ',') . $child['id'] . '?format=browser">' . ($child['name'] ?? $child['id']) . '</a></span>');
+            }
             $this->ok('<span class="tasks">' . ($task ? '+' : '') . '</span>');
             $this->ok('<span class="events">' . ($event ? '+' : '') . '</span>');
             $this->ok('<span class="childs">' . (!$file ? ($child['+childs'] + $child['+entries']) : '') . '</span>');
