@@ -4,6 +4,11 @@
 :root {
     --bg-color: hsl(333, 49%, 49%);
     --light-bg-color: rgb(255, 232, 242);
+    --highlight-color: hsla(90, 65%, 30%, 1);
+    --highlight-light-color: hsla(90, 65%, 30%, 0.5);
+    --bg2-color: hsla(245, 65%, 30%, 1);
+    --bg2-light-color: hsla(90, 65%, 30%, 0.5);
+
 }
 
 .keditorRoot {
@@ -47,7 +52,9 @@
 
 .kentry-tools .name {
     float: right;
-    font-family: monospace;
+    font-family: 'B612 Mono', monospace;
+    font-size: 14px;
+    text-overflow: hidden;
 }
 
 .kentry-container.squared {
@@ -82,13 +89,70 @@
     min-height: 64px;
 }
 
+ .highlight .kmetadata {
+    background-color: var(--highlight-color)  !important;
+}
+
+.highlight .kentry-container  {
+    border-bottom: 2px solid var(--highlight-color) !important;
+    box-shadow: 5px 6px 8px 0px var(--highlight-light-color) !important;
+}
+.highlight .kentry-tools {
+    background-color: var(--highlight-light-color) i !important
+}
+
+.kform-inline {
+    width: calc(100% - 16px);
+    background-color: var(--bg2-color);
+    min-height: 64px;
+    display: flex;
+    align-items: center;
+    padding: 8px;
+}
+
+.kform-inline input, .kform-inline button, .kform-inline span.message {
+    max-height: 36px;
+    min-height: 36px;
+    min-width: 120px;
+    margin: 5px;
+}
+
+.kform-inline input, .kform-inline span.message {
+    flex-grow: 4;
+    font-family: 'B612 Mono', monospace;
+}
+
+.kform-inline span.message {
+    display: inline-block;
+    color: white;
+}
+
+.ksubmenu .navigation {
+    display: flex;
+    float: right;
+    padding: 0px 8px;
+    margin: 0px 4px;
+    background-color: var(--bg-color);
+    color: lightgray;
+    justify-content: center;
+}
+
+.ksubmenu .navigation span i {
+    align-items: center;
+}
+
+.childs .ksubmenu .navigation {
+    background-color: white !important;
+    color: var(--bg-color) !important;
+}
+
 .keditorRoot .klink {
     display: block;
     width: 100%;
     height: 200px;
     margin: 4px;
     font-size: 0.8em;
-    font-family: monospace;
+    font-family: 'B612 Mono', monospace;
     text-decoration: none;
     display: flex;
     justify-content: center;

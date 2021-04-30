@@ -36,13 +36,27 @@ function KEditor(container, baseUrl) {
     //this.container.addEventListener('click', this.interact.bind(this))
     window.addEventListener('popstate', event => {
         if (event.state === null) { this.cwd = ''}
-        else { this.cwd = event.state.cwd }
+        else { this.setPath(event.state.cwd) }
         this.clear()
         this.ls()
     })
+    /*window.addEventListener('hashchange', event => {
+        if (window.location.hash) {
+            this.setPath(window.location.hash.substr(1))
+        }
+        const p = []
+        this.pushState('')
+        for(const path of this.cwd.split(',')) {
+            p.push(path)
+            this.pushState(p.join(','))
+        }
+        this.clear()
+        this.ls()    
+    })*/
     this.container.classList.add('keditorRoot')
     if (window.location.hash) {
-        this.cd(window.location.hash.substr(1))
+        this.clear()
+        this.setPath(window.location.hash.substr(1))
     }
     this.ls()
 }
@@ -81,6 +95,10 @@ KEditor.prototype.fetch = function (path, content) {
     })
 }
 
+KEditor.prototype.highlight = function (id) {
+    this.toHighlight = id
+}
+
 KEditor.prototype.error = function (data) {
     if (typeof data === 'string') {
         alert(data)
@@ -88,21 +106,31 @@ KEditor.prototype.error = function (data) {
 }
 
 KEditor.prototype.ls = function () {
-    this.fetch(this.cwd, {operation: 'list-document', format: 'extended'}).then(result =>{
-        if (!result.ok) { this.error(result.data); return }
-        this.render(result.data)
+    return new Promise((resolve, reject) => {
+        console.log(this.cwd)
+        this.fetch(this.cwd, {operation: 'list-document', format: 'extended'})
+        .then(result =>{
+            if (!result.ok) { this.error(result.data); return }
+            return this.render(result.data)
+        })
+        .then(_ => resolve())
+        .catch(reason => reject(reason))
     })
 }
 
 
-KEditor.prototype.pushState = function () {
+KEditor.prototype.pushState = function (path) {
     const url = String(window.location).split('#')[0]
-    history.pushState({cwd: this.cwd}, 'KED', `${url}${this.cwd === '' ? '' : '#'}${this.cwd}`)
+    history.pushState({cwd: this.cwd}, 'KED', `${url}${this.cwd === '' ? '' : '#'}${path || this.cwd}`)
 }
 
 KEditor.prototype.replaceState = function () {
     const url = String(window.location).split('#')[0]
     history.replaceState({cwd: this.cwd}, 'KED', `${url}${this.cwd === '' ? '' : '#'}${this.cwd}`)
+}
+
+KEditor.prototype.setPath = function (path) {
+    this.cwd = path
 }
 
 KEditor.prototype.cd = function (id) {
@@ -291,6 +319,32 @@ KEditor.prototype.renderEntry = function (path, entry) {
     })
 }
 
+KEditor.prototype.deleteDocumentInteract = function (docNode) {
+    new Promise((resolve, reject) => {
+        const formNode = document.createElement('FORM')
+        formNode.classList.add('kform-inline')
+        formNode.addEventListener('submit', event => {
+            event.preventDefault()
+            const fdata = new FormData(event.target)
+            event.target.parentNode.removeChild(event.target)
+            resolve(true)
+        })
+        formNode.addEventListener('reset', event => {
+            event.target.parentNode.removeChild(event.target)
+            resolve(false)
+        })
+        formNode.innerHTML = `<span class="message">Voulez-vous supprimer ce document</span><button type="submit">Oui</button><button type="reset">Non</button>`
+        docNode.insertBefore(formNode, docNode.getElementsByClassName('kmetadata')[0].nextElementSibling)
+    })
+    .then (confirm => {
+        if (confirm) {
+            this.deleteDocument(docNode)
+            this.clear()
+            this.ls()
+        }
+    })
+}
+
 KEditor.prototype.deleteDocument = function (docNode) {
     const operation = {
         operation: 'delete',
@@ -309,9 +363,12 @@ KEditor.prototype.addDocument = function (title = null, path = null) {
     .then(result => {
         if (!result.ok) { return }
         if (result.data.id) {
+            this.setPath(path)
+            this.pushState(path)
+            this.highlight(result.data.id)
+            this.clear()
             this.ls()
         }
-
     }) 
 }
 
@@ -353,6 +410,7 @@ KEditor.prototype.menuEvents = function (event) {
 
     switch(actionNode.dataset.action) {
         case 'add-doc': this.addDocument(); break
+        case 'history-back': history.back(); break
 
     }
 }
@@ -368,8 +426,8 @@ KEditor.prototype.submenuEvents = function (event) {
     if (!docNode) { return }
 
     switch (actionNode.dataset.action) {
-        case 'delete-document': this.deleteDocument(docNode); this.clear(); this.ls(); break;
-        case 'add-subdocument':  this.addDocument(null, this.buildPath(this.cwd, docNode.dataset.pathid)); break
+        case 'delete-document': this.deleteDocumentInteract(docNode); break;
+        case 'add-subdocument':  this.addDocumentInteract(docNode); break
         case 'open-document': this.cd(docNode.dataset.pathid); this.clear(); this.ls(); break
         case 'add-text': this.addTextInteract(docNode); break
         case 'upload-file': this.uploadFileInteract(docNode); break
@@ -378,6 +436,27 @@ KEditor.prototype.submenuEvents = function (event) {
         case 'set-task-done': this.updateTask(docNode, [[ 'taskDone', new Date().toISOString() ]]); break
         case 'set-task-undone': this.updateTask(docNode, [[ 'taskDone', '' ]]); break
     }
+}
+
+KEditor.prototype.addDocumentInteract = function (docNode) {
+    new Promise((resolve, reject) => {
+        const formNode = document.createElement('FORM')
+        formNode.classList.add('kform-inline')
+        formNode.addEventListener('submit', event => {
+            event.preventDefault()
+            const fdata = new FormData(event.target)
+            event.target.parentNode.removeChild(event.target)
+            resolve(fdata.get('name'))
+        })
+        formNode.addEventListener('reset', event => {
+            event.target.parentNode.removeChild(event.target)
+        })
+        formNode.innerHTML = `<input type="text" placeholder="Nom / titre" name="name" /><button type="submit">Créer</button><button type="reset">Annuler</button>`
+        docNode.insertBefore(formNode, docNode.getElementsByClassName('kmetadata')[0].nextElementSibling)
+    })
+    .then (title => {
+        this.addDocument(title, this.buildPath(this.cwd, docNode.dataset.pathid)); 
+    })
 }
 
 KEditor.prototype.uploadFileInteract = function (docNode) {
@@ -558,12 +637,10 @@ KEditor.prototype.render = function (root) {
         menu.classList.add('kmenu')
         let p = Promise.resolve()
         if (this.cwd === '') {
-            menu.innerHTML = `
-                <span class="kmenu-title">Racine</span> <span class="kemu-item" data-action="add-doc"><i class="fas fa-passport"></i></span>
-            `
+            menu.innerHTML = `<span class="kmenu-title">${KED.title ?? ''}</span>`
         } else {
             p = new Promise((resolve, reject) => {
-                menu.innerHTML = '<span class="kmenu-title"></span>'
+                menu.innerHTML = '<span data-action="history-back" class="kemu-back"><i class="fas fa-arrow-left"></i></span><span class="kmenu-title"></span>'
                 this.getInfo(this.cwd)
                 .then(info => {
                     menu.getElementsByClassName('kmenu-title')[0].innerHTML = info.name
@@ -614,12 +691,12 @@ KEditor.prototype.render = function (root) {
                                     ${new Intl.DateTimeFormat(navigator.language).format(date)} ${doc.name}
                                     <div class="ksubmenu">
                                     <span data-action="add-text"><i class="fas fa-file-alt"></i></span>
-                                    <span data-action="upload-file"><i class="fas fa-cloud-upload-alt"></i><span>
-                                    <span data-action="add-subdocument"><i class="fas fa-passport"></i><span>
+                                    <span data-action="upload-file"><i class="fas fa-cloud-upload-alt"></i></span>
+                                    <span data-action="add-subdocument"><i class="fas fa-folder-plus"></i></span>
                                     ${!task.is ? '<span data-action="to-task"><i class="fas fa-tasks"></i></span>' : 
                                         '<span data-action="to-not-task" class="fa-stack"><i class="fas fa-tasks fa-stack-1x"></i><i class="fas fa-slash fa-stack-1x"></i></span>'}
-                                    ${doc['+childs'] > 0 ? '<span data-action="open-document"><i class="fas fa-caret-square-right"></i></span>' : ''}
-                                    <span data-action="delete-document"><i class="fas fa-trash"></i><span>
+                                    <span data-action="delete-document"><i class="fas fa-trash"></i></span>
+                                    <div class="navigation"><span data-action="${doc['+childs'] > 0 ? 'open-document' : ''}" class="forward"><i class="fas fa-arrow-right"></i></span></div>
                                     </div>
                                     </div>`
                                 htmlnode.addEventListener('click', this.submenuEvents.bind(this))
@@ -628,6 +705,13 @@ KEditor.prototype.render = function (root) {
                                 htmlnode.dataset.modified = doc.modified
                                 htmlnode.dataset.childs = doc['+childs']
                                 htmlnode.classList.add('document')
+                                if (this.toHighlight === doc.id) {
+                                    htmlnode.classList.add('highlight')
+                                    setTimeout(_ => {
+                                        htmlnode.classList.remove('highlight')
+                                        this.toHighlight = null
+                                    }, 5000)
+                                }
                                 htmlnode.addEventListener('dragover', (event) => { event.preventDefault() })
                                 htmlnode.addEventListener('dragenter', (event) => { 
                                     let node = event.target
@@ -637,7 +721,7 @@ KEditor.prototype.render = function (root) {
                                     }
                                     node.dataset.kedDrageCounter++
                                     window.requestAnimationFrame(() => {
-                                        node.classList.add('kdropme')
+                                        node.classList.add('highlight')
                                     })
                                     event.preventDefault() 
                                 })
@@ -647,7 +731,7 @@ KEditor.prototype.render = function (root) {
                                     node.dataset.kedDrageCounter--
                                     window.requestAnimationFrame(() => {
                                         if (node.dataset.kedDrageCounter <= 0) {
-                                            node.classList.remove('kdropme')
+                                            node.classList.remove('highlight')
                                         }
                                     })
                                     event.preventDefault() 
