@@ -2,6 +2,7 @@ function KEditor(container, baseUrl) {
     this.container = container
     this.baseUrl = baseUrl
     this.cwd = ''
+    this.replaceState()
 
     this.quillOpts = {
         theme: 'snow',
@@ -33,16 +34,16 @@ function KEditor(container, baseUrl) {
     }
 
     //this.container.addEventListener('click', this.interact.bind(this))
-    window.addEventListener('popstate', (event) => {
-        if (event.state === null) { 
-            this.cwd = ''
-            this.ls()
-            return;
-         }
-        this.cwd = event.state.path
+    window.addEventListener('popstate', event => {
+        if (event.state === null) { this.cwd = ''}
+        else { this.cwd = event.state.cwd }
+        this.clear()
         this.ls()
     })
     this.container.classList.add('keditorRoot')
+    if (window.location.hash) {
+        this.cd(window.location.hash.substr(1))
+    }
     this.ls()
 }
 
@@ -50,7 +51,6 @@ KEditor.prototype.fetch = function (path, content) {
     return new Promise((resolve, reject) => {
         if (path.length > 0) { path = `/${path}` }
         let url = new URL(`${this.baseUrl.toString()}${path}`)
-        console.trace()
         fetch(url, {'method': 'POST',
             body: content instanceof FormData ? content : JSON.stringify(content)
         })
@@ -94,25 +94,34 @@ KEditor.prototype.ls = function () {
     })
 }
 
-KEditor.prototype.getInfo = function (docId) {
-    return new Promise((resolve, reject) => {
-    })
+
+KEditor.prototype.pushState = function () {
+    const url = String(window.location).split('#')[0]
+    history.pushState({cwd: this.cwd}, 'KED', `${url}${this.cwd === '' ? '' : '#'}${this.cwd}`)
+}
+
+KEditor.prototype.replaceState = function () {
+    const url = String(window.location).split('#')[0]
+    history.replaceState({cwd: this.cwd}, 'KED', `${url}${this.cwd === '' ? '' : '#'}${this.cwd}`)
 }
 
 KEditor.prototype.cd = function (id) {
-    if (id === '.') { return }
-    if (id === '..') {
-        if (this.cwd === '') { return }
-        let frags = this.cwd.split(',')
-        frags.pop()
-        if (frags.length === 0) { this.cwd = ''; return}
-        this.cwd = frags.join(',')
-    }
-    if (this.cwd === '') {
-        this.cwd = id
-        return
-    }
-    this.cwd = [this.cwd, id].join(',')
+    (function () {
+        if (id === '.') { return }
+        if (id === '..') {
+            if (this.cwd === '') { return }
+            let frags = this.cwd.split(',')
+            frags.pop()
+            if (frags.length === 0) { return}
+            this.cwd = frags.join(',')
+        }
+        if (this.cwd === '') {
+            this.cwd = id
+            return
+        }
+        this.cwd = [this.cwd, id].join(',')
+    }.bind(this))()
+    this.pushState()
 }
 
 KEditor.prototype.interact = function (event) {
@@ -212,9 +221,7 @@ KEditor.prototype.renderEntry = function (path, entry) {
                         switch (subtype[1]) {
                             case 'html':
                                 let x = document.createElement('HTML')
-                                x.innerHTML = content
-                                htmlnode = document.createElement('DIV')
-                                htmlnode.innerHTML = x.getElementsByTagName('BODY')[0].innerHTML
+                                x.innerHTML = contenttitregetElementsByTagName('BODY')[0].innerHTML
                                 htmlnode.classList.add('htmltext')
                                 subresolve(htmlnode)
                                 return
@@ -432,6 +439,20 @@ KEditor.prototype.updateTask = function (docNode, values = []) {
     })
 }
 
+KEditor.prototype.getInfo = function (path) {
+    return new Promise((resolve, reject) => {
+        const formData = new FormData()
+        formData.append('operation', 'get-info');
+        formData.append('path', path)
+        this.fetch('', formData)
+        .then(response => {
+            if (!response.ok) { resolve(null) }
+            resolve(response.data)
+        })
+        .catch(reason => reject(reason))
+    })
+}
+
 KEditor.prototype.uploadFile = function (node, event) {
     const files = event.target.files
     const op = node.dataset.entryid ? 'update-entry' : 'add-entry'
@@ -538,11 +559,15 @@ KEditor.prototype.render = function (root) {
         let p = Promise.resolve()
         if (this.cwd === '') {
             menu.innerHTML = `
-                <span class="kemu-item" data-action="add-doc"><i class="fas fa-passport"></i></span>
+                <span class="kmenu-title">Racine</span> <span class="kemu-item" data-action="add-doc"><i class="fas fa-passport"></i></span>
             `
         } else {
             p = new Promise((resolve, reject) => {
-                menu.innerHTML = ''
+                menu.innerHTML = '<span class="kmenu-title"></span>'
+                this.getInfo(this.cwd)
+                .then(info => {
+                    menu.getElementsByClassName('kmenu-title')[0].innerHTML = info.name
+                })
                 resolve()
             })
         }

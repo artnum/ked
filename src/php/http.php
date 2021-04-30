@@ -292,6 +292,12 @@ class http {
                 if ($documents === null) { $this->errorUnableToOperate(); }
                 $this->ok(json_encode(['documents' => $documents]));
                 break;
+            case 'get-info':
+                if (empty($body['path'])) { $this->errorBadRequest(); }
+                $document = $this->ked->getInfo($body['path']);
+                if ($document === null) { $this->errorNotFound(); }
+                $this->ok(json_encode($document));
+                break;
             case 'get-document':
                 if (empty($body['path'])) { $this->errorBadRequest(); }
                 $docDn = $this->ked->pathToDn($body['path']);
