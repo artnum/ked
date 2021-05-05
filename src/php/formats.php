@@ -37,7 +37,6 @@ require_once __DIR__ . '/vendor/autoload.php';
 
         function get () {
             if ($this->medium === 'browser' && $this->filepath) {
-                error_log($this->in);
                 if (is_file($this->in . '.preview')) {
                     return fopen($this->in . '.preview', 'r');
                 }

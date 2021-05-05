@@ -269,6 +269,19 @@ class http {
             default:
                 $this->errorBadRequest();
                 break;
+            case 'create-tag':
+                if (empty($body['name'])) {
+                    $this->errorBadRequest();
+                }
+                $related = [];
+                if (!empty($body['related'])) {
+                    if (!is_array($body['related'])) { $related = [ $body['related'] ]; }
+                    else { $related = $body['related']; }
+                }
+                $tag = $this->ked->createTag($body['name'], $related); 
+                if (!$tag) { $this->errorUnableToOperate(); }
+                $this->ok(json_encode(['id' => $tag['kedid'][0]]));
+                break;
             case 'create-document':
                 $parent = null;
                 if (empty($body['name'])) {
@@ -282,7 +295,15 @@ class http {
                 if (!empty($body['application'])) {
                     $application = $body['application'];
                 }
-                $id = $this->ked->addDocument($body['name'], $parent, $application);
+                $tags = [];
+                if (!empty($body['tags'])) {
+                    if (!is_array($body['tags'])) {
+                        $tags = [$body['tags']];
+                    } else {
+                        $tags = $body['tags'];
+                    }
+                }
+                $id = $this->ked->addDocument($body['name'], $parent, $application, $tags);
                 if ($id === null) { $this->errorUnableToOperate(); }
                 $this->ok(json_encode(['id' => $id]));
                 break;

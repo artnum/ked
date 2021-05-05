@@ -5,16 +5,16 @@ objectClass: olcDatabaseConfig
 objectClass: olcMdbConfig
 olcDatabase: {1}mdb
 olcDbDirectory: /tmp/ked/db
-olcSuffix: o=ked
+olcSuffix: o=artnum
 olcAccess: {0}to attrs=userPassword,shadowLastChange  by dn.base="cn=admin,o
- =ked" write  by anonymous auth  by self write  by * none
+ =artnum" write  by anonymous auth  by self write  by * none
 olcAccess: {1}to dn.base=""  by * read
-olcAccess: {2}to *  by dn.base="cn=admin,o=ked" write  by * read
+olcAccess: {2}to *  by dn.base="cn=admin,o=artnum" write  by * read
 olcAddContentAcl: FALSE
 olcLastMod: TRUE
 olcMaxDerefDepth: 15
 olcReadOnly: FALSE
-olcRootDN: cn=admin,o=ked
+olcRootDN: cn=admin,o=artnum
 olcRootPW:: MTIzNA==
 olcSyncUseSubentry: FALSE
 olcMonitoring: FALSE

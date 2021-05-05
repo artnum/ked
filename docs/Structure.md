@@ -61,3 +61,11 @@ A document is deleted by having its attribute kedDelete set to the current time.
 
 If creation time is set by kedTimestamp, modification can be tricky. With features like "auto-save", one modification can happen through several modification over time. Having each "auto-save" iteration as an historic version of the document might not be wanted. Thus kedModified is there to offer that kind of support.
 It can also be used to have a control over simultaneous modification of the content. 
+
+# Tags
+
+Tag is a well known system. You tag something and search by tags. Here we just add the ability to tag a tag. So if you create a tag "Project" which you want to use to tag all document about any projects, but you also want to create a tag for each project with the project name. By tagging the tag "project name" with the tag "Project" you achieve this structure.
+
+## ACL
+
+ACL are enforced through tag, people have access to item based on their tag.

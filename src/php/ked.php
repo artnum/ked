@@ -47,12 +47,50 @@ class ked {
     {
         $this->conn = $ldapconn;
         $this->rwconn = $ldapconn;
-        $this->base = $base;
+        $this->dirBase = $base;
+        $this->base = null;
+        $this->tagBase = null;
+        $this->aclBase = null;
+    }
+
+    function init():bool {
+        $filter = $this->buildFilter('(objectClass=kedRoot)');
+        $res = @ldap_search($this->conn, $this->dirBase, $filter);
+        if (!$res) { $this->ldapFail($this->conn); return false; }
+        for ($entry = @ldap_first_entry($this->conn, $res); $entry; $entry = ldap_next_entry($this->conn, $entry)) {
+            $kedRootType = @ldap_get_values($this->conn, $entry, 'kedRootType');
+            if (!$kedRootType) { continue; }
+            if ($kedRootType['count'] <= 0) { continue; }
+            $dn = @ldap_get_dn($this->conn, $entry);
+            switch($kedRootType[0]) {
+                case 'content': $this->base = $dn; break;
+                case 'tag': $this->tagBase = $dn; break;
+                case 'acl': $this->aclBase = $dn; break;
+
+            }
+        }
+        if ($this->base === null) { return false; }
+        if ($this->tagBase === null) { $this->tagBase = $this->base; }
+        if ($this->aclBase === null) { $this->aclBase = $this->base; }
+
+        $rootTag = $this->findTag('__root__');
+        if (!$rootTag) {
+            if (!$this->createTag('__root__')) { return false; }
+            $rootTag = $this->findTag('__root__');
+            if (!$rootTag) { return false; }
+        }
+        
+        $this->rootTag = $rootTag;
+        return true;
     }
 
     /* for master/slave structure, add a write connection */
     function setRWLdapConn ($rwconn):void {
         $this->rwconn = $rwconn;
+    }
+
+    function setTagsBase (string $tagsBase):void {
+        $this->tagsBase = $tagsBase;
     }
 
     /* normalized utf-8 and an ascii version, useful for search */
@@ -69,30 +107,32 @@ class ked {
         return call_user_func_array('sprintf', $args);
     }
 
-    function ldapFail(string $function, $conn, $message = ''):void {
-        error_log(sprintf('ked:%s: LDAP:<%s> "%s"', $function, ldap_error($conn), $message));
+    function ldapFail($conn, string $message = ''):void {
+        $frame = debug_backtrace(DEBUG_BACKTRACE_PROVIDE_OBJECT, 1)[0];
+        error_log(sprintf('ked:[%s:%d#%s]: LDAP:<%s> "%s"', basename($frame['file']), $frame['line'], $frame['function'], ldap_error($conn), $message));
     }
     
-    function logicFail(string $function, string $message):void {
-        error_log(sprintf('ked:%s: LOGIC:<%s>', $function, $message));
+    function logicFail(string $message):void {
+        $frame = debug_backtrace(DEBUG_BACKTRACE_PROVIDE_OBJECT, 1)[0];
+        error_log(sprintf('ked:[%s:%d#%s]: LOGIC:<%s>', basename($frame['file']), $frame['line'], $frame['function'], $message));
     }
 
     function getLdapValue ($conn, $entry, string $mapName) {
         if (!isset(self::attrMap[$mapName])) { return null; }
         $lattr = self::attrMap[$mapName];
         $entryAttributes = @ldap_get_attributes($conn, $entry);
-        if ($entryAttributes === false) { $this->ldapFail(__FUNCTION__, $conn); return null; }
+        if ($entryAttributes === false) { $this->ldapFail($conn); return null; }
         unset($entryAttributes['count']);
         if (!in_array($lattr[0], $entryAttributes)) { return null; }
         if ($lattr[2]) {
             $value = @ldap_get_values_len($conn, $entry, $lattr[0]);
-            if (!$value) { $this->ldapFail(__FUNCTION__, $conn); return null; }
+            if (!$value) { $this->ldapFail($conn); return null; }
             if ($value['count'] === 1) { return $value[0]; }
             unset($value['count']);
             return $value;
         }
         $value = @ldap_get_values($conn, $entry, $lattr[0]);
-        if (!$value) { $this->ldapFail(__FUNCTION__, $conn); return null; }
+        if (!$value) { $this->ldapFail($conn); return null; }
         if ($value['count'] === 1) { return $value[0]; }
         unset($value['count']);
         return $value;
@@ -132,11 +172,16 @@ class ked {
         $document['kedModified'] = $rdn[2];
         $document['kedName'] =$this->sanitizeString($name);
         $document['objectClass'] = 'kedDocument';
-
+        if (!empty($options['tags'])) {
+            $document['kedRelatedTag'] = [];
+            foreach ($options['tags'] as $tag) {
+                $document['kedRelatedTag'][] = $tag;
+            }
+        }
         /* base is from configuration, rdn is generated, no need to escape */
         $dn = sprintf('%s,%s', $rdn[0], $parent);
         $res = @ldap_add($this->rwconn, $dn, $document);
-        if (!$res) { $this->ldapFail(__FUNCTION__, $this->rwconn); return null; }
+        if (!$res) { $this->ldapFail($this->rwconn); return null; }
         return $rdn[1];
     }
 
@@ -162,11 +207,58 @@ class ked {
         /* base is from configuration, rdn is generated, no need to escape */
         $dn = sprintf('%s,%s', $rdn[0], $docDn);
         $res = @ldap_add($this->rwconn, $dn, $entry);
-        if (!$res) { $this->ldapFail(__FUNCTION__, $this->rwconn); return null; }
+        if (!$res) { $this->ldapFail($this->rwconn); return null; }
         if (isset($options['__update'])) { // when we call from updateEntry, we want to have previous entry full dn
             return $dn;
         }
         return $rdn[1];
+    }
+
+    function createTag (string $tag, array $relatedTags = []):?array {
+        $tag = $this->sanitizeString($tag);
+        $exists = $this->findTag($tag);
+        if (!$exists) { return $exists; }
+
+        $tagObject = [ 'kedId' => $tag, 'kedRelatedTag' => [], 'objectClass' => [ 'kedTag' ] ];
+        foreach ($relatedTags as $relatedTag) {
+            $relatedTag = $this->sanitizeString($relatedTag);
+            $relatedTagObject = $this->findTag($relatedTag);
+            if (!$relatedTag) { continue; } // don't fail if related tag don't exist
+            $tagObject['kedRelatedTag'][] = $relatedTagObject['dn'];
+        }
+
+        /* allow creation of root tag from this function. All other tags must have __root__ related */
+        if ($tag !== '__root__') {
+            if (!in_array($this->rootTag['dn'], $tagObject['kedRelatedTag'])) {
+                $tagObject['kedRelatedTag'][] = $this->rootTag['dn'];
+            }
+        }
+        if (empty($tagObject['kedRelatedTag'])) { unset($tagObject['kedRelatedTag']); }
+
+        $dn = 'kedId=' . ldap_escape($tag, '', LDAP_ESCAPE_DN) . ',' . $this->tagBase;
+        $res = @ldap_add($this->rwconn, $dn, $tagObject);
+        if (!$res) { $this->ldapFail($this->rwconn); return null; }
+    
+        return $this->getRawLdapObjectByDn($dn);
+    }
+
+    function findTag (string $tag):?array {
+        $filter = $this->buildFilter('(&(objectclass=kedTag)(kedId=%s))', $this->sanitizeString($tag));
+        $res = @ldap_search($this->conn, $this->tagBase, $filter, [ '*' ]);
+        if (!$res) { $this->ldapFail($this->conn); return null; }
+        $entry = @ldap_first_entry($this->conn, $res);
+        if (!$entry) { return null; }
+        $currentEntry = $this->getRawLdapObject($this->conn, $entry);
+        if (!$currentEntry) { return null; }
+        return $currentEntry;
+    }
+
+    function findByTags (string ...$tags):array {
+        if (empty($tags)) { return []; }
+        $documents = [];
+        foreach ($tags as $tag) {
+
+        }
     }
 
     /* Find documents metadata for matching name */
@@ -175,7 +267,7 @@ class ked {
         $documents = [];
         $filter = $this->buildFilter('(&(objectclass=kedDocument)(kedName=*%s*))', $name);
         $res = @ldap_search($this->conn, $this->base, $filter, [ '*' ]);
-        if (!$res) { $this->ldapFail(__FUNCTION__, $this->conn); return null; }
+        if (!$res) { $this->ldapFail($this->conn); return null; }
         for ($entry = @ldap_first_entry($this->conn, $res); $entry; $entry = @ldap_next_entry($this->conn, $entry)) {
             $currentEntry = $this->getLdapObject($this->conn, $entry);
             if ($currentEntry === null) { $document[] = ['+failed' => true]; continue; }
@@ -184,9 +276,30 @@ class ked {
         return $documents;
     }
 
+    function getRawLdapObjectByDn (string $dn):?array {
+        $res = @ldap_read($this->conn, $dn, '(objectclass=*)', [ '*' ]);
+        if (!$res) { $this->ldapFail($this->conn); return null; }
+        $entry = @ldap_first_entry($this->conn, $res);
+        if (!$entry) { $this->ldapFail($this->conn); return null; }
+        return $this->getRawLdapObject($this->conn, $entry);
+    }
+
+    function getRawLdapObject ($conn, $entry):?array {
+        $currentEntry = [ 'dn' => ldap_get_dn($conn, $entry) ];
+        if (!$currentEntry['dn']) { $this->ldapFail($this->conn); return null; }
+        for ($attr = @ldap_first_attribute($this->conn, $entry); $attr; $attr = @ldap_next_attribute($this->conn, $entry)) {
+            $values =  @ldap_get_values($this->conn, $entry, $attr);
+            if (!$values) { $this->ldapFail($this->conn); return null; }
+            unset($values['count']);
+            if (empty($values)) { continue; }
+            $currentEntry[strtolower($attr)] = $values;
+        }
+        return $currentEntry;
+    }
+
     function getLdapObject ($conn, $entry):array {
         $currentEntry =[ '__dn' => ldap_get_dn($conn, $entry) ];
-        if (!$currentEntry['__dn']) { $this->ldapFail(__FUNCTION__, $conn); return null; }
+        if (!$currentEntry['__dn']) { $this->ldapFail($conn); return []; }
         foreach (self::attrMap as $attr => $_) {
             $value = $this->getLdapValue($conn, $entry, $attr);
             if ($value !== null) { $currentEntry[$attr] = $value; }
@@ -210,27 +323,27 @@ class ked {
         $res = @ldap_read($this->conn, $dn, '(objectclass=*)', [ 
             'kedId', 'kedName', 'kedTimestamp', 'kedDeleted', 'kedModified', 'objectClass', 'kedContentType', 'kedSignature', 'kedApplication', 'kedContentReference'
             ]);
-        if (!$res) { $this->ldapFail(__FUNCTION__, $this->conn); return null; }
+        if (!$res) { $this->ldapFail($this->conn); return null; }
         $entry = @ldap_first_entry($this->conn, $res);
-        if (!$entry) { $this->ldapFail(__FUNCTION__, $this->conn); return null; }
+        if (!$entry) { $this->ldapFail($this->conn); return null; }
         return $this->getLdapObject($this->conn, $entry);
     }
 
     function getAll (string $dn):?array {
         $res = @ldap_read($this->conn, $dn, '(objectclass=*)', [ '*' ]);
-        if (!$res) { $this->ldapFail(__FUNCTION__, $this->conn); return null; }
+        if (!$res) { $this->ldapFail($this->conn); return null; }
         $entry = @ldap_first_entry($this->conn, $res);
-        if (!$entry) { $this->ldapFail(__FUNCTION__, $this->conn); return null; }
+        if (!$entry) { $this->ldapFail($this->conn); return null; }
         return $this->getLdapObject($this->conn, $entry);
     }
 
     function getObjectClasses (string $dn):array {
         $res = @ldap_read($this->conn, $dn, '(objectclass=*)', [ 'objectClass' ]);
-        if (!$res) { $this->ldapFail(__FUNCTION__, $this->conn); return []; }
+        if (!$res) { $this->ldapFail($this->conn); return []; }
         $entry = @ldap_first_entry($this->conn, $res);
-        if (!$entry) { $this->ldapFail(__FUNCTION__, $this->conn); return []; }
+        if (!$entry) { $this->ldapFail($this->conn); return []; }
         $classes = @ldap_get_values($this->conn, $entry, 'objectClass');
-        if (!$classes) { $this->ldapFail(__FUNCTION__, $this->conn); return []; }
+        if (!$classes) { $this->ldapFail($this->conn); return []; }
         unset($classes['count']);
         return $classes;
     }
@@ -239,12 +352,12 @@ class ked {
     function getDocument (string $docDn):array {
         /* get document */
         $res = @ldap_read($this->conn, $docDn, '(objectClass=kedDocument)', [ '*' ]);
-        if (!$res) { $this->ldapFail(__FUNCTION__, $this->conn); return []; }
+        if (!$res) { $this->ldapFail($this->conn); return []; }
         $entriesCount = @ldap_count_entries($this->conn, $res);
-        if ($entriesCount === false) { $this->ldapFail(__FUNCTION__, $this->conn); return []; }
-        if ($entriesCount !== 1) { $this->logicFail(__FUNCTION__, 'Should have only one entry'); return []; }
+        if ($entriesCount === false) { $this->ldapFail($this->conn); return []; }
+        if ($entriesCount !== 1) { $this->logicFail( 'Should have only one entry'); return []; }
         $entry = @ldap_first_entry($this->conn, $res);
-        if (!$entry) { $this->ldapFail(__FUNCTION__, $this->conn); return []; }
+        if (!$entry) { $this->ldapFail($this->conn); return []; }
         $document = $this->getLdapObject($this->conn, $entry);
         if (!$document) { return []; }
         
@@ -252,7 +365,7 @@ class ked {
 
         /* get entries */
         $res = @ldap_list($this->conn, $docDn, '(&(objectclass=kedEntry)(!(kedNext=*))(!(kedDeleted=*)))', [ '*' ]);
-        if (!$res) { $this->ldapFail(__FUNCTION__, $this->conn); return []; }
+        if (!$res) { $this->ldapFail($this->conn); return []; }
         $document['+entries'] = [];
         for ($entry = ldap_first_entry($this->conn, $res); $entry; $entry = ldap_next_entry($this->conn, $entry)) {
             $object = $this->getLdapObject($this->conn, $entry);
@@ -268,7 +381,7 @@ class ked {
         $res = @ldap_list($this->conn, $docDn, '(&(objectclass=kedEntry)(!(kedNext=*))(!(kedDeleted=*)))', [ 
             'kedId', 'kedTimestamp', 'kedDeleted', 'kedModified', 'objectClass', 'kedContentType', 'kedSignature', 'kedApplication'
         ]);
-        if (!$res) { $this->ldapFail(__FUNCTION__, $this->conn); return $entries; }
+        if (!$res) { $this->ldapFail($this->conn); return $entries; }
         for ($e = @ldap_first_entry($this->conn, $res); $e; $e = @ldap_next_entry($this->conn, $e)) {
             $entries[] = $this->getLdapObject($this->conn, $e);
         }
@@ -277,18 +390,18 @@ class ked {
 
     function countDocumentEntries (string $docDn):int {
         $res = @ldap_list($this->conn, $docDn, '(&(objectclass=kedEntry)(!(kedNext=*))(!(kedDeleted=*)))', [ '*' ]);
-        if (!$res) { $this->ldapFail(__FUNCTION__, $this->conn); return -1; }
+        if (!$res) { $this->ldapFail($this->conn); return -1; }
         $countEntries = @ldap_count_entries($this->conn, $res);
-        if ($countEntries === false) { $this->ldapFail(__FUNCTION__, $this->conn); return -1; }
+        if ($countEntries === false) { $this->ldapFail($this->conn); return -1; }
         return $countEntries;
     }
 
     function countDocumentChilds (string $docDn):int {
         /* count child documents */
         $res = @ldap_list($this->conn, $docDn, '(&(objectclass=kedDocument)(!(kedDeleted=*)))', [ 'dn' ]);
-        if (!$res) { $this->ldapFail(__FUNCTION__, $this->conn); return -1; } 
+        if (!$res) { $this->ldapFail($this->conn); return -1; } 
         $countChilds = @ldap_count_entries($this->conn, $res);
-        if ($countChilds === false) { $this->ldapFail(__FUNCTION__, $this->conn); return -1; }
+        if ($countChilds === false) { $this->ldapFail( $this->conn); return -1; }
         return $countChilds;
     }
 
@@ -296,10 +409,10 @@ class ked {
     function getCurrentEntry (string $docDn, string $entryId):?array {
         $filter = $this->buildFilter('(&(objectclass=kedEntry)(kedId=%s)(!(kedNext=*))(!(kedDeleted=*)))', $entryId);
         $res = @ldap_list($this->conn, $docDn, $filter, [ '*' ]);
-        if (!$res) { $this->ldapFail(__FUNCTION__, $this->conn); return null; }
+        if (!$res) { $this->ldapFail($this->conn); return null; }
         $entriesCount = @ldap_count_entries($this->conn, $res);
-        if ($entriesCount === false) { $this->ldapFail(__FUNCTION__, $this->conn); return null; }
-        if ($entriesCount > 1) { $this->logicFail(__FUNCTION__, 'Too many entries'); return null; }
+        if ($entriesCount === false) { $this->ldapFail($this->conn); return null; }
+        if ($entriesCount > 1) { $this->logicFail( 'Too many entries'); return null; }
         if ($entriesCount < 1) { return null; }
         $currentEntry = [];
         $entry = @ldap_first_entry($this->conn , $res);
@@ -321,14 +434,14 @@ class ked {
         $filter = $this->buildFilter('(&(objectClass=kedEntry)(kedId=%s)(!(kedNext=*))(!(kedDeleted=*)))', $entry['id']);
 
         $res = @ldap_list($this->conn, $this->getParentDn($entry['__dn']), $filter, [ '*' ]);
-        if (!$res) { $this->ldapFail(__FUNCTION__, $this->conn); return null; }
+        if (!$res) { $this->ldapFail($this->conn); return null; }
         $entriesCount = @ldap_count_entries($this->conn, $res);
-        if ($entriesCount === false) { $this->ldapFail(__FUNCTION__, $this->conn); return null; }
-        if ($entriesCount > 1) { $this->logicFail(__FUNCTION__, 'Too many entries'); return null; }
+        if ($entriesCount === false) { $this->ldapFail($this->conn); return null; }
+        if ($entriesCount > 1) { $this->logicFail( 'Too many entries'); return null; }
         if ($entriesCount < 1) { return null; }
         
         $entry = @ldap_first_entry($this->conn, $res);
-        if (!$entry) { $this->ldapFail(__FUNCTION__, $this->conn); return null; }
+        if (!$entry) { $this->ldapFail($this->conn); return null; }
         return $this->getLdapObject($this->conn, $entry);
     }
 
@@ -337,11 +450,11 @@ class ked {
         $history = [];
         $filter = $this->buildFilter('(&(objectclass=kedEntry)(kedId=%s)(!(kedDeleted=*))(kedNext=*))', $entryId);
         $res = @ldap_list($this->conn, $docDn, $filter, [ '*' ]);
-        if (!$res) { $this->ldapFail(__FUNCTION__, $this->conn); return $history; }
+        if (!$res) { $this->ldapFail($this->conn); return $history; }
         for ($entry = ldap_first_entry($this->conn, $res); $entry; $entry = ldap_next_entry($this->conn, $entry)) {
             $currentEntry = [ '__dn' => @ldap_get_dn($this->conn, $entry) ];
             /* a failed dn insert a failed entry */
-            if (!$currentEntry['__dn']) { $this->ldapFail(__FUNCTION__, $this->conn); $currentEntry['+failed'] = true; continue; }
+            if (!$currentEntry['__dn']) { $this->ldapFail($this->conn); $currentEntry['+failed'] = true; continue; }
             foreach(self::attrMap as $attr => $_) {
                 $value = $this->getLdapValue($this->conn, $entry, $attr);
                 if ($value !== null) { $currentEntry[$attr] = $value; }
@@ -366,7 +479,7 @@ class ked {
             $updateCurrentEntry['kedContentReference'] = $options['contentRef'];
         }       
         $res = ldap_mod_replace($this->rwconn, $currentEntry['__dn'], $updateCurrenEntry);
-        if (!$res) { $this->ldapFail(__FUNCTION__, $this->rwconn); return null; }
+        if (!$res) { $this->ldapFail($this->rwconn); return null; }
         return $currentEntry['id'];
     }
 
@@ -382,7 +495,7 @@ class ked {
         if ($newEntryDn === null) { return null; } 
         $updateCurrent = ['kedModified' => time(), 'kedNext' => $newEntryDn];
         $res = ldap_mod_replace($this->rwconn, $currentEntry['__dn'], $updateCurrent);
-        if (!$res) { $this->ldapFail(__FUNCTION__, $this->rwconn); return null; }
+        if (!$res) { $this->ldapFail($this->rwconn); return null; }
         return $currentEntry['id']; // update do not change the id
     }
 
@@ -401,9 +514,9 @@ class ked {
         $res = @ldap_mod_replace($this->rwconn, $currentEntry['__dn'], $updateCurrent);
         if (!$res) {
             /* rollback operation */
-            $this->ldapFail(__FUNCTION__, $this->rwconn);
+            $this->ldapFail($this->rwconn);
             if (!@ldap_delete($this->rwconn, $newEntryDn)) {
-                $this->ldapFail(__FUNCTION__, $this->rwconn, 'Directory must be in bad state for this to happen');
+                $this->ldapFail($this->rwconn, 'Directory must be in bad state for this to happen');
             }
             return null;
         }
@@ -430,7 +543,7 @@ class ked {
         }
         /* we must do replace as, at least, we have modified timestamp to update */
         $res = @ldap_mod_replace($this->rwconn, $dn, $attributes);
-        if (!$res) { $this->ldapFail(__FUNCTION__, $this->rwconn); return false; }
+        if (!$res) { $this->ldapFail($this->rwconn); return false; }
         return true;
     }
 
@@ -443,7 +556,7 @@ class ked {
             }
         }
         $res = @ldap_mod_replace($this->rwconn, $dn, [ 'objectClass' => $currentClasses, 'kedModified' => time() ]);
-        if (!$res) { $this->ldapFail(__FUNCTION__, $this->rwconn); }
+        if (!$res) { $this->ldapFail($this->rwconn); }
         return $res;
     }
 
@@ -462,10 +575,10 @@ class ked {
         }
         
         $res = @ldap_mod_replace($this->rwconn, $dn, $attributes);
-        if (!$res) { $this->ldapFail(__FUNCTION__, $this->rwconn); }
+        if (!$res) { $this->ldapFail($this->rwconn); }
         if ($res) {
             $res = @ldap_mod_replace($this->rwconn, $dn, [ 'objectClass' => $currentClasses, 'kedModified' => time() ]);
-            if (!$res) { $this->ldapFail(__FUNCTION__, $this->rwconn, var_dump($currentClasses, true)); }
+            if (!$res) { $this->ldapFail($this->rwconn, var_export($currentClasses, true)); }
         }
     }
 
@@ -505,15 +618,15 @@ class ked {
         } else {
             $res = @ldap_list($this->conn, $options['parent'], $filter, [ 'dn' ]);
         }
-        if (!$res) { $this->ldapFail(__FUNCTION__, $this->conn); return null; }
+        if (!$res) { $this->ldapFail($this->conn); return null; }
         $entriesCount = @ldap_count_entries($this->conn, $res);
-        if ($entriesCount === false) { $this->ldapFail(__FUNCTION__, $this->conn); return null; }
-        if ($entriesCount > 1) { $this->logicFail( __FUNCTION__, 'Too many entries'); return null; }
+        if ($entriesCount === false) { $this->ldapFail($this->conn); return null; }
+        if ($entriesCount > 1) { $this->logicFail('Too many entries'); return null; }
         if ($entriesCount < 1) { return null; }
         $entry = @ldap_first_entry($this->conn, $res);
-        if (!$entry) { $this->ldapFail(__FUNCTION__, $this->conn); return null; }
+        if (!$entry) { $this->ldapFail($this->conn); return null; }
         $dn = @ldap_get_dn($this->conn, $entry);
-        if (!$dn) { $this->ldapFail(__FUNCTION__, $this->conn); return null; }
+        if (!$dn) { $this->ldapFail($this->conn); return null; }
 
         return $dn;
     }
@@ -521,14 +634,14 @@ class ked {
     function getDnByName (string $name, string $parentDn):?string {
         $filter = $this->buildFilter('(&(|(kedName=%s)(kedApplication=%s))(!(kedNext=*)))', $name, 'ked:name=' . $name);
         $res = @ldap_list($this->conn, $parentDn, $filter, [ 'dn' ]);
-        if (!$res) { $this->ldapFail(__FUNCTION__, $this->conn); return null; }
+        if (!$res) { $this->ldapFail($this->conn); return null; }
         $countEntries = @ldap_count_entries($this->conn, $res);
-        if ($countEntries === false) { $this->ldapFail(__FUNCTION__, $this->conn); return null; }
+        if ($countEntries === false) { $this->ldapFail($this->conn); return null; }
         if ($countEntries !== 1) { return null; }
         $entry = @ldap_first_entry($this->conn, $res);
-        if (!$entry) { $this->ldapFail(__FUNCTION__, $this->conn); return null;}
+        if (!$entry) { $this->ldapFail($this->conn); return null;}
         $dn = @ldap_get_dn($this->conn, $entry);
-        if (!$dn) { $this->ldapFail(__FUNCTION__, $this->conn); return null; }
+        if (!$dn) { $this->ldapFail($this->conn); return null; }
         return $dn;
     }
 
@@ -554,15 +667,15 @@ class ked {
         } else {
             $res = @ldap_list($this->conn, $options['parent'], $filter, [ 'dn' ]);
         }
-        if (!$res) { $this->ldapFail(__FUNCTION__, $this->conn); return null; }
+        if (!$res) { $this->ldapFail($this->conn); return null; }
         $entriesCount = @ldap_count_entries($this->conn, $res);
-        if ($entriesCount === false) { $this->ldapFail(__FUNCTION__, $this->conn); return null; }
-        if ($entriesCount > 1) { $this->logicFail(__FUNCTION__, 'Too many entries'); return null; }
+        if ($entriesCount === false) { $this->ldapFail( $this->conn); return null; }
+        if ($entriesCount > 1) { $this->logicFail('Too many entries'); return null; }
         if ($entriesCount < 1) { return null; }
         $entry = @ldap_first_entry($this->conn, $res);
-        if (!$entry) { $this->ldapFail(__FUNCTION__, $this->conn); return null; }
+        if (!$entry) { $this->ldapFail($this->conn); return null; }
         $dn = @ldap_get_dn($this->conn, $entry);
-        if (!$dn) { $this->ldapFail(__FUNCTION__, $this->conn); return null; }
+        if (!$dn) { $this->ldapFail($this->conn); return null; }
 
         return $dn;
     }
@@ -572,7 +685,7 @@ class ked {
         if (empty($meta['deleted'])) {
             $mod = ['kedDeleted' => time() ];
             $res = @ldap_mod_add($this->rwconn, $meta['__dn'], $mod);
-            if (!$res) { $this->ldapFail(__FUNCTION__, $this->rwconn); return false; }
+            if (!$res) { $this->ldapFail($this->rwconn); return false; }
             return true;
         }
     }

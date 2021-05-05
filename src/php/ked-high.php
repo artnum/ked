@@ -1,5 +1,5 @@
 <?PHP
-
+declare(strict_types=1);
 namespace ked;
 
 use Exception;
@@ -70,7 +70,7 @@ class high extends ked {
             $currentDir = $path;
         }
         $res = @ldap_list($this->conn, $currentDir, '(&(objectClass=kedDocument)(!(kedDeleted=*)))', [ '*' ]);
-        if (!$res) { $this->ldapFail(__FUNCTION__, $this->conn); return null; }
+        if (!$res) { $this->ldapFail($this->conn); return null; }
         $documents = [];
         for ($entry = @ldap_first_entry($this->conn, $res); $entry; $entry = @ldap_next_entry($this->conn, $entry)) {
             $object = $this->getLdapObject($this->conn, $entry);
@@ -89,7 +89,7 @@ class high extends ked {
         }
         /* specify attribute to avoir reading content while listing */
         $res = @ldap_list($this->conn, $currentDir, '(&(objectClass=kedEntry)(!(kedDeleted=*))(!(kedNext=*)))', [ 'objectClass', 'dn', 'kedTimestamp', 'kedId', 'kedContentType', 'kedNext', 'kedDeleted', 'kedModified', 'kedSignature', 'kedApplication', 'kedContentReference']);
-        if (!$res) { $this->ldapFail(__FUNCTION__, $this->conn); return null; }
+        if (!$res) { $this->ldapFail($this->conn); return null; }
         for ($entry = @ldap_first_entry($this->conn, $res); $entry; $entry = @ldap_next_entry($this->conn, $entry)) {
             $object = $this->getLdapObject($this->conn, $entry);
             $h = $this->getEntryHistory($currentDir, $object['id']);
@@ -208,7 +208,7 @@ class high extends ked {
         return implode(self::PATH_SEPARATOR, $path);
     }
 
-    function addDocument (string $name, ?string $parent, $application = null) {
+    function addDocument (string $name, ?string $parent, $application = null, $tags = []) {
         $options = [];
         if ($application !== null) {
             if (is_array($application)) {
@@ -226,6 +226,16 @@ class high extends ked {
             if ($parent === null) { return null; }
             $options['parent'] = $parent;
         }
+        $tagsDn = [];
+        foreach ($tags as $tag) {
+            $object = $this->findTag($tag);
+            if (!$object) { continue; }
+            $tagsDn[] = $object['dn'];
+        }
+        if (!in_array($this->rootTag['dn'], $tagsDn)) {
+            $tagsDn[] = $this->rootTag['dn'];
+        }
+        $options['tags'] = $tagsDn;
         return $this->createDocument($name, $options);
     }
 
@@ -434,7 +444,7 @@ class high extends ked {
             }
             $im->clear();
         } catch (Exception $e) {
-            $this->logicFail(__FUNCTION__, $e->getMessage());
+            $this->logicFail($e->getMessage());
             return null;
         }
 

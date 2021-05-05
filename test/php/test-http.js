@@ -18,6 +18,21 @@ function out (response) {
         })
     }
 }
+
+function createTag (event) {
+    const name = event.target.nextElementSibling.value
+    const related = event.target.nextElementSibling.nextElementSibling.value.split(',').map(v => v.trim())
+    const operation = {
+        operation: 'create-tag',
+        name,
+        related
+    }
+    fetch(url, {
+        method: 'POST',
+        body: JSON.stringify(operation)
+    }).then(out)
+}
+
 function createDocument (event) {
     const name = event.target.nextElementSibling.value
     const path = event.target.nextElementSibling.nextElementSibling.value
@@ -35,9 +50,9 @@ function createDocument (event) {
     if (tags && tags !== '') {
         let t = tags.split(',')
         if (t.length > 0) {
-            operation['application'] = []
+            operation['tags'] = []
             t.forEach(value => {
-                operation['application'].push(`tag=${value.trim()}`)
+                operation['tags'].push(value.trim())
             })
         }
     }

@@ -126,21 +126,44 @@ olcAttributeTypes: (kedAttr:18 NAME 'kedEventOrganizer'
   DESC 'People that organize the event (DN of an address entry)'
   EQUALITY distinguishedNameMatch
   SYNTAX 1.3.6.1.4.1.1466.115.121.1.12
+ )
+olcAttributeTypes: (kedAttr:19 NAME 'kedRelatedTag'
+  DESC 'Tag set on a document or entry'
+  EQUALITY distinguishedNameMatch
+  SYNTAX 1.3.6.1.4.1.1466.115.121.1.12
+ )
+olcAttributeTypes: (kedAttr:20 NAME 'kedAclRight'
+  DESC 'Right for a given acl'
+  SYNTAX 1.3.6.1.4.1.1466.115.121.1.15
+  EQUALITY caseIgnoreMatch
+  SUBSTR caseIgnoreSubstringsMatch
+  ORDERING caseIgnoreOrderingMatch
+ )
+olcAttributeTypes: (kedAttr:21 NAME 'kedAclMember'
+  SUP member
  ) 
+olcAttributeTypes: (kedAttr:22 NAME 'kedRootType'
+  DESC 'Type for kedRoot'
+  SYNTAX 1.3.6.1.4.1.1466.115.121.1.15
+  EQUALITY caseExactMatch
+  SUBSTR caseExactSubstringsMatch
+  ORDERING caseExactOrderingMatch
+  SINGLE-VALUE
+ )
 olcObjectClasses: (kedClass:1 NAME 'kedEntry'
   SUP top
   STRUCTURAL
   DESC 'An entry, the rdn most likely in form kedUid=...+kedTimestamp=...
   Empty entry have no content'
   MUST ( kedTimestamp $ kedId )
-  MAY ( kedContent $ kedContentType $ kedNext $kedDeleted $ kedModified $ kedSignature $ kedApplication $kedContentReference )
+  MAY ( kedContent $ kedContentType $ kedNext $kedDeleted $ kedModified $ kedSignature $ kedApplication $kedContentReference $ kedRelatedTag )
  )
 olcObjectClasses: (kedClass:2 NAME 'kedDocument'
   SUP top
   STRUCTURAL
   DESC 'A document. Basically it contains kedEntry. As many as needed.'
   MUST ( kedTimestamp $ kedId )
-  MAY ( kedName $ kedContentType $ kedDeleted $ kedModified $ kedApplication )
+  MAY ( kedName $ kedContentType $ kedDeleted $ kedModified $ kedApplication $ kedRelatedTag )
  )
 olcObjectClasses: (kedClass:3 NAME 'kedTask'
   SUP top
@@ -153,4 +176,24 @@ olcObjectClasses: (kedClass:4 NAME 'kedEvent'
   AUXILIARY
   DESC 'Document can bet set as event by adding this class'
   MAY ( kedEventStart $ kedEventStop $ kedEventAttendee $ kedEventOrganizer )
+ )
+olcObjectClasses: (kedClass:5 NAME 'kedTag'
+  SUP top
+  STRUCTURAL
+  DESC 'Tag definition'
+  MUST kedId
+  MAY kedRelatedTag
+ )
+olcObjectClasses: (kedClass:6 NAME 'kedAcl'
+  SUP top
+  STRUCTURAL
+  DESC 'ACL definition'
+  MUST ( kedId $ kedRelatedTag )
+  MAY ( kedAclRight $ kedAclMember)
+ )
+olcObjectClasses: (kedClass:7 NAME 'kedRoot'
+  SUP top
+  STRUCTURAL
+  DESC 'Root of ked tree'
+  MUST ( kedId $ kedRootType )
  )

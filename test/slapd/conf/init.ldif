@@ -1,3 +1,18 @@
-dn: o=ked
+dn: o=artnum
 objectClass: organization
-o: ked
+o: artnum
+
+dn: kedId=documents,o=artnum
+objectClass: kedRoot
+kedId: documents
+kedRootType: content
+
+dn: kedId=tags,o=artnum
+objectClass: kedRoot
+kedId: tags
+kedRootType: tag
+
+dn: kedId=tags,o=artnum
+objectClass: kedRoot
+kedId: tags
+kedRootType: acl

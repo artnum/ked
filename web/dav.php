@@ -11,10 +11,13 @@ include ('../src/php/ked-sdav.php');
 
 $ldap = ldap_connect('ldap://127.0.0.1:9090/');
 ldap_set_option($ldap, LDAP_OPT_PROTOCOL_VERSION, 3);
-ldap_bind($ldap, 'cn=admin,o=ked', '1234');
+ldap_bind($ldap, 'cn=admin,o=artnum', '1234');
 
 
-$high = new high($ldap, 'o=ked');
+$high = new high($ldap, 'o=artnum');
+if (!$high->init()) { 
+    exit( 'Init Failed');
+}
 $high->setStore('/tmp/');
 $high->setMaxTextSize(4096);
 $high->disableInlinePicture();
