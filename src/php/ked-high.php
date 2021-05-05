@@ -367,8 +367,9 @@ class high extends ked {
         return true;
     }
 
-    function createFile (string $content, string $hash):bool {
+    function createFile (string $content, string $hash, bool $preview = false):bool {
         $filepath = $this->getFilePath($hash);
+        if ($preview) { $filepath .= '.preview'; }
         if (!$this->createStorePath($filepath)) { return false; }
         if (file_exists($filepath)) { return true; }
         $written = file_put_contents($filepath, $content);
@@ -399,23 +400,37 @@ class high extends ked {
         return $this->createEntry($docDn, null, [ 'type' => $filetype, 'contentRef' => $hash, 'application' => $application ]);
     }
 
+    function isSupportedImage (string $file):bool {
+        $formats = Imagick::queryFormats(); 
+        try {
+            $im = new Imagick($file);
+            if (!in_array($im->getImageFormat(), $formats)) { return false; }
+        } catch (Exception $e) {
+            return false;
+        }
+        return true;
+    }
+
     function convertImageToContent (string $file):?array {
         $content = null;
+        $hash = $this->hash($file, true);
         try {
             /* generate a thumbnail 400x400 max */
             $im = new Imagick($file);
             $imageType = $im->getImageMimeType();
+            $size = $im->getSize();
+            $im->setImageFormat('jpeg');
+            $im->setImageCompressionQuality(40);
+            $im->stripImage();
+            if ($size['columns'] > $size['rows']) {
+                $im->thumbnailImage(200, 400, true);
+            } else {
+                $im->thumbnailImage(400, 200, true);
+            }
             if ($this->inlinePicture) {
-                $size = $im->getSize();
-                $im->setImageFormat('jpeg');
-                $im->setImageCompressionQuality(40);
-                $im->stripImage();
-                if ($size['columns'] > $size['rows']) {
-                    $im->thumbnailImage(200, 400, true);
-                } else {
-                    $im->thumbnailImage(400, 200, true);
-                }
                 $content = base64_encode($im->getImageBlob());
+            } else {
+                $this->createFile($im->getImageBlob(), $hash, true);
             }
             $im->clear();
         } catch (Exception $e) {
@@ -423,7 +438,6 @@ class high extends ked {
             return null;
         }
 
-        $hash = $this->hash($file, true);
         if (!$this->moveFile($file, $hash)) { return null; }
 
         return [ 'raw' => $content, 'contentRef' => $hash, 'type' => $imageType ];

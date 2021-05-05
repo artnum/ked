@@ -231,9 +231,10 @@ KEditor.prototype.renderEntry = function (path, entry) {
                 subresolve(htmlnode)
                 return
             case 'image':
-                htmlnode = document.createElement('IMG')
-                htmlnode.src = this.buildPath(path, entry.id)
-                htmlnode.classList.add('kimage')
+                htmlnode = document.createElement('A')
+                htmlnode.href = this.buildPath(path, entry.id)
+                htmlnode.style.backgroundImage = `url('${htmlnode.href}!browser')`
+                htmlnode.classList.add('klink')
                 htmlnode.dataset.edit = 'file'
                 subresolve(htmlnode)
                 return
@@ -291,14 +292,14 @@ KEditor.prototype.renderEntry = function (path, entry) {
                         return
                     case 'application/pdf':
                         htmlnode = document.createElement('A')
-                        htmlnode.src = this.buildPath(path, entry.id)
-                        htmlnode.style.backgroundImage = `url('${htmlnode.src}?format=preview')`
+                        htmlnode.href = this.buildPath(path, entry.id)
+                        htmlnode.style.backgroundImage = `url('${htmlnode.href}!browser')`
                         htmlnode.classList.add('klink')
                         htmlnode.dataset.edit = 'file'
                         subresolve(htmlnode)
                         return                       
                     case 'message/rfc822':
-                        fetch(new URL(`${this.buildPath(path, entry.id)}?format=browser`))
+                        fetch(new URL(`${this.buildPath(path, entry.id)}`))
                         .then(response => {
                             if (!response.ok) { return null; }
                             return response.text()
@@ -791,6 +792,7 @@ KEditor.prototype.render = function (root) {
                                 const curCreated = new Date(n.dataset.modified) 
                                 if (curCreated.getTime() < insCreated.getTime()) {
                                     insert = n
+                                    break
                                 }
                             }
                             this.container.insertBefore(node, insert)

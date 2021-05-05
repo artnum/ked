@@ -182,7 +182,15 @@ class http {
             /* apache like display */
             case 'get':
                 $path = '';
-                if (!empty($_SERVER['PATH_INFO'])) { $path = str_replace('/', '', $_SERVER['PATH_INFO']); }
+                $medium = '';
+                if (!empty($_SERVER['PATH_INFO'])) {
+                    $path = str_replace('/', '', $_SERVER['PATH_INFO']);
+                    $parts = explode('!', $path, 2);
+                    if (isset($parts[1])) {
+                        $path = $parts[0];
+                        $medium = $parts[1];
+                    }
+                }
                 $info = $this->ked->getAll($path, false);
                 if ($info === null) { $this->errorNotFound(); }
                 if (in_array('document', $info['+class'])) {
@@ -195,8 +203,8 @@ class http {
                             header('Content-Type: ' . $info['type']);
                             $this->ok(null);
                             $formatted = Format($this->ked->getFilePath($info['contentRef']), $info['type']);
-                            if (isset($_GET['format'])) {
-                                $formatted->setMedium($_GET['format']);
+                            if (!empty($medium)) {
+                                $formatted->setMedium($medium);
                             }
                             $formatted->output();
                         } else {
@@ -334,6 +342,15 @@ class http {
                         }
                         break;
                     case 'image':
+                        /* unsupported format are as blob */
+                        if (!$this->ked->isSupportedImage($body['_file']['tmp_name'])) {
+                            if ($update) {
+                                $id = $this->ked->updateBinaryEntry($body['path'], $body['_file']['tmp_name'], $body['_file']['type'], $application);
+                            } else {
+                                $id = $this->ked->addBinaryEntry($body['path'], $body['_file']['tmp_name'], $body['_file']['type'], $application);
+                            }
+                            break;
+                        }
                         if ($update) {
                             $id = $this->ked->updateImageEntry($body['path'], $body['_file']['tmp_name'], $application);
                         } else {

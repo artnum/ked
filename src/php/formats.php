@@ -36,6 +36,12 @@ require_once __DIR__ . '/vendor/autoload.php';
         }
 
         function get () {
+            if ($this->medium === 'browser' && $this->filepath) {
+                error_log($this->in);
+                if (is_file($this->in . '.preview')) {
+                    return fopen($this->in . '.preview', 'r');
+                }
+            }
             if ($this->filepath) {
                 return fopen($this->in, 'r');
             }
@@ -44,7 +50,7 @@ require_once __DIR__ . '/vendor/autoload.php';
 
         function output () {
             if ($this->filepath) {
-                $fp = fopen($this->in, 'r');
+                $fp = $this->get();
                 if ($fp) {
                     fpassthru($fp);
                     fclose($fp);
@@ -123,7 +129,7 @@ require_once __DIR__ . '/vendor/autoload.php';
 
     class pdf extends file {
         function get () {
-            if ($this->medium !== 'preview') {
+            if ($this->medium !== 'browser') {
                 return parent::get();
             }
             if (!$this->filepath) { return parent::get(); }
@@ -138,7 +144,7 @@ require_once __DIR__ . '/vendor/autoload.php';
             }
         }
         function output() {
-            if ($this->medium === 'preview') {
+            if ($this->medium === 'browser') {
                 header('Content-Type: image/png', true);
             }
             file_put_contents('php://output', $this->get());
