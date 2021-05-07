@@ -2,15 +2,19 @@
 namespace ked;
 
 require ('formats.php');
+require ('ked-acl.php');
 
 use Normalizer;
 
 class http {
     protected $ked;
+    protected $acl;
     function __construct(high $ked)
     {
         $this->ked = $ked;
+        $this->acl = new ACL($this->ked);
         $this->responseStarted = false;
+        $this->user = [ 'dn' => '' ];
     }
 
     function responseHeaders() {
@@ -47,6 +51,12 @@ class http {
     function errorNotFound () {
         $this->responseHeaders();
         http_response_code(404);
+        exit();
+    }
+
+    function errorForbidden() {
+        $this->responseHeaders();
+        http_response_code(403);
         exit();
     }
 
@@ -192,6 +202,7 @@ class http {
                     }
                 }
                 $info = $this->ked->getAll($path, false);
+                if (!$this->acl->can($this->user['dn'], 'access', $info['__dn'])) { $this->errorForbidden(); }
                 if ($info === null) { $this->errorNotFound(); }
                 if (in_array('document', $info['+class'])) {
                     $childs = $this->ked->listDirectory($info['__dn']);
@@ -269,6 +280,18 @@ class http {
             default:
                 $this->errorBadRequest();
                 break;
+            case 'search-tags':
+                $limit = 50; // search 50 tags
+                if (empty($body['expression'])) {
+                    $this->errorBadRequest();
+                }
+                if (!empty($body['maxsize']) && is_numeric(($body['maxsize'])))  {
+                    $limit = intval($body['maxsize']);
+                }
+                $tags = $this->ked->searchTags($body['expression'], [$limit, -1]);
+                if (!$tags) { $tags = []; }
+                $this->ok(json_encode(['tags' => $tags]));
+                break;
             case 'create-tag':
                 if (empty($body['name'])) {
                     $this->errorBadRequest();
@@ -280,7 +303,18 @@ class http {
                 }
                 $tag = $this->ked->createTag($body['name'], $related); 
                 if (!$tag) { $this->errorUnableToOperate(); }
-                $this->ok(json_encode(['id' => $tag['kedid'][0]]));
+                $this->ok(json_encode(['id' => $tag['kedidname'][0]]));
+                break;
+            case 'add-document-tag':
+                if (empty($body['tag'])) {
+                    $this->errorBadRequest();
+                }
+                if (empty($body['path'])) {
+                    $this->errorBadRequest();
+                }
+                $id = $this->ked->addDocumentTag($body['path'], $body['tag']);
+                if ($id === null) { $this->errorNotFound(); }
+                $this->ok(json_encode(['id' => $id]));
                 break;
             case 'create-document':
                 $parent = null;
@@ -291,6 +325,7 @@ class http {
                     $parent = $this->ked->pathToDn($body['path']);
                     if ($parent === null) { $this->errorNotFound(); }
                 }
+                if (!$this->acl->can($this->user['dn'], 'create:sub', $parent ?? '')) { $this->errorForbidden(); }
                 $application = null;
                 if (!empty($body['application'])) {
                     $application = $body['application'];
@@ -330,6 +365,7 @@ class http {
             case 'get-document':
                 if (empty($body['path'])) { $this->errorBadRequest(); }
                 $docDn = $this->ked->pathToDn($body['path']);
+                if (!$this->acl->can($this->user['dn'], 'access', $docDn)) { $this->errorForbidden(); }
                 if ($docDn === null) { $this->errorNotFound(); }
                 $document = $this->ked->getDocument($docDn);
                 $this->ok(json_encode($document));

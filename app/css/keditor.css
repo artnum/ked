@@ -1,7 +1,7 @@
-@import url('https://fonts.googleapis.com/css?family=B612+Mono&display=swap');
-
+@import url('https://fonts.googleapis.com/css2?family=B612+Mono:wght@400;700&display=swap');
 
 :root {
+    --white: white;
     --bg-color: hsl(333, 49%, 49%);
     --light-bg-color: rgb(255, 232, 242);
     --highlight-color: hsla(90, 65%, 30%, 1);
@@ -59,8 +59,8 @@
 
 .kentry-container.squared {
     display: inline-block;
-    width: 49%;
-    margin: 4px;
+    width: calc(50%);
+    margin: 4px 0;
     overflow: hidden;
 }
 
@@ -83,8 +83,8 @@
 .keditorRoot .kmetadata {
     font-family: 'B612 Mono', monospace;
     background-color: var(--bg-color);
-    color: white;
-    margin-bottom: 1ex;
+    color: var(--white);
+    margin: 0 0 1ex 0;
     padding: 4px;
     min-height: 64px;
 }
@@ -101,13 +101,27 @@
     background-color: var(--highlight-light-color) i !important
 }
 
-.kform-inline {
+.kform-autocomplete, .kform-inline {
     width: calc(100% - 16px);
     background-color: var(--bg2-color);
     min-height: 64px;
+    padding: 8px;
+}
+
+.kform-inline {
     display: flex;
     align-items: center;
-    padding: 8px;
+    
+}
+
+.kform-autocomplete .ktags {
+    width: 100%;
+    font-family: 'B612 Mono', monospace;
+}
+
+.kform-autocomplete .ktags .ktag {
+    padding: 8px 4px;
+    width: 100%;
 }
 
 .kform-inline input, .kform-inline button, .kform-inline span.message {
@@ -124,27 +138,9 @@
 
 .kform-inline span.message {
     display: inline-block;
-    color: white;
+    color: var(--white);
 }
 
-.ksubmenu .navigation {
-    display: flex;
-    float: right;
-    padding: 0px 8px;
-    margin: 0px 4px;
-    background-color: var(--bg-color);
-    color: lightgray;
-    justify-content: center;
-}
-
-.ksubmenu .navigation span i {
-    align-items: center;
-}
-
-.childs .ksubmenu .navigation {
-    background-color: white !important;
-    color: var(--bg-color) !important;
-}
 
 .keditorRoot .klink {
     display: block;
@@ -166,11 +162,67 @@
 
 .kmenu {
     font-size: 36px;
+    margin: 0.5em 0;
 }
 
-.ksubmenu {
+.kmenu .back {
+    padding: 0 3px;
+    width: 48px;
+    height: 42px;
+    display: inline-block;
+    color: var(--light-bg-color);
+    background-color: var(--bg-color);
+    margin: 0 0.3ch 0 0;
+}
+
+.kmenu .back:active {
+    background-color: var(--bg2-color);
+    color: var(--white);
+}
+
+.kmenu .back i {
+    margin: 3px 8px;
+}
+
+.kmetadata .navigation {
     float: right;
     font-size: 36px;
+    display: flex;
+    float: right;
+    padding: 0px 8px;
+    margin: 0px 4px;
+    display: none;
+    justify-content: center;
+}
+
+.kmetadata .navigation span i {
+    align-items: center;
+}
+
+.kmetadata.childs .navigation {
+    background-color: var(--white);
+    color: var(--bg-color);
+    display: inline-block;
+}
+
+.kmetadata.childs .navigation:active {
+    background-color: var(--bg2-color);
+    color: var(--white);
+}
+
+.ktags {
+    margin-top: 0.5em;
+    display: flex;
+    align-items: center;   
+}
+
+.kform-inline .ktags {
+    display: block;
+    width: 100%;
+}
+
+.ktags-tools {
+    margin-left: 1ch;
 }
 
 @media only screen and (max-width: 860px) {
@@ -179,8 +231,14 @@
         max-width: 100%;
         padding: 4px,
     }
-
+    .ktags {
+        clear: both;
+        height: 3em;
+    }
+    .ksubmenu {
+        display: none;
+    }
     .kentry-container.squared {
-        width: calc(100% - 20px);
+        width: 100%;
     }
 }

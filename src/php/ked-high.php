@@ -64,12 +64,20 @@ class high extends ked {
         return sprintf('%s/%s/%s/%s', $this->store, substr($hash, 0, 2), substr($hash, 2, 2), $hash);
     }
 
-    function listDirectory (?string $path, bool $extended = false):?array {
+    function listDirectory (?string $path, bool $extended = false, array $limits = [-1, -1]):?array {
         $currentDir = $this->base;
         if ($path !== null) {
             $currentDir = $path;
         }
-        $res = @ldap_list($this->conn, $currentDir, '(&(objectClass=kedDocument)(!(kedDeleted=*)))', [ '*' ]);
+        $res = @ldap_list(
+            $this->conn,
+            $currentDir,
+            '(&(objectClass=kedDocument)(!(kedDeleted=*)))',
+            [ '*' ],
+            0,
+            $limits[0],
+            $limits[1]
+        );
         if (!$res) { $this->ldapFail($this->conn); return null; }
         $documents = [];
         for ($entry = @ldap_first_entry($this->conn, $res); $entry; $entry = @ldap_next_entry($this->conn, $entry)) {
@@ -88,7 +96,26 @@ class high extends ked {
             $documents[] = $object;
         }
         /* specify attribute to avoir reading content while listing */
-        $res = @ldap_list($this->conn, $currentDir, '(&(objectClass=kedEntry)(!(kedDeleted=*))(!(kedNext=*)))', [ 'objectClass', 'dn', 'kedTimestamp', 'kedId', 'kedContentType', 'kedNext', 'kedDeleted', 'kedModified', 'kedSignature', 'kedApplication', 'kedContentReference']);
+        $res = @ldap_list(
+            $this->conn,
+            $currentDir,
+            '(&(objectClass=kedEntry)(!(kedDeleted=*))(!(kedNext=*)))',
+            [
+                'objectClass',
+                'kedTimestamp',
+                'kedId',
+                'kedContentType',
+                'kedNext',
+                'kedDeleted',
+                'kedModified',
+                'kedSignature',
+                'kedApplication',
+                'kedContentReference'
+            ],
+            0,
+            $limits[0],
+            $limits[1]
+        );
         if (!$res) { $this->ldapFail($this->conn); return null; }
         for ($entry = @ldap_first_entry($this->conn, $res); $entry; $entry = @ldap_next_entry($this->conn, $entry)) {
             $object = $this->getLdapObject($this->conn, $entry);
@@ -239,8 +266,8 @@ class high extends ked {
         return $this->createDocument($name, $options);
     }
 
-    function getDocument (string $docDn):array {
-        $document = parent::getDocument($docDn);
+    function getDocument (string $docDn, array $limits = [-1, -1]):array {
+        $document = parent::getDocument($docDn, $limits);
         $document = $this->filterConvertResult($document);
 
         return $document;
@@ -485,6 +512,13 @@ class high extends ked {
         if ($imgEntry === NULL) { return null; }
 
         return $this->updateEntryByDn($entryDn, $imgEntry[0], $imgEntry[1]);
+    }
+
+    function addDocumentTag (string $path, string $tag) {
+        $tagObject = $this->findTag($tag);
+        if (!$tagObject) { return null; }
+        $docDn = $this->pathToDn($path, false);
+        return $this->addTag($docDn, $tagObject['dn']);
     }
 }
 

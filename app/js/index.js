@@ -4,11 +4,13 @@ window.addEventListener('load', (event) => {
 
     const scripts = [
         '../js/keditor.js',
+        '../js/ktags.js',
         '../node_modules/quill/dist/quill.min.js'
     ]
 
     const csss = [
         '../css/keditor.css',
+        '../css/ktags.css',
         '../node_modules/@fortawesome/fontawesome-free/css/all.min.css',
         '../node_modules/quill/dist/quill.snow.css'
     ]

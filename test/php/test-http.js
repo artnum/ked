@@ -19,6 +19,19 @@ function out (response) {
     }
 }
 
+function searchTags (event) {
+    const expression = event.target.nextElementSibling.value
+    const operation = {
+        operation: 'search-tags',
+        expression,
+        maxsize: 10
+    }
+    fetch(url, {
+        method: 'POST',
+        body: JSON.stringify(operation)
+    }).then(out)
+}
+
 function createTag (event) {
     const name = event.target.nextElementSibling.value
     const related = event.target.nextElementSibling.nextElementSibling.value.split(',').map(v => v.trim())
@@ -26,6 +39,20 @@ function createTag (event) {
         operation: 'create-tag',
         name,
         related
+    }
+    fetch(url, {
+        method: 'POST',
+        body: JSON.stringify(operation)
+    }).then(out)
+}
+
+function addTag (event) {
+    const path = event.target.nextElementSibling.value
+    const tag = event.target.nextElementSibling.nextElementSibling.value
+    const operation = {
+        operation: 'add-document-tag',
+        tag,
+        path
     }
     fetch(url, {
         method: 'POST',

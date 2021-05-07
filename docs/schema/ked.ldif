@@ -150,6 +150,14 @@ olcAttributeTypes: (kedAttr:22 NAME 'kedRootType'
   ORDERING caseExactOrderingMatch
   SINGLE-VALUE
  )
+olcAttributeTypes: (kedAttr:23 NAME 'kedIdName'
+  DESC 'Identifier name, like id but case insensitive'
+  SYNTAX 1.3.6.1.4.1.1466.115.121.1.15
+  EQUALITY caseIgnoreMatch
+  SUBSTR caseIgnoreSubstringsMatch
+  ORDERING caseIgnoreOrderingMatch
+  SINGLE-VALUE
+ )
 olcObjectClasses: (kedClass:1 NAME 'kedEntry'
   SUP top
   STRUCTURAL
@@ -181,7 +189,7 @@ olcObjectClasses: (kedClass:5 NAME 'kedTag'
   SUP top
   STRUCTURAL
   DESC 'Tag definition'
-  MUST kedId
+  MUST kedIdName
   MAY kedRelatedTag
  )
 olcObjectClasses: (kedClass:6 NAME 'kedAcl'

@@ -107,7 +107,6 @@ KEditor.prototype.error = function (data) {
 
 KEditor.prototype.ls = function () {
     return new Promise((resolve, reject) => {
-        console.log(this.cwd)
         this.fetch(this.cwd, {operation: 'list-document', format: 'extended'})
         .then(result =>{
             if (!result.ok) { this.error(result.data); return }
@@ -354,6 +353,18 @@ KEditor.prototype.deleteDocument = function (docNode) {
     this.fetch('', operation)
 }
 
+KEditor.prototype.createTag = function (name = null, related = []) {
+    return new Promise((resolve, reject) => {
+        if (name === null) { resolve(null); return; }
+        const operation = {
+            operation: 'create-tag',
+            name,
+            related
+        }
+        this.fetch('', operation).then(result => resolve(result))
+    })
+}
+
 KEditor.prototype.addDocument = function (title = null, path = null) {
     const operation = {
         operation: 'create-document',
@@ -436,7 +447,93 @@ KEditor.prototype.submenuEvents = function (event) {
         case 'to-not-task': this.convertToNotTaskInteract(docNode); break
         case 'set-task-done': this.updateTask(docNode, [[ 'taskDone', new Date().toISOString() ]]); break
         case 'set-task-undone': this.updateTask(docNode, [[ 'taskDone', '' ]]); break
+        case 'add-tag': this.addTagInteract(docNode); break
     }
+}
+
+KEditor.prototype.addTagInteract = function (docNode) {
+    new Promise((resolve, reject) => {
+        const form = document.createElement('FORM')
+        form.classList.add('kform-autocomplete')
+        form.addEventListener('submit', event => {
+            event.preventDefault()
+            const form = new FormData(event.target)
+            event.target.parentNode.removeChild(event.target)
+            resolve([form.get('tag'), true])
+        })
+        form.addEventListener('reset', event => {
+            event.target.parentNode.removeChild(event.target)
+        })
+        form.innerHTML = `<div class="kform-inline"><input type="text" placeholder="Tag" name="tag" autocomplete="off"></input>
+            '<button type="submit">Ajouter</button><button type="reset">Annuler</button></div>
+            <div class="ktags"></div>`
+        form.firstElementChild.addEventListener('keyup', event => {
+            const expr = event.target.value
+            if (expr === '') { return; }
+            const operation = new FormData()
+            operation.set('operation', 'search-tags')
+            operation.set('expression', expr)
+            operation.set('maxsize', 3)
+            this.fetch('', operation)
+            .then(response => {
+                if (!response.ok) { console.log('a'); return; }
+                if (!response.data.tags) { console.log('b'); return; }
+                if (response.data.tags.length <= 0) { return; }
+                let existing = form.lastElementChild.firstElementChild
+                for (const tag of response.data.tags) {
+                    const div = existing || document.createElement('DIV')
+                    if (!existing) {
+                        div.addEventListener('click', event => {
+                            form.parentNode.removeChild(form)
+                            resolve([event.target.dataset.tag, false])
+                            return;
+                        })
+                    }
+                    div.classList.add('ktag')
+                    div.dataset.tag = tag
+                    div.innerHTML = `<i class="fas fa-hashtag"></i>${tag}`
+                    if (!existing) { form.lastElementChild.appendChild(div) }
+                    if (existing) { existing = existing.nextElementSibling }
+                }
+                if (existing) {
+                    let next
+                    while (existing) {
+                        next = existing.nextElementSibling
+                        existing.parentNode.removeChild(existing)
+                        existing = next
+                    }
+                }
+            })
+        })
+        docNode.insertBefore(form, docNode.getElementsByClassName('kmetadata')[0].nextElementSibling)
+    })
+    .then (([tag, create]) => {
+        if (create) {
+            this.createTag(tag)
+            .then(result => {
+                this.addDocumentTag(this.buildPath(this.cwd, docNode.dataset.pathid), result.data.id)
+            })
+        } else {
+            console.log(tag)
+            console.log(this.buildPath(this.cwd, docNode.dataset.pathid))
+            this.addDocumentTag(this.buildPath(this.cwd, docNode.dataset.pathid), tag)
+        }
+    })
+}
+
+KEditor.prototype.addDocumentTag = function (path, tag) {
+    return new Promise((resolve, reject) => {
+        if (name === null) { resolve(null); return; }
+        const operation = {
+            operation: 'add-document-tag',
+            path,
+            tag
+        }
+        this.fetch('', operation).then(result => {
+            this.clear()
+            this.ls()
+        })
+    })   
 }
 
 KEditor.prototype.addDocumentInteract = function (docNode) {
@@ -641,7 +738,7 @@ KEditor.prototype.render = function (root) {
             menu.innerHTML = `<span class="kmenu-title">${KED.title ?? ''}</span>`
         } else {
             p = new Promise((resolve, reject) => {
-                menu.innerHTML = '<span data-action="history-back" class="kemu-back"><i class="fas fa-arrow-left"></i></span><span class="kmenu-title"></span>'
+                menu.innerHTML = '<span data-action="history-back" class="back"><i class="fas fa-arrow-left"></i></span><span class="kmenu-title"></span>'
                 this.getInfo(this.cwd)
                 .then(info => {
                     menu.getElementsByClassName('kmenu-title')[0].innerHTML = info.name
@@ -690,6 +787,7 @@ KEditor.prototype.render = function (root) {
                                 htmlnode.innerHTML = `<div class="kmetadata ${doc['+childs'] > 0 ? 'childs' : ''}">
                                     ${task.is ? (task.done ? '<i data-action="set-task-undone" class="fas fa-clipboard-check"></i>' : '<i data-action="set-task-done" class="fas fa-clipboard"></i>'): ''}
                                     ${new Intl.DateTimeFormat(navigator.language).format(date)} ${doc.name}
+                                    <div class="navigation"><span data-action="${doc['+childs'] > 0 ? 'open-document' : ''}" class="forward"><i class="fas fa-arrow-right"></i></span></div>
                                     <div class="ksubmenu">
                                     <span data-action="add-text"><i class="fas fa-file-alt"></i></span>
                                     <span data-action="upload-file"><i class="fas fa-cloud-upload-alt"></i></span>
@@ -697,9 +795,12 @@ KEditor.prototype.render = function (root) {
                                     ${!task.is ? '<span data-action="to-task"><i class="fas fa-tasks"></i></span>' : 
                                         '<span data-action="to-not-task" class="fa-stack"><i class="fas fa-tasks fa-stack-1x"></i><i class="fas fa-slash fa-stack-1x"></i></span>'}
                                     <span data-action="delete-document"><i class="fas fa-trash"></i></span>
-                                    <div class="navigation"><span data-action="${doc['+childs'] > 0 ? 'open-document' : ''}" class="forward"><i class="fas fa-arrow-right"></i></span></div>
                                     </div>
+                                    <div class="ktags"><span class="ktags-tools" data-action="add-tag"><i class="fas fa-plus-circle"></i></span></div>
                                     </div>`
+                                for (const tag of doc.tags) {
+                                    htmlnode.lastElementChild.lastElementChild.insertBefore(new KTag(tag).html(), htmlnode.lastElementChild.lastElementChild.firstElementChild)
+                                }
                                 htmlnode.addEventListener('click', this.submenuEvents.bind(this))
                                 htmlnode.dataset.pathid = doc.id
                                 htmlnode.dataset.created = doc.created
