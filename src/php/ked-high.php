@@ -134,7 +134,12 @@ class high extends ked {
     function filterConvertResult (array $entry) {
         $keys = array_keys($entry);
         foreach ($keys as $k) {
-            if (substr($k, 0, 2) === '__') { unset($entry[$k]); }
+            if (substr($k, 0, 2) === '__') { 
+                if ($k === '__dn') {
+                    $entry['abspath'] = $this->dnToPath($entry[$k]);
+                }
+                unset($entry[$k]); 
+            }
             switch ($k) {
                 case 'deleted':
                 case 'modified':
@@ -271,6 +276,35 @@ class high extends ked {
         $document = $this->filterConvertResult($document);
 
         return $document;
+    }
+
+    function findByTags(array $tags, $limits = [ -1, -1 ]):array {
+        $objects = parent::findByTags($tags, $limits);
+        $frontObjects = ['documents' => [], 'entries' => [], 'tags' => []];
+        foreach ($objects as $object) {
+            if (in_array('kedDocument', $object['objectclass'])) {
+                $document = $this->getDocument($object['dn']);
+                if ($document) {
+                    $frontObjects['documents'][] = $document;
+                }
+                continue;
+            }
+            if (in_array('kedEntry', $object['objectclass'])) {
+                $entry = $this->getCurrentEntryByDn($object['dn']);
+                if ($entry) {
+                    $frontObjects['entries'][] = $entry;
+                }
+                continue;
+            }
+            if (in_array('kedTag', $object['objectclass'])) {
+                $tag = $this->getTagName($object['dn']);
+                if ($tag) {
+                    $frontObjects['tags'][] = $tag;
+                }
+                continue;
+            }
+        }
+        return $frontObjects;
     }
 
     function anyToTask (string $path, array $details = []):bool {

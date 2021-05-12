@@ -19,6 +19,18 @@ function out (response) {
     }
 }
 
+function searchByTags (event) {
+    const tags = event.target.nextElementSibling.value.split(',').map(v => v.trim())
+    const operation = {
+        operation: 'search-by-tags',
+        tags
+    }
+    fetch(url, {
+        method: 'POST',
+        body: JSON.stringify(operation)
+    }).then(out)
+}
+
 function searchTags (event) {
     const expression = event.target.nextElementSibling.value
     const operation = {

@@ -5,6 +5,7 @@
     </head>
     <body>
         <textarea id="results" cols="200" rows="48"></textarea><br/>
+        <b>Documents</b>
         <button onclick="createDocument(event)">Créer document</button> Nom : <input type="text" name="name"></input> Parent : <input type="text" name="parent"></input> Étiquettes : <input type="text" name="tags"></input><br/>
         <button onclick="listDocument(event)">Lister les document</button> Chemin : <input type="text" name="path"></input><br />
         <button onclick="listDocumentExtended(event)">Lister les document [étendu]</button> Chemin : <input type="text" name="path"></input><br />
@@ -12,6 +13,7 @@
         <button onclick="getDocument(event)">Obtenir un document</button> Chemin : <input type="text" name="path"></input><br />
         <button onclick="addEntry(event)">Ajouter une entrée à un document</button> Chemin : <input type="text" name="path"></input><input type="file" name="file"></input><br />
         <button onclick="deleteAny(event)">Supprimer l'élément</button> Chemin : <input type="text" name="path"></input><br />
+        <button onclick="searchByTags(event)">Rechercher par tags </button> Tags : <input type="text" name="path"></input><br />
         <hr />
         <b>Tags</b>
         <button onclick="createTag(event)">Créer tag</button> Nom : <input type="text" name="name"></input>  Relatif : <input type="text" name="related"></input><br />

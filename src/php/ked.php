@@ -264,6 +264,7 @@ class ked {
     function getRelatedTags (string $dn):array {
         $object = $this->getRawLdapObjectByDn($dn);
         $related = [];
+        if (!isset($object['kedrelatedtag'])) { return $related; }
         foreach ($object['kedrelatedtag'] as $rTag) {
             $tag = $this->getRawLdapObjectByDn($rTag);
             if (!$tag) { continue; }
@@ -304,10 +305,54 @@ class ked {
         return $entry['kedidname'][0];
     }
 
-    function findByTags (array $tags):array {
+    function findByTags (array $tags, $limits = [ -1, -1 ]):array {
         if (empty($tags)) { return []; }
+        $tagsDn = [];
         foreach ($tags as $tag) {
+            $tagObject = $this->findTag($tag);
+            if (!$tagObject) { continue; }
+            if (!in_array($tagObject['dn'], $tagsDn)) {
+                $tagsDn[] = $tagObject['dn'];
+            }
+            foreach ($tagObject['kedrelatedtag'] as $relatedTag) {
+                if (!in_array($relatedTag, $tagsDn)) {
+                    $tagsDn[] = $relatedTag;
+                }
+                $relatedTags = $this->getRelatedTags($relatedTag);
+                foreach (array_keys($relatedTags) as $relatedTag) {
+                    if (!in_array($relatedTag, $tagsDn)) {
+                        $tagsDn[] = $relatedTag;
+                    }
+                }
+            }
         }
+
+        $objects = [];
+        foreach ($tagsDn as $tagDn) {
+            /* exclude __root__ as everyone have it (or is supposed to have it) */
+            if ($tagDn === $this->rootTag['dn']) { continue; }
+            /* search entry, documents and tags. We want everything */
+            foreach ([$this->base, $this->tagBase] as $base) {
+                $filter = $this->buildFilter('(kedRelatedTag=%s)', $tagDn);
+                $res = @ldap_search(
+                    $this->conn,
+                    $base,
+                    $filter,
+                    [ 'objectclass' ],
+                    0,
+                    $limits[0],
+                    $limits[1]
+                );
+                if (!$res) { $this->ldapFail($this->conn); continue; }
+                for($entry = @ldap_first_entry($this->conn, $res); $entry; $entry = @ldap_next_entry($this->conn, $entry)) {
+                    $object = $this->getRawLdapObject($this->conn, $entry);
+                    if (!$object) { continue; }
+                    if (isset($objects[$object['dn']])) { continue; }
+                    $objects[$object['dn']] = $object;
+                }
+            }
+        }
+        return $objects;
     }
 
     function searchTags(string $expression, array $limits = [-1, -1]):array {

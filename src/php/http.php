@@ -305,6 +305,14 @@ class http {
                 if (!$tag) { $this->errorUnableToOperate(); }
                 $this->ok(json_encode(['id' => $tag['kedidname'][0]]));
                 break;
+            case 'search-by-tags':
+                if (empty($body['tags'])) {
+                    $this->errorBadRequest();
+                }
+                $objects = $this->ked->findByTags($body['tags']);
+
+                $this->ok(json_encode($objects));
+                break;
             case 'add-document-tag':
                 if (empty($body['tag'])) {
                     $this->errorBadRequest();

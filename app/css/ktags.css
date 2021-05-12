@@ -1,7 +1,13 @@
 .ktag {
+    cursor: pointer;
     padding: 2px 4px;
     margin: 1px;
     color: var(--bg2-color);
     background-color: var(--light-bg-color);
     text-transform: capitalize;
+}
+
+.ktag.selected {
+    color: var(--light-bg-color);
+    background-color: var(--bg2-color);
 }

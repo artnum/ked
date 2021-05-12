@@ -213,7 +213,8 @@
 .ktags {
     margin-top: 0.5em;
     display: flex;
-    align-items: center;   
+    align-items: center;
+    flex-wrap: wrap;
 }
 
 .kform-inline .ktags {
