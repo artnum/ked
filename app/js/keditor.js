@@ -4,6 +4,7 @@ function KEditor(container, baseUrl) {
     this.cwd = ''
     this.headerMenu = document.createElement('DIV')
     this.headerMenu.classList.add('kmenu')
+    this.headerMenu._tools = '<div class="tools"><span data-action="add-document"><i class="fas fa-folder-plus"></i> Nouveau document</span></div>'
     this.headerMenu.addEventListener('click', this.menuEvents.bind(this))
     this.container.appendChild(this.headerMenu)
     this.container.classList.add('keditorRoot')
@@ -376,10 +377,7 @@ KEditor.prototype.addDocument = function (title = null, path = null) {
     .then(result => {
         if (!result.ok) { return }
         if (result.data.id) {
-            this.setPath(path)
-            this.pushState(path)
             this.highlight(result.data.id)
-            this.clear()
             this.ls()
         }
     }) 
@@ -422,8 +420,8 @@ KEditor.prototype.menuEvents = function (event) {
     if (!actionNode) { return }
 
     switch(actionNode.dataset.action) {
-        case 'add-doc': this.addDocument(); break
         case 'history-back': history.back(); break
+        case 'add-document':  this.addDocumentInteract(this.cwd); break
 
     }
 }
@@ -440,7 +438,6 @@ KEditor.prototype.submenuEvents = function (event) {
 
     switch (actionNode.dataset.action) {
         case 'delete-document': this.deleteDocumentInteract(docNode); break;
-        case 'add-subdocument':  this.addDocumentInteract(docNode); break
         case 'open-document': this.cd(docNode.id); this.ls(); break
         case 'add-text': this.addTextInteract(docNode); break
         case 'upload-file': this.uploadFileInteract(docNode); break
@@ -535,7 +532,9 @@ KEditor.prototype.addDocumentTag = function (path, tag) {
     })   
 }
 
-KEditor.prototype.addDocumentInteract = function (docNode) {
+KEditor.prototype.addDocumentInteract = function (path) {
+    const docNode = this.headerMenu
+    console.log(this.cwd)
     new Promise((resolve, reject) => {
         const formNode = document.createElement('FORM')
         formNode.classList.add('kform-inline')
@@ -549,10 +548,10 @@ KEditor.prototype.addDocumentInteract = function (docNode) {
             event.target.parentNode.removeChild(event.target)
         })
         formNode.innerHTML = `<input type="text" placeholder="Nom / titre" name="name" /><button type="submit">Créer</button><button type="reset">Annuler</button>`
-        docNode.insertBefore(formNode, docNode.getElementsByClassName('kmetadata')[0].nextElementSibling)
+        docNode.appendChild(formNode)
     })
     .then (title => {
-        this.addDocument(title, this.buildPath(this.cwd, docNode.dataset.pathid)); 
+        this.addDocument(title, path); 
     })
 }
 
@@ -731,12 +730,12 @@ KEditor.prototype.render = function (root) {
 
     if (this.cwd === '') {
         window.requestAnimationFrame(() => {
-            this.headerMenu.innerHTML = `<span class="kmenu-title">${KED.title ?? ''}</span>`
+            this.headerMenu.innerHTML = `<span class="kmenu-title">${KED.title ?? ''}</span>${this.headerMenu._tools}`
         })
     } else {
         new Promise ((resolve, reject) => {
             window.requestAnimationFrame(() => {
-                this.headerMenu.innerHTML = '<span data-action="history-back" class="back"><i class="fas fa-arrow-left"></i></span><span class="kmenu-title"></span>'
+                this.headerMenu.innerHTML = `<span data-action="history-back" class="back"><i class="fas fa-arrow-left"></i></span><span class="kmenu-title"></span>${this.headerMenu._tools}`
                 resolve()
             })
         })
@@ -778,14 +777,13 @@ KEditor.prototype.render = function (root) {
                         refresh = false
                         htmlnode = document.createElement('DIV')
                     }
-                    htmlnode.innerHTML = `<div class="kmetadata ${doc['+childs'] > 0 ? 'childs' : ''}">
+                    htmlnode.innerHTML = `<div class="kmetadata ${doc['+childs'] > 0 ? 'childs' : 'no-child'}">
                         ${task.is ? (task.done ? '<i data-action="set-task-undone" class="fas fa-clipboard-check"></i>' : '<i data-action="set-task-done" class="fas fa-clipboard"></i>'): ''}
                         ${new Intl.DateTimeFormat(navigator.language).format(date)} ${doc.name}
-                        <div class="navigation"><span data-action="${doc['+childs'] > 0 ? 'open-document' : ''}" class="forward"><i class="fas fa-arrow-right"></i></span></div>
+                        <div class="navigation"><span data-action="open-document" class="forward"><i class="fas fa-arrow-right"></i></span></div>
                         <div class="ksubmenu">
                         <span data-action="add-text"><i class="fas fa-file-alt"></i></span>
                         <span data-action="upload-file"><i class="fas fa-cloud-upload-alt"></i></span>
-                        <span data-action="add-subdocument"><i class="fas fa-folder-plus"></i></span>
                         ${!task.is ? '<span data-action="to-task"><i class="fas fa-tasks"></i></span>' : 
                             '<span data-action="to-not-task" class="fa-stack"><i class="fas fa-tasks fa-stack-1x"></i><i class="fas fa-slash fa-stack-1x"></i></span>'}
                         <span data-action="delete-document"><i class="fas fa-trash"></i></span>

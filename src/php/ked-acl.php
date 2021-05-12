@@ -32,7 +32,7 @@ class ACL {
         $tags = [];
         if (!isset($object['kedrelatedtag'])) { return true; }
         $tags = $this->ked->getRelatedTags($object['dn']);
-        if (!empty($tags)) { var_dump($tags); }
+        if (!empty($tags)) { }
         return true;
     }
 

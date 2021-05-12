@@ -329,7 +329,7 @@ class http {
                 if (empty($body['name'])) {
                     $this->errorBadRequest();
                 }
-                if (!empty($body['path'])) {
+                if (isset($body['path'])) {
                     $parent = $this->ked->pathToDn($body['path']);
                     if ($parent === null) { $this->errorNotFound(); }
                 }

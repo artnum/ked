@@ -457,9 +457,12 @@ class ked {
             if (!is_array($currentEntry['tags'])) {
                 $currentEntry['tags'] = [ $currentEntry['tags'] ];
             }
-            foreach ($currentEntry['tags'] as &$tagDn) {
-                $tagDn = $this->getTagName($tagDn);
+            $tags = [];
+            foreach ($currentEntry['tags'] as $tagDn) {
+                if ($tagDn === $this->rootTag['dn']) { continue; }
+                $tags[] = $this->getTagName($tagDn);
             }
+            $currentEntry['tags'] = $tags;
         } else {
             $currentEntry['tags'] = [];
         }
@@ -741,7 +744,6 @@ class ked {
 
     function updateEntryByDn (string $dn, ?string $content, array $options = []):?string {
         $currentEntry = $this->getCurrentEntryByDn($dn);
-        var_dump($currentEntry);
         if ($currentEntry === null) { return null; }
         $options['id'] = $currentEntry['id'];
         if (empty($options['type']) && !empty($currentEntry['type'])) {
