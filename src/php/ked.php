@@ -305,6 +305,36 @@ class ked {
         return $entry['kedidname'][0];
     }
 
+    function findSubTags (string $tagDn, $limits = [ -1, -1 ]):array {
+        $filter = $this->buildFilter('(&(objectclass=kedTag)(kedRelatedTag=%s))', $tagDn);
+        $res = @ldap_search(
+            $this->conn,
+            $this->tagBase,
+            $filter,
+            [ '*' ],
+            0,
+            $limits[0],
+            $limits[1]
+        );
+        if (!$res) { $this->ldapFail($this->conn); return [];}
+        $objects = [];
+        for($entry = @ldap_first_entry($this->conn, $res); $entry; $entry = @ldap_next_entry($this->conn, $entry)) {
+            $object = $this->getRawLdapObject($this->conn, $entry);
+            if (!$object) { continue; }
+            if (isset($objects[$object['dn']])) { continue; }
+            $objects[$object['dn']] = $object;
+            $subtags = $this->findSubTags($object['dn'], $limits);
+            if (!empty($subtags)) {
+                foreach ($subtags as $k => $v) {
+                    if (!isset($objects[$k])) {
+                        $objects[$k] = $v;
+                    }
+                }
+            }
+        }
+        return $objects;
+    }
+
     function findByTags (array $tags, $limits = [ -1, -1 ]):array {
         if (empty($tags)) { return []; }
         $tagsDn = [];
@@ -314,15 +344,10 @@ class ked {
             if (!in_array($tagObject['dn'], $tagsDn)) {
                 $tagsDn[] = $tagObject['dn'];
             }
-            foreach ($tagObject['kedrelatedtag'] as $relatedTag) {
+            $relatedTags = $this->findSubTags($tagObject['dn']);
+            foreach (array_keys($relatedTags) as $relatedTag) {
                 if (!in_array($relatedTag, $tagsDn)) {
                     $tagsDn[] = $relatedTag;
-                }
-                $relatedTags = $this->getRelatedTags($relatedTag);
-                foreach (array_keys($relatedTags) as $relatedTag) {
-                    if (!in_array($relatedTag, $tagsDn)) {
-                        $tagsDn[] = $relatedTag;
-                    }
                 }
             }
         }
