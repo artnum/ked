@@ -21,6 +21,7 @@ class http {
         header('Allow: GET, POST, HEAD');
         header('Accept-Charset: utf-8');
         header('Accept: application/json');
+        header('Cache-Control: no-store', true);
     }
 
     function errorUnsupportedMethod () {

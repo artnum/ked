@@ -216,6 +216,12 @@ KEditor.prototype.edit = {
         this.editors.set(contentNode.dataset.entryid, quill)
     },
     text: function (contentNode) {
+        if (contentNode.dataset.edition) {
+            this.uploadText(contentNode, contentNode.firstElementChild.value, 'text/plain')
+            delete contentNode.dataset.edition
+            return;
+        }
+        contentNode.dataset.edition = '1'
         let content = this.data.get(contentNode.dataset.entryid)
         contentNode.innerHTML = '<textarea style="width: calc(100% - 8px); height: 380px"></textarea>'
         contentNode.firstElementChild.value = content
@@ -247,7 +253,7 @@ KEditor.prototype.renderEntry = function (path, entry) {
         switch(subtype[0]) {
             case 'video':
                 htmlnode = document.createElement('VIDEO')
-                htmlnode.src = this.buildPath(path, entry.id)
+                htmlnode.src =`${path}/${entry.abspath}?mod=${entry.modified}`
                 htmlnode.classList.add('kvideo')
                 htmlnode.setAttribute('width', '200px')
                 htmlnode.setAttribute('height', '200px')
@@ -257,15 +263,15 @@ KEditor.prototype.renderEntry = function (path, entry) {
                 return
             case 'image':
                 htmlnode = document.createElement('A')
-                htmlnode.href = this.buildPath(path, entry.id)
+                htmlnode.href = `${path}/${entry.abspath}?mod=${entry.modified}`
                 htmlnode.target = '_blank'
-                htmlnode.style.backgroundImage = `url('${htmlnode.href}!browser')`
+                htmlnode.style.backgroundImage = `url('${path}/${entry.abspath}!browser?mod=${entry.modified}')`
                 htmlnode.classList.add('klink')
                 htmlnode.dataset.edit = 'file'
                 subresolve(htmlnode)
                 return
             case 'text':
-                fetch(new URL(this.buildPath(path, entry.id)))
+                fetch(new URL(`${path}/${entry.abspath}?mod=${entry.modified}`))
                 .then(response => {
                     if (!response.ok) { resolve(null); return; }
                     response.text()
@@ -276,7 +282,9 @@ KEditor.prototype.renderEntry = function (path, entry) {
                         switch (subtype[1]) {
                             case 'html':
                                 let x = document.createElement('HTML')
-                                x.innerHTML = contenttitregetElementsByTagName('BODY')[0].innerHTML
+                                x.innerHTML = content
+                                htmlnode = document.createElement('DIV')
+                                htmlnode.innerHTML = x.getElementsByTagName('BODY')[0].innerHTML
                                 htmlnode.classList.add('htmltext')
                                 subresolve(htmlnode)
                                 return
@@ -312,22 +320,22 @@ KEditor.prototype.renderEntry = function (path, entry) {
                         htmlnode = document.createElement('A')
                         htmlnode.classList.add('klink')
                         htmlnode.target = '_blank'
-                        htmlnode.href = this.buildPath(path, entry.id)
+                        htmlnode.href = `${path}/${entry.abspath}?mod=${entry.modified}`
                         htmlnode.innerHTML = `<span class="name">${EntryName}</span>`
                         htmlnode.dataset.edit = 'file'
                         subresolve(htmlnode)
                         return
                     case 'application/pdf':
                         htmlnode = document.createElement('A')
-                        htmlnode.href = this.buildPath(path, entry.id)
+                        htmlnode.href = `${path}/${entry.abspath}?mod=${entry.modified}`
                         htmlnode.target = '_blank'
-                        htmlnode.style.backgroundImage = `url('${htmlnode.href}!browser')`
+                        htmlnode.style.backgroundImage = `url('${path}/${entry.abspath}!browser?mod=${entry.modified}')`
                         htmlnode.classList.add('klink')
                         htmlnode.dataset.edit = 'file'
                         subresolve(htmlnode)
                         return                       
                     case 'message/rfc822':
-                        fetch(new URL(`${this.buildPath(path, entry.id)}`))
+                        fetch(new URL(`${path}/${entry.abspath}?mod=${entry.modified}`))
                         .then(response => {
                             if (!response.ok) { return null; }
                             return response.text()
@@ -688,9 +696,13 @@ KEditor.prototype.getInfo = function (path) {
 }
 
 KEditor.prototype.uploadFile = function (node, event) {
+    let docNode = node
+    while (docNode && !docNode.classList.contains('document')) {
+        docNode = docNode.parentNode
+    }
     const files = event.target.files
     const op = node.dataset.entryid ? 'update-entry' : 'add-entry'
-    const path = op === 'update-entry' ? this.buildPath(this.cwd, this.buildPath(node.dataset.parentid, node.dataset.entryid)) :  this.buildPath(this.cwd, node.dataset.pathid)
+    const path = op === 'update-entry' ? this.buildPath(docNode.id, node.dataset.entryid) :  docNode.id
     let allTransfers = []
     for (let i = 0; i < files.length; i++) {
         allTransfers.push(new Promise ((resolve, reject) => {
@@ -708,7 +720,7 @@ KEditor.prototype.uploadFile = function (node, event) {
 
     Promise.all(allTransfers)
     .then(_ => {
-        this.refreshDocument(node.id)
+        this.refreshDocument(docNode.id)
     })
 }
 
@@ -912,7 +924,7 @@ KEditor.prototype.renderSingle = function (doc) {
             if (doc['+entries'] !== undefined) {
                 for (let j = 0; j < doc['+entries'].length; j++) {
                     let entry = doc['+entries'][j]
-                    p.push(this.renderEntry(`${this.baseUrl.toString()}/${this.buildPath(this.cwd, doc.id)}`, entry))
+                    p.push(this.renderEntry(`${this.baseUrl.toString()}/`, entry))
                 }
             }
             if (p.length > 0) { htmlnode.classList.add('opened-entries') }
@@ -922,16 +934,25 @@ KEditor.prototype.renderSingle = function (doc) {
                     if (nodes[i] === null) { continue; }
                     nodes[i].dataset.parentid = doc.id
                     const entryContainer = document.createElement('DIV')
+                    entryContainer.id = `container-${nodes[i].id}`
                     entryContainer.appendChild(nodes[i])
                     entryContainer.classList.add('kentry-container')
                     switch(nodes[i].nodeName) {
                         case 'IMG':
                         case 'VIDEO':
                         case 'A':
+                            if (document.getElementById(entryContainer.id)) {
+                                const p = document.getElementById(entryContainer.id).parentNode
+                                p.removeChild(document.getElementById(entryContainer.id))
+                            } 
                             htmlnode.appendChild(entryContainer)
                             entryContainer.classList.add('squared')
                             break;
                         case 'DIV':
+                            if (document.getElementById(entryContainer.id)) {
+                                const p = document.getElementById(entryContainer.id).parentNode
+                                p.removeChild(document.getElementById(entryContainer.id))
+                            } 
                             htmlnode.insertBefore(entryContainer, htmlnode.firstChild.nextElementSibling)
                             entryContainer.classList.add('flowed')
                             break
