@@ -258,6 +258,7 @@ KEditor.prototype.renderEntry = function (path, entry) {
             case 'image':
                 htmlnode = document.createElement('A')
                 htmlnode.href = this.buildPath(path, entry.id)
+                htmlnode.target = '_blank'
                 htmlnode.style.backgroundImage = `url('${htmlnode.href}!browser')`
                 htmlnode.classList.add('klink')
                 htmlnode.dataset.edit = 'file'
@@ -310,6 +311,7 @@ KEditor.prototype.renderEntry = function (path, entry) {
                     default:
                         htmlnode = document.createElement('A')
                         htmlnode.classList.add('klink')
+                        htmlnode.target = '_blank'
                         htmlnode.href = this.buildPath(path, entry.id)
                         htmlnode.innerHTML = `<span class="name">${EntryName}</span>`
                         htmlnode.dataset.edit = 'file'
@@ -318,6 +320,7 @@ KEditor.prototype.renderEntry = function (path, entry) {
                     case 'application/pdf':
                         htmlnode = document.createElement('A')
                         htmlnode.href = this.buildPath(path, entry.id)
+                        htmlnode.target = '_blank'
                         htmlnode.style.backgroundImage = `url('${htmlnode.href}!browser')`
                         htmlnode.classList.add('klink')
                         htmlnode.dataset.edit = 'file'
