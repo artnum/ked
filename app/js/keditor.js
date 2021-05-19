@@ -221,6 +221,7 @@ KEditor.prototype.renderEntry = function (path, entry) {
     return new Promise ((resolve, reject) => {
         const subresolve = function (htmlnode) {
             htmlnode.dataset.entryid = entry.id
+            htmlnode.id = entry.abspath
             if (entry['+class'].indexOf('task') !== -1) {
                 htmlnode.dataset.task = '1'
             }
@@ -330,6 +331,36 @@ KEditor.prototype.renderEntry = function (path, entry) {
                         break;
                 }
         }
+    })
+}
+
+KEditor.prototype.deleteEntryInteract = function (docNode, entryNode) {
+    return new Promise((resolve, reject) => {
+        new Promise((resolve, reject) => {
+            const formNode = document.createElement('FORM')
+            formNode.classList.add('kform-inline')
+            formNode.addEventListener('submit', event => {
+                event.preventDefault()
+                const fdata = new FormData(event.target)
+                event.target.parentNode.removeChild(event.target)
+                resolve(true)
+            })
+            formNode.addEventListener('reset', event => {
+                event.target.parentNode.removeChild(event.target)
+                resolve(false)
+            })
+            formNode.innerHTML = `<span class="message">Voulez-vous supprimer cette entrée</span><button type="submit">Oui</button><button type="reset">Non</button>`
+            entryNode.parentNode.appendChild(formNode)
+        })
+        .then (confirm => {
+            if (confirm) {
+                this.fetch('', {operation: 'delete', path: entryNode.id})
+                .then(_ => {
+                    this.renderSingle(docNode.id)
+                })
+            
+            }
+        })
     })
 }
 
@@ -721,7 +752,15 @@ KEditor.prototype.handleToolsEvents = function (event) {
     while (ktoolsNode && !ktoolsNode.dataset?.action) { ktoolsNode = ktoolsNode.parentNode}
     if (!ktoolsNode) { return }
 
+    let docNode = kcontainerNode
+    while (docNode && !docNode.classList.contains('document')) {
+        docNode = docNode.parentNode
+    }
+
     switch(ktoolsNode.dataset.action) {
+        case 'delete-entry':
+            this.deleteEntryInteract(docNode, kcontainerNode.firstElementChild)
+            break;
         case 'edit-entry':
             if (!kcontainerNode.firstElementChild.dataset?.edit) { return }
             if (!this.edit[kcontainerNode.firstElementChild.dataset.edit]) { return }
@@ -854,7 +893,8 @@ KEditor.prototype.renderSingle = function (doc) {
                     entryTools.innerHTML = `<span data-action="edit-entry"><i class="fas fa-edit"></i></span>
                         ${nodes[i].dataset.task ? 
                             '<span data-action="to-not-task" class="fa-stack"><i class="fas fa-tasks fa-stack-1x"></i><i class="fas fa-slash fa-stack-1x"></i></span>' 
-                            : '<span data-action="to-task"><i class="fas fa-tasks"></i></span>'}`
+                            : '<span data-action="to-task"><i class="fas fa-tasks"></i></span>'}
+                            <span data-action="delete-entry"><i class="fas fa-trash"></i></span>`
                         + `<span class="name">${nodes[i].dataset.name}</span>`
                     entryTools.addEventListener('click', this.handleToolsEvents.bind(this))
                     entryContainer.appendChild(entryTools)

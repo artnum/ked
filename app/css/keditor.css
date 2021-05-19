@@ -45,6 +45,11 @@
     font-size: 16px;
 }
 
+.kentry-tools span {
+    margin: 0px 4px;
+    cursor: pointer;
+}
+
 .kentry-tools .name {
     float: right;
     font-family: 'B612 Mono', monospace;
@@ -129,6 +134,7 @@
 .kform-inline input, .kform-inline span.message {
     flex-grow: 4;
     font-family: 'B612 Mono', monospace;
+    font-size: 12px;
 }
 
 .kform-inline span.message {

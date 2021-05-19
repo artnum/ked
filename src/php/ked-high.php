@@ -267,6 +267,7 @@ class high extends ked {
         $document['+childs'] = $this->countDocumentChilds($document['__dn']);
         $document['+entries'] = $this->listDocumentEntries($document['__dn']);
         foreach ($document['+entries'] as $k => $child) {
+            $child['abspath'] = $this->pathToDn($child['__dn']);
             $document['+entries'][$k] = $this->filterConvertResult($child);
         }
        
