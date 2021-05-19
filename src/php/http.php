@@ -375,7 +375,7 @@ class http {
                 $docDn = $this->ked->pathToDn($body['path']);
                 if (!$this->acl->can($this->user['dn'], 'access', $docDn)) { $this->errorForbidden(); }
                 if ($docDn === null) { $this->errorNotFound(); }
-                $document = $this->ked->getDocument($docDn);
+                $document = $this->ked->getDocument($docDn, true);
                 $this->ok(json_encode($document));
                 break;
             case 'add-entry':
