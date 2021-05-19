@@ -336,32 +336,30 @@ KEditor.prototype.renderEntry = function (path, entry) {
 
 KEditor.prototype.deleteEntryInteract = function (docNode, entryNode) {
     return new Promise((resolve, reject) => {
-        new Promise((resolve, reject) => {
-            const formNode = document.createElement('FORM')
-            formNode.classList.add('kform-inline')
-            formNode.addEventListener('submit', event => {
-                event.preventDefault()
-                const fdata = new FormData(event.target)
-                event.target.parentNode.removeChild(event.target)
-                resolve(true)
-            })
-            formNode.addEventListener('reset', event => {
-                event.target.parentNode.removeChild(event.target)
-                resolve(false)
-            })
-            formNode.innerHTML = `<span class="message">Voulez-vous supprimer cette entrée</span><button type="submit">Oui</button><button type="reset">Non</button>`
-            entryNode.parentNode.appendChild(formNode)
+        const formNode = document.createElement('FORM')
+        formNode.classList.add('kform-inline')
+        formNode.addEventListener('submit', event => {
+            event.preventDefault()
+            const fdata = new FormData(event.target)
+            event.target.parentNode.removeChild(event.target)
+            resolve(true)
         })
-        .then (confirm => {
-            if (confirm) {
-                this.fetch('', {operation: 'delete', path: entryNode.id})
-                .then(_ => {
-                    this.renderSingle(docNode.id)
-                })
-            
-            }
+        formNode.addEventListener('reset', event => {
+            event.target.parentNode.removeChild(event.target)
+            resolve(false)
         })
+        formNode.innerHTML = `<span class="message">Voulez-vous supprimer cette entrée</span><button type="submit">Oui</button><button type="reset">Non</button>`
+        entryNode.parentNode.appendChild(formNode)
     })
+    .then (confirm => {
+        if (confirm) {
+            this.fetch('', {operation: 'delete', path: entryNode.id})
+            .then(_ => {
+                this.refreshDocument(docNode.id)
+            })
+        }
+    })
+
 }
 
 KEditor.prototype.deleteDocumentInteract = function (docNode) {
