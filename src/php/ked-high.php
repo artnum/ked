@@ -189,6 +189,8 @@ class high extends ked {
             $metadata['+class'] = [ 'root', 'document' ];
             $metadata['name'] = '[root]';
         }
+        $metadata['+childs'] = $this->countDocumentChilds($dn);
+        $metadata['+entries'] = $this->countDocumentEntries($dn);
         if ($filter) { $metadata = $this->filterConvertResult($metadata); }
         return $metadata;
     }
@@ -261,14 +263,18 @@ class high extends ked {
         return $this->createDocument($name, $options);
     }
 
-    function getDocument (string $docDn, array $limits = [-1, -1]):array {
-        $document = parent::getDocument($docDn, $limits);
+    function getDocument (string $docDn, $extended = false):array {
+        $document = parent::getDocument($docDn);
 
         $document['+childs'] = $this->countDocumentChilds($document['__dn']);
-        $document['+entries'] = $this->listDocumentEntries($document['__dn']);
-        foreach ($document['+entries'] as $k => $child) {
-            $child['abspath'] = $this->pathToDn($child['__dn']);
-            $document['+entries'][$k] = $this->filterConvertResult($child);
+        if ($extended) {
+            $document['+entries'] = $this->listDocumentEntries($document['__dn']);
+            foreach ($document['+entries'] as $k => $child) {
+                $child['abspath'] = $this->pathToDn($child['__dn']);
+                $document['+entries'][$k] = $this->filterConvertResult($child);
+            }
+        } else {
+            $document['+entries'] = $this->countDocumentEntries($document['__dn']);
         }
        
         $document['+history'] = [];
