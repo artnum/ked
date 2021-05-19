@@ -230,7 +230,7 @@ class ked {
         if (isset($options['__update'])) { // when we call from updateEntry, we want to have previous entry full dn
             return $dn;
         }
-        return $rdn[1];
+        return $dn;
     }
 
     function createTag (string $tag, array $relatedTags = []):?array {
@@ -565,26 +565,6 @@ class ked {
         if (!$entry) { $this->ldapFail($this->conn); return []; }
         $document = $this->getLdapObject($this->conn, $entry);
         if (!$document) { return []; }
-        
-        $document['+childs'] = $this->countDocumentChilds($docDn);
-
-        /* get entries */
-        $res = @ldap_list(
-            $this->conn,
-            $docDn,
-            '(&(objectclass=kedEntry)(!(kedNext=*))(!(kedDeleted=*)))',
-            [ '*' ],
-            0,
-            $limits[0],
-            $limits[1]
-        );
-        if (!$res) { $this->ldapFail($this->conn); return []; }
-        $document['+entries'] = [];
-        for ($entry = ldap_first_entry($this->conn, $res); $entry; $entry = ldap_next_entry($this->conn, $entry)) {
-            $object = $this->getLdapObject($this->conn, $entry);
-            if (!$object) { $document['+entries'][] = ['+failed' => true]; continue; }
-            $document['+entries'][] = $object;
-        }
 
         return $document;
     }

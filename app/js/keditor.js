@@ -98,6 +98,18 @@ KEditor.prototype.error = function (data) {
     }
 }
 
+KEditor.prototype.refreshDocument = function (docPath) {
+    return new Promise((resolve, reject) => {
+        this.fetch(this.cwd, {operation: 'get-document', path: docPath})
+        .then(result => {
+            if (!result.ok) { this.error(result.data); return }
+            return this.renderSingle(result.data)
+        })
+        .then(_ => resolve())
+        .catch(reason => reject(reason))
+    })
+}
+
 KEditor.prototype.ls = function () {
     return new Promise((resolve, reject) => {
         this.fetch(this.cwd, {operation: 'list-document', format: 'extended'})
@@ -534,7 +546,6 @@ KEditor.prototype.addDocumentTag = function (path, tag) {
 
 KEditor.prototype.addDocumentInteract = function (path) {
     const docNode = this.headerMenu
-    console.log(this.cwd)
     new Promise((resolve, reject) => {
         const formNode = document.createElement('FORM')
         formNode.classList.add('kform-inline')
@@ -574,7 +585,7 @@ KEditor.prototype.convertToTaskInteract = function (docNode) {
 
     this.fetch('', formData)
     .then(_ => {
-        this.ls()
+        this.refreshDocument(docNode.id)
     })
 }
 
@@ -589,7 +600,7 @@ KEditor.prototype.convertToNotTaskInteract = function (docNode) {
 
     this.fetch('', formData)
     .then(_ => {
-        this.ls()
+        this.refreshDocument(docNode.id)
     })
 }
 
@@ -610,7 +621,7 @@ KEditor.prototype.updateTask = function (docNode, values = []) {
     })
     this.fetch('', formData)
     .then(_ => {
-        this.ls()
+        this.refreshDocument(docNode.id)
     })
 }
 
@@ -649,7 +660,7 @@ KEditor.prototype.uploadFile = function (node, event) {
 
     Promise.all(allTransfers)
     .then(_ => {
-        this.ls()
+        this.refreshDocument(node.id)
     })
 }
 
@@ -690,7 +701,7 @@ KEditor.prototype.addTextInteract = function (docNode) {
             formData.append('file', new File([JSON.stringify(deltaContent)], name, {type: "text/x-quill-delta;charset=utf-8"}))
             formData.append('_filename', name)
             this.fetch('', formData)
-            .then(_ => {this.ls()})
+            .then(_ => { this.refreshDocument(docNode.id) })
         })
     })
 }
@@ -725,6 +736,160 @@ KEditor.prototype.handleToolsEvents = function (event) {
     }
 }
 
+KEditor.prototype.renderSingle = function (doc) {
+    return new Promise((resolve, reject) => {
+        (new Promise((resolve, reject) => {
+            let htmlnode
+            doc.class = 'document'
+            const task = {
+                is: doc['+class'].indexOf('task') === -1 ? false : true,
+                done: false,
+                end: null,
+                previous: null
+            }
+            if (task.is) {
+                if (doc['taskDone'] !== undefined) {
+                    task.done = true
+                }
+            }
+
+            let date = new Date(doc.created)
+            let refresh = true
+            htmlnode = document.getElementById(this.buildPath(doc.id, this.cwd))
+            if (!htmlnode) {
+                refresh = false
+                htmlnode = document.createElement('DIV')
+            }
+            htmlnode.innerHTML = `<div class="kmetadata ${doc['+childs'] > 0 ? 'childs' : 'no-child'}">
+                ${task.is ? (task.done ? '<i data-action="set-task-undone" class="fas fa-clipboard-check"></i>' : '<i data-action="set-task-done" class="fas fa-clipboard"></i>'): ''}
+                ${new Intl.DateTimeFormat(navigator.language).format(date)} ${doc.name}
+                <div class="navigation"><span data-action="open-document" class="forward"><i class="fas fa-arrow-right"></i></span></div>
+                <div class="ksubmenu">
+                <span data-action="add-text"><i class="fas fa-file-alt"></i></span>
+                <span data-action="upload-file"><i class="fas fa-cloud-upload-alt"></i></span>
+                ${!task.is ? '<span data-action="to-task"><i class="fas fa-tasks"></i></span>' : 
+                    '<span data-action="to-not-task" class="fa-stack"><i class="fas fa-tasks fa-stack-1x"></i><i class="fas fa-slash fa-stack-1x"></i></span>'}
+                <span data-action="delete-document"><i class="fas fa-trash"></i></span>
+                </div>
+                <div class="ktags"><span class="ktags-tools" data-action="add-tag"><i class="fas fa-plus-circle"></i></span></div>
+                </div>`
+            for (const tag of doc.tags) {
+                let ktag = this.tags.get(tag)
+                if (!ktag) {
+                    ktag = new KTag(tag)
+                    ktag.addEventListener('change', this.selecteTag.bind(this))
+                    this.tags.set(tag, ktag)
+                }
+                htmlnode.lastElementChild.lastElementChild.insertBefore(ktag.html(), htmlnode.lastElementChild.lastElementChild.firstElementChild)
+            }
+            if (!refresh) { htmlnode.addEventListener('click', this.submenuEvents.bind(this)) }
+            htmlnode.id = doc.abspath
+            htmlnode.dataset.pathid = doc.id
+            htmlnode.dataset.created = doc.created
+            htmlnode.dataset.modified = doc.modified
+            htmlnode.dataset.childs = doc['+childs']
+            htmlnode.classList.add('document')
+            if (this.toHighlight === doc.id) {
+                htmlnode.classList.add('highlight')
+                setTimeout(_ => {
+                    htmlnode.classList.remove('highlight')
+                    this.toHighlight = null
+                }, 5000)
+            }
+            if (!refresh) {
+                htmlnode.addEventListener('dragover', (event) => { event.preventDefault() }) 
+                htmlnode.addEventListener('dragenter', (event) => { 
+                    let node = event.target
+                    while (node && ! node.dataset?.pathid) { node = node.parentNode }
+                    if (node.dataset.kedDrageCounter === undefined) {
+                        node.dataset.kedDrageCounter = 0
+                    }
+                    node.dataset.kedDrageCounter++
+                    window.requestAnimationFrame(() => {
+                        node.classList.add('highlight')
+                    })
+                    event.preventDefault() 
+                })
+                htmlnode.addEventListener('dragleave', (event) => { 
+                    let node = event.target
+                    while (node && ! node.dataset?.pathid) { node = node.parentNode }
+                    node.dataset.kedDrageCounter--
+                    window.requestAnimationFrame(() => {
+                        if (node.dataset.kedDrageCounter <= 0) {
+                            node.classList.remove('highlight')
+                        }
+                    })
+                    event.preventDefault() 
+                })
+                htmlnode.addEventListener('drop', this.dropEntry.bind(this))
+            }
+
+            let p = []
+            for (let j = 0; j < doc['+entries'].length; j++) {
+                let entry = doc['+entries'][j]
+                p.push(this.renderEntry(`${this.baseUrl.toString()}/${this.buildPath(this.cwd, doc.id)}`, entry))
+            }
+            Promise.all(p)
+            .then(nodes => {
+                for (let i = 0; i < nodes.length; i++) {
+                    if (nodes[i] === null) { continue; }
+                    nodes[i].dataset.parentid = doc.id
+                    const entryContainer = document.createElement('DIV')
+                    entryContainer.appendChild(nodes[i])
+                    entryContainer.classList.add('kentry-container')
+                    switch(nodes[i].nodeName) {
+                        case 'IMG':
+                        case 'VIDEO':
+                        case 'A':
+                            htmlnode.appendChild(entryContainer)
+                            entryContainer.classList.add('squared')
+                            break;
+                        case 'DIV':
+                            htmlnode.insertBefore(entryContainer, htmlnode.firstChild.nextElementSibling)
+                            entryContainer.classList.add('flowed')
+                            break
+                    }
+                    const entryTools = document.createElement('DIV')
+                    entryTools.classList.add('kentry-tools')
+                    entryTools.innerHTML = `<span data-action="edit-entry"><i class="fas fa-edit"></i></span>
+                        ${nodes[i].dataset.task ? 
+                            '<span data-action="to-not-task" class="fa-stack"><i class="fas fa-tasks fa-stack-1x"></i><i class="fas fa-slash fa-stack-1x"></i></span>' 
+                            : '<span data-action="to-task"><i class="fas fa-tasks"></i></span>'}`
+                        + `<span class="name">${nodes[i].dataset.name}</span>`
+                    entryTools.addEventListener('click', this.handleToolsEvents.bind(this))
+                    entryContainer.appendChild(entryTools)
+                }
+                resolve(htmlnode)
+            })
+        }))
+        .then(node => {
+            if (node === null) { return }
+            const currentNode = document.getElementById(node.id)
+            if (currentNode) {
+                window.requestAnimationFrame(() => {
+                    currentNode.parentNode.replaceChild(node, currentNode)
+                    resolve();
+                })
+                return;
+            }
+            window.requestAnimationFrame(() => {
+                const insCreated = new Date(node.dataset.modified)
+                let insert = null
+                for (let n = this.container.firstElementChild; n; n = n.nextElementSibling) {
+                    if (n.dataset.created === undefined) { continue; }
+                    const curCreated = new Date(n.dataset.modified) 
+                    if (curCreated.getTime() < insCreated.getTime()) {
+                        insert = n
+                        break
+                    }
+                }
+                this.container.insertBefore(node, insert)
+                resolve()
+            })
+        })
+    })
+}
+
 KEditor.prototype.render = function (root) {
     if (!root.documents) { console.log(root); return }
 
@@ -748,167 +913,25 @@ KEditor.prototype.render = function (root) {
             })
         })
     }
-    const documentsAbsPath = []
-    let chain = Promise.resolve()
-    for (let i = 0; i < root.documents.length; i++) {
-        if (root.documents[i]['+class'].indexOf('entry') !== -1) { continue; }
-        documentsAbsPath.push(root.documents[i].abspath)
-        const nextDoc = (doc) => {
-            return new Promise((resolve, reject) => {
-                (new Promise((resolve, reject) => {
-                    let htmlnode
-                    doc.class = 'document'
-                    const task = {
-                        is: doc['+class'].indexOf('task') === -1 ? false : true,
-                        done: false,
-                        end: null,
-                        previous: null
-                    }
-                    if (task.is) {
-                        if (doc['taskDone'] !== undefined) {
-                            task.done = true
-                        }
-                    }
-   
-                    let date = new Date(doc.created)
-                    let refresh = true
-                    htmlnode = document.getElementById(this.buildPath(doc.id, this.cwd))
-                    if (!htmlnode) {
-                        refresh = false
-                        htmlnode = document.createElement('DIV')
-                    }
-                    htmlnode.innerHTML = `<div class="kmetadata ${doc['+childs'] > 0 ? 'childs' : 'no-child'}">
-                        ${task.is ? (task.done ? '<i data-action="set-task-undone" class="fas fa-clipboard-check"></i>' : '<i data-action="set-task-done" class="fas fa-clipboard"></i>'): ''}
-                        ${new Intl.DateTimeFormat(navigator.language).format(date)} ${doc.name}
-                        <div class="navigation"><span data-action="open-document" class="forward"><i class="fas fa-arrow-right"></i></span></div>
-                        <div class="ksubmenu">
-                        <span data-action="add-text"><i class="fas fa-file-alt"></i></span>
-                        <span data-action="upload-file"><i class="fas fa-cloud-upload-alt"></i></span>
-                        ${!task.is ? '<span data-action="to-task"><i class="fas fa-tasks"></i></span>' : 
-                            '<span data-action="to-not-task" class="fa-stack"><i class="fas fa-tasks fa-stack-1x"></i><i class="fas fa-slash fa-stack-1x"></i></span>'}
-                        <span data-action="delete-document"><i class="fas fa-trash"></i></span>
-                        </div>
-                        <div class="ktags"><span class="ktags-tools" data-action="add-tag"><i class="fas fa-plus-circle"></i></span></div>
-                        </div>`
-                    for (const tag of doc.tags) {
-                        let ktag = this.tags.get(tag)
-                        if (!ktag) {
-                            ktag = new KTag(tag)
-                            ktag.addEventListener('change', this.selecteTag.bind(this))
-                            this.tags.set(tag, ktag)
-                        }
-                        htmlnode.lastElementChild.lastElementChild.insertBefore(ktag.html(), htmlnode.lastElementChild.lastElementChild.firstElementChild)
-                    }
-                    if (!refresh) { htmlnode.addEventListener('click', this.submenuEvents.bind(this)) }
-                    htmlnode.id = doc.abspath
-                    htmlnode.dataset.pathid = doc.id
-                    htmlnode.dataset.created = doc.created
-                    htmlnode.dataset.modified = doc.modified
-                    htmlnode.dataset.childs = doc['+childs']
-                    htmlnode.classList.add('document')
-                    if (this.toHighlight === doc.id) {
-                        htmlnode.classList.add('highlight')
-                        setTimeout(_ => {
-                            htmlnode.classList.remove('highlight')
-                            this.toHighlight = null
-                        }, 5000)
-                    }
-                    if (!refresh) {
-                        htmlnode.addEventListener('dragover', (event) => { event.preventDefault() }) 
-                        htmlnode.addEventListener('dragenter', (event) => { 
-                            let node = event.target
-                            while (node && ! node.dataset?.pathid) { node = node.parentNode }
-                            if (node.dataset.kedDrageCounter === undefined) {
-                                node.dataset.kedDrageCounter = 0
-                            }
-                            node.dataset.kedDrageCounter++
-                            window.requestAnimationFrame(() => {
-                                node.classList.add('highlight')
-                            })
-                            event.preventDefault() 
-                        })
-                        htmlnode.addEventListener('dragleave', (event) => { 
-                            let node = event.target
-                            while (node && ! node.dataset?.pathid) { node = node.parentNode }
-                            node.dataset.kedDrageCounter--
-                            window.requestAnimationFrame(() => {
-                                if (node.dataset.kedDrageCounter <= 0) {
-                                    node.classList.remove('highlight')
-                                }
-                            })
-                            event.preventDefault() 
-                        })
-                        htmlnode.addEventListener('drop', this.dropEntry.bind(this))
-                    }
 
-                    let p = []
-                    for (let j = 0; j < doc['+entries'].length; j++) {
-                        let entry = doc['+entries'][j]
-                        p.push(this.renderEntry(`${this.baseUrl.toString()}/${this.buildPath(this.cwd, doc.id)}`, entry))
-                    }
-                    Promise.all(p)
-                    .then(nodes => {
-                        for (let i = 0; i < nodes.length; i++) {
-                            if (nodes[i] === null) { continue; }
-                            nodes[i].dataset.parentid = doc.id
-                            const entryContainer = document.createElement('DIV')
-                            entryContainer.appendChild(nodes[i])
-                            entryContainer.classList.add('kentry-container')
-                            switch(nodes[i].nodeName) {
-                                case 'IMG':
-                                case 'VIDEO':
-                                case 'A':
-                                    htmlnode.appendChild(entryContainer)
-                                    entryContainer.classList.add('squared')
-                                    break;
-                                case 'DIV':
-                                    htmlnode.insertBefore(entryContainer, htmlnode.firstChild.nextElementSibling)
-                                    entryContainer.classList.add('flowed')
-                                    break
-                            }
-                            const entryTools = document.createElement('DIV')
-                            entryTools.classList.add('kentry-tools')
-                            entryTools.innerHTML = `<span data-action="edit-entry"><i class="fas fa-edit"></i></span>
-                                ${nodes[i].dataset.task ? 
-                                    '<span data-action="to-not-task" class="fa-stack"><i class="fas fa-tasks fa-stack-1x"></i><i class="fas fa-slash fa-stack-1x"></i></span>' 
-                                    : '<span data-action="to-task"><i class="fas fa-tasks"></i></span>'}`
-                                + `<span class="name">${nodes[i].dataset.name}</span>`
-                            entryTools.addEventListener('click', this.handleToolsEvents.bind(this))
-                            entryContainer.appendChild(entryTools)
-                        }
-                        resolve(htmlnode)
-                    })
-                })).then(node => {    
-                    if (node === null) { return }
-                    window.requestAnimationFrame(() => {
-                        const insCreated = new Date(node.dataset.modified)
-                        let insert = null
-                        for (let n = this.container.firstElementChild; n; n = n.nextElementSibling) {
-                            if (n.dataset.created === undefined) { continue; }
-                            if (n.dataset.pathid === node.dataset.pathid) {
-                                this.container.removeChild(n)
-                                continue
-                            }
-                            const curCreated = new Date(n.dataset.modified) 
-                            if (curCreated.getTime() < insCreated.getTime()) {
-                                insert = n
-                                break
-                            }
-                        }
-                        this.container.insertBefore(node, insert)
-                        resolve()
-                    })
+    const elementOnPage = []
+    let chain = Promise.resolve()
+    const p = []
+    for (let i = 0; i < root.documents.length; i++) {
+        elementOnPage.push(root.documents[i].abspath)
+        if (root.documents[i]['+class'].indexOf('entry') !== -1) { continue; }
+        const r = this.renderSingle(root.documents[i])
+        p.push(r)
+        chain = chain.then(r)
+    }
+    Promise.all(p)
+    .then(_ => {
+        for (const node of document.getElementsByClassName('document')) {
+            if (elementOnPage.indexOf(node.id) === -1) {
+                window.requestAnimationFrame(_ =>{
+                    node.parentNode.removeChild(node)
                 })
-            })
+            }
         }
-        chain = chain.then(nextDoc(root.documents[i]))
-    }
-    const currentDocs = this.container.getElementsByClassName('document')
-    for (const currentDoc of currentDocs) {
-        if (documentsAbsPath.indexOf(currentDoc.id) === -1) {
-            window.requestAnimationFrame(() => {
-                currentDoc.parentNode.removeChild(currentDoc)
-            })
-        }
-    }
+    })
 }

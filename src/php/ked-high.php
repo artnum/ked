@@ -73,7 +73,7 @@ class high extends ked {
             $this->conn,
             $currentDir,
             '(&(objectClass=kedDocument)(!(kedDeleted=*)))',
-            [ '*' ],
+            [ 'dn' ],
             0,
             $limits[0],
             $limits[1]
@@ -81,19 +81,9 @@ class high extends ked {
         if (!$res) { $this->ldapFail($this->conn); return null; }
         $documents = [];
         for ($entry = @ldap_first_entry($this->conn, $res); $entry; $entry = @ldap_next_entry($this->conn, $entry)) {
-            $object = $this->getLdapObject($this->conn, $entry);
-            $object['+childs'] = $this->countDocumentChilds($object['__dn']);
-            if ($extended) {
-                $object['+entries'] = $this->listDocumentEntries($object['__dn']);
-                foreach ($object['+entries'] as $k => $child) {
-                    $object['+entries'][$k] = $this->filterConvertResult($child);
-                }
-            } else {
-                $object['+entries'] = $this->countDocumentEntries($object['__dn']);
-            }
-            $object['+history'] = [];
-            $object = $this->filterConvertResult($object);
-            $documents[] = $object;
+            $docDn = @ldap_get_dn($this->conn, $entry);
+            if (!$docDn) { $this->ldapFail($this->conn); continue; }
+            $documents[] = $this->getDocument($docDn);
         }
         /* specify attribute to avoir reading content while listing */
         $res = @ldap_list(
@@ -273,6 +263,14 @@ class high extends ked {
 
     function getDocument (string $docDn, array $limits = [-1, -1]):array {
         $document = parent::getDocument($docDn, $limits);
+
+        $document['+childs'] = $this->countDocumentChilds($document['__dn']);
+        $document['+entries'] = $this->listDocumentEntries($document['__dn']);
+        foreach ($document['+entries'] as $k => $child) {
+            $document['+entries'][$k] = $this->filterConvertResult($child);
+        }
+       
+        $document['+history'] = [];
         $document = $this->filterConvertResult($document);
 
         return $document;
@@ -423,7 +421,7 @@ class high extends ked {
                     }
                     break;                    
             }
-            return $this->createEntry($docDn, $subtext, ['type' => $type, 'contentRef' => $hash, 'application' => $application]);
+            return $this->dnToPath($this->createEntry($docDn, $subtext, ['type' => $type, 'contentRef' => $hash, 'application' => $application]));
         }
     }
 
@@ -468,7 +466,7 @@ class high extends ked {
         $hash = $this->hash($file, true);
         if (!$this->moveFile($file, $hash)) { return null; }
 
-        return $this->createEntry($docDn, null, [ 'type' => $filetype, 'contentRef' => $hash, 'application' => $application ]);
+        return $this->dnToPath($this->createEntry($docDn, null, [ 'type' => $filetype, 'contentRef' => $hash, 'application' => $application ]));
     }
 
     function isSupportedImage (string $file):bool {
@@ -533,7 +531,7 @@ class high extends ked {
         $imgEntry = $this->_imageEntry($file, $application);
         if ($imgEntry === NULL) { return null; }
 
-        return $this->createEntry($docDn, $imgEntry[0], $imgEntry[1]);
+        return $this->dnToPath($this->createEntry($docDn, $imgEntry[0], $imgEntry[1]));
     }
 
     function updateImageEntry (string $path, string $file, array $application = []):?string {
