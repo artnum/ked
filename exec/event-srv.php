@@ -49,8 +49,9 @@ do {
             if ($payload) {
                 foreach ($clients as $k => $client) {
                     if (@socket_write($client, $data) === false) {
+                        socket_shutdown($client);
                         socket_close($client);
-                        array_splice($clients, $k, 1);
+                        unset($clients[$k]);
                     }
                 }
             }
@@ -61,16 +62,22 @@ do {
             if (!($data === false || $data === '')) {
                 $payload = $msgAuth->verify($data);
                 if ($payload === 'exit')  {
+                    socket_shutdown($sock);
                     socket_close($sock);
-                    array_splice($clients, $k, 1);
+                    unset($clients[$k]);
                 }
+            }
+            if ($data === false || $data === 0 || $data === '') {
+                socket_shutdown($sock);
+                socket_close($sock);
+                unset($clients[$k]);
             }
         }
     }
 } while(!$exit);
 
 foreach ($clients as $client) {
-    @socket_write($client, 'x');
+    @socket_write($client, $msgAuth->sign('exit'));
 }
 
 socket_shutdown($socket);

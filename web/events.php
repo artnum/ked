@@ -61,4 +61,5 @@ do {
     sleep(1);
 } while(!$exit);
 
+socket_write($socket, $msgAuth->sign('exit'));
 socket_close($socket);
