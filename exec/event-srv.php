@@ -28,7 +28,7 @@ pcntl_signal(SIGTERM, '_do_exit');
 pcntl_signal(SIGINT, '_do_exit');
 
 do {
-    $read = [$socket, $msgSocket, ...$clients];
+    $read = array_merge([$socket, $msgSocket], $clients);
     $n = null;
 
     if (@socket_select($read, $n, $n, null) < 1) { continue; }
