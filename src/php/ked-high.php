@@ -377,7 +377,7 @@ class high extends ked {
 
         $textSize = strlen($text);
         if ($textSize <= $this->maxTextSize) {
-            return $this->updateEntryByDn($entryDn, $text, ['type' => $type]);
+            return $this->dnToPath($this->updateEntryByDn($entryDn, $text, ['type' => $type]));
         } else {
             $hash = $this->hash($text);
             $filepath = $this->getFilePath($hash);
@@ -400,7 +400,7 @@ class high extends ked {
                     }
                     break;                    
             }
-            return $this->updateEntryByDn($entryDn, $subtext, ['type' => $type, 'contentRef' => $hash, 'application' => $application]);
+            return $this->dnToPath($this->updateEntryByDn($entryDn, $subtext, ['type' => $type, 'contentRef' => $hash, 'application' => $application]));
         }
     }
 
@@ -411,7 +411,7 @@ class high extends ked {
 
         $textSize = strlen($text);
         if ($textSize <= $this->maxTextSize) {
-            return $this->createEntry($docDn, $text, ['type' => $type]);
+            return $this->dnToPath($this->createEntry($docDn, $text, ['type' => $type]));
         } else {
             $hash = $this->hash($text);
             if (!$this->createFile($text, $hash)) { return null; }
@@ -462,7 +462,7 @@ class high extends ked {
         $hash = $this->hash($file, true);
         if (!$this->moveFile($file, $hash)) { return null; }
 
-        return $this->updateEntryByDn($entryDn, null, ['type' => $filetype, 'contentRef' => $hash, 'application' => $application]);
+        return $this->dnToPath($this->updateEntryByDn($entryDn, null, ['type' => $filetype, 'contentRef' => $hash, 'application' => $application]));
     }
 
     function addBinaryEntry (string $path, string $file, string $filetype = 'application/octet-stream',  array $application = []):?string {

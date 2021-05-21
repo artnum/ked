@@ -424,7 +424,7 @@ class ked {
             ['kedRelatedTag' => $relatedTag]
         );
         if (!$res) { $this->ldapFail($res); return null; }
-        return $object['kedid'];
+        return $object['kedid'][0];
     }
 
     /* Find documents metadata for matching name */

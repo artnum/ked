@@ -33,6 +33,28 @@ function KEditor(container, baseUrl) {
         }
     }
 
+    const cuEvent = (event) => {
+        const data = JSON.parse(event.data)
+        const element = document.querySelector(`div[data-pathid="${data.id}"]`)
+        if (element) {
+            this.refreshDocument(element.id)
+        }
+    }
+    const sseSetup = () => {        
+        this.sse = new EventSource(new URL('./events.php', this.baseUrl))
+        this.sse.addEventListener('create', event => cuEvent(event))
+        this.sse.addEventListener('update', event => cuEvent(event))        
+        this.sse.addEventListener('error', event => {
+            this.sse.close()
+            this.sse = null
+            setTimeout(() => {
+                sseSetup()
+            }, 15000)
+        })
+    }
+    
+    sseSetup()
+
     this.data = new Map()
     this.editors = new Map()
 
@@ -830,8 +852,8 @@ KEditor.prototype.renderSingle = function (doc) {
     return new Promise((resolve, reject) => {
         (new Promise((resolve, reject) => {
             let htmlnode
-            const opened = this.currentOpenedDocument.get(doc.abspath)
             if (!doc) { reject(); return; }
+            const opened = this.currentOpenedDocument.get(doc.abspath) || false
             doc.class = 'document'
             const task = {
                 is: doc['+class'].indexOf('task') === -1 ? false : true,
@@ -915,13 +937,12 @@ KEditor.prototype.renderSingle = function (doc) {
                     event.preventDefault() 
                 })
                 htmlnode.addEventListener('drop', this.dropEntry.bind(this))
-                if ((Array.isArray(doc['+entries']) && doc['+entries'].length >0) || doc['+entries'] > 0) {
-                    htmlnode.classList.add('with-entries')
-                }
             }
-
+            if ((Array.isArray(doc['+entries']) && doc['+entries'].length >0) || doc['+entries'] > 0) {
+                htmlnode.classList.add('with-entries')
+            }
             const p = []
-            if (doc['+entries'] !== undefined) {
+            if (doc['+entries'] !== undefined && opened) {
                 for (let j = 0; j < doc['+entries'].length; j++) {
                     let entry = doc['+entries'][j]
                     p.push(this.renderEntry(`${this.baseUrl.toString()}/`, entry))

@@ -8,10 +8,12 @@ use Normalizer;
 
 class http {
     protected $ked;
+    protected $msg;
     protected $acl;
-    function __construct(high $ked)
+    function __construct(high $ked, msg $msg = null)
     {
         $this->ked = $ked;
+        $this->msg = $msg;
         $this->acl = new ACL($this->ked);
         $this->responseStarted = false;
         $this->user = [ 'dn' => '' ];
@@ -323,6 +325,7 @@ class http {
                 }
                 $id = $this->ked->addDocumentTag($body['path'], $body['tag']);
                 if ($id === null) { $this->errorNotFound(); }
+                if ($this->msg) { $this->msg->update($id); }
                 $this->ok(json_encode(['id' => $id]));
                 break;
             case 'create-document':
@@ -349,6 +352,7 @@ class http {
                 }
                 $id = $this->ked->addDocument($body['name'], $parent, $application, $tags);
                 if ($id === null) { $this->errorUnableToOperate(); }
+                if ($this->msg) { $this->msg->create($id); }
                 $this->ok(json_encode(['id' => $id]));
                 break;
             case 'list-document':
@@ -432,11 +436,16 @@ class http {
                         break;
                 }
                 if ($id === null) { $this->errorUnableToOperate(); }
+                if ($this->msg) { 
+                    $path = explode(',', $id);
+                    $this->msg->update($path[count($path) - 2]); 
+                }
                 $this->ok(json_encode(['id' => $id]));
                 break;
             case 'to-not-task':
                 if (empty($body['path'])) { $this->errorBadRequest(); }
                 if (!$this->ked->anyToNotTask($body['path'])) { $this->errorUnableToOperate(); }
+                if ($this->msg) { $this->msg->create($body['path']); }
                 return $this->ok(json_encode(['path' => $body['path'], 'modified' => true]));
                 break;
             case 'update-task':
@@ -459,6 +468,7 @@ class http {
                     $modified = $this->ked->anyToTask($body['path'], $params);
                 }
                 if (!$modified) { $this->errorUnableToOperate(); }
+                if ($this->msg) { $this->msg->create($body['path']); }
                 $this->ok(json_encode(['path' => $body['path'], 'modified' => $modified]));
                 break;
             case 'delete':
@@ -466,6 +476,7 @@ class http {
                 $anyDn = $this->ked->pathToDn($body['path'], false);
                 if ($anyDn === NULL) { $this->errorNotFound(); }
                 $deleted = $this->ked->deleteByDn($anyDn);
+                if ($this->msg) { $this->msg->delete($body['path']); }
                 $this->ok(json_encode(['path' => $body['path'], 'deleted' => $deleted]));
                 break;
         }
