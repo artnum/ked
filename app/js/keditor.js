@@ -4,8 +4,8 @@ function KEditor(container, baseUrl) {
     this.cwd = ''
     this.headerMenu = document.createElement('DIV')
     this.headerMenu.classList.add('kmenu')
-    this.headerMenu._tools = '<div class="tools"><span data-action="add-document"><i class="fas fa-folder-plus"></i> Nouveau document</span></div>' +
-        '<div class="search"><form name="search"><input type="text" name="search" value=""/> <button class="kui" type="submit">Rechercher</button></form></div>'
+    this.headerMenu._tools = '<div><div class="tools"><span data-action="add-document"><i class="fas fa-folder-plus"></i> Nouveau document</span></div>' +
+        '<div class="search"><form name="search"><input type="text" name="search" value=""/> <button class="kui" type="submit">Rechercher</button></form></div></div>'
     this.headerMenu.addEventListener('click', this.menuEvents.bind(this))
     this.headerMenu.addEventListener('submit', this.menuFormSubmit.bind(this))
 
@@ -1045,7 +1045,7 @@ KEditor.prototype.render = function (root) {
 
     if (this.cwd === '') {
         window.requestAnimationFrame(() => {
-            this.headerMenu.innerHTML = `<div class="kmenu-title">${KED.title ?? ''}</div>${this.headerMenu._tools}`
+            this.headerMenu.innerHTML = `<span class="kmenu-title">${KED.title ?? ''}</span>${this.headerMenu._tools}`
             document.title = `[ked] ${KED.title ?? ''}`
         })
     } else {
