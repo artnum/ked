@@ -1,4 +1,5 @@
 function KEditor(container, baseUrl) {
+    this.API = new KEDApi(baseUrl)
     this.container = container
     this.baseUrl = baseUrl
     this.cwd = ''
@@ -40,21 +41,32 @@ function KEditor(container, baseUrl) {
             this.refreshDocument(element.id)
         }
     }
-    const sseSetup = () => {        
-        this.sse = new EventSource(new URL('./events.php', this.baseUrl))
-        this.sse.addEventListener('create', event => cuEvent(event))
-        this.sse.addEventListener('update', event => cuEvent(event))        
-        this.sse.addEventListener('error', event => {
-            this.sse.close()
-            this.sse = null
-            setTimeout(() => {
-                sseSetup()
-            }, 15000)
+    const sseSetup = () => {
+        const url = new URL('./events.php', this.baseUrl)
+        crypto.subtle.digest('SHA-256', new TextEncoder().encode(
+            (new Date().getTime()).toString() + (performance.now()).toString() + (navigator.userAgent).toString()
+        ))
+        .then(id => {
+            return this.API.Menshen.qstring(
+                url,
+                'get',
+                MenshenEncoding.buf2b64(id)
+            )
+        })
+        .then(url => { 
+            this.sse = new EventSource(url)
+            this.sse.addEventListener('create', event => cuEvent(event))
+            this.sse.addEventListener('update', event => cuEvent(event))        
+            this.sse.addEventListener('error', event => {
+                this.sse.close()
+                this.sse = null
+                setTimeout(() => {
+                    sseSetup()
+                }, 15000)
+            })
         })
     }
     
-    sseSetup()
-
     this.data = new Map()
     this.editors = new Map()
 
@@ -73,15 +85,37 @@ function KEditor(container, baseUrl) {
     if (window.location?.hash?.length > 0) {
         this.cwd = window.location.hash.substring(1)
     }
-    this.replaceState()
-    this.ls()
+    this.API.init()
+    .then((inited) => {
+        if (!inited) {
+            this.authForm()
+        } else {
+            sseSetup()
+            this.replaceState()
+            this.ls()
+        }
+    })
+}
+
+KEditor.prototype.authForm = function () {
+    const form = document.createElement('FORM')
+    form.innerHTML = `<label for="username">Nom d'utilisateur : <input type="text" name="username" value=""></label><br>
+        <label for="key">Clé privé PEM : <textarea name="key"></textarea></label><br>
+        <button type="submit">Authentifier</button>`
+    document.body.innerHTML = '';
+    document.body.appendChild(form)
+    form.addEventListener('submit', event => {
+        event.preventDefault()
+        const data = new FormData(form)
+        this.API.importAuth(data.get('username'), data.get('key'))
+    })
 }
 
 KEditor.prototype.fetch = function (path, content) {
     return new Promise((resolve, reject) => {
         if (path.length > 0) { path = `/${path}` }
         let url = new URL(`${this.baseUrl.toString()}${path}`)
-        fetch(url, {'method': 'POST',
+        this.API.fetch(url, {'method': 'POST',
             body: content instanceof FormData ? content : JSON.stringify(content)
         })
         .then(response => {
@@ -98,16 +132,18 @@ KEditor.prototype.fetch = function (path, content) {
                     case 405: ret.data = 'Méthode non-supportée'; break
                     case 500: ret.data = 'Serveur en difficulté'; break
                 }
-                resolve(ret)
-                return
+                return ret
+                
             }
-            response.json()
-            .then(result => {
-                resolve({ok: true, data: result})
-            })
-            .catch(reason => resolve({ok: false, data: reason}))
+            return response.json()
         })
-        .catch(reason => resolve({ok: false, data: reason}))
+        .then(result => {
+            resolve({ok: true, data: result})
+        })
+        .catch(reason => {
+            console.log(reason)
+            resolve({ok: false, data: reason})
+        })
     })
 }
 
@@ -123,7 +159,7 @@ KEditor.prototype.error = function (data) {
 
 KEditor.prototype.getDocument = function (docPath) {
     return new Promise((resolve, reject) => {
-        this.fetch(this.cwd, {operation: 'get-document', path: docPath})
+        this.API.getDocument(docPath)
         .then(result => {
             if (!result.ok) { resolve(null); return }
             resolve(result.data)
@@ -556,13 +592,8 @@ KEditor.prototype.addTagInteract = function (docNode) {
             '<button type="submit">Ajouter</button><button type="reset">Annuler</button></div>
             <div class="ktags"></div>`
         form.firstElementChild.addEventListener('keyup', event => {
-            const expr = event.target.value
-            if (expr === '') { return; }
-            const operation = new FormData()
-            operation.set('operation', 'search-tags')
-            operation.set('expression', expr)
-            operation.set('maxsize', 3)
-            this.fetch('', operation)
+            if (event.target.value.length <= 0) { return; }
+            this.API.searchTags(event.target.value, KED?.tags?.searchMaxSize)
             .then(response => {
                 if (!response.ok) { return; }
                 if (!response.data.tags) { return; }

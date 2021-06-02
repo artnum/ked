@@ -3,8 +3,10 @@ window.addEventListener('load', (event) => {
     const head = document.head
 
     const scripts = [
+        '/Menshen/js/menshen.js',
         '../js/keditor.js',
         '../js/ktags.js',
+        '../js/api.js',
         '../node_modules/quill/dist/quill.min.js'
     ]
 

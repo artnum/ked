@@ -1,5 +1,6 @@
 <?PHP
 
+use artnum\Auth\Menshen;
 use ked\high;
 use ked\http;
 use ked\msg;
@@ -8,11 +9,11 @@ include ('../src/php/ked.php');
 include ('../src/php/ked-high.php');
 include ('../src/php/http.php');
 include ('../src/php/msg.php');
+include ('../../Menshen/php/Menshen.php');
 
 $ldap = ldap_connect('ldap://127.0.0.1:9090/');
 ldap_set_option($ldap, LDAP_OPT_PROTOCOL_VERSION, 3);
 ldap_bind($ldap, 'cn=admin,o=artnum', '1234');
-
 
 $high = new high($ldap, 'o=artnum');
 if (!$high->init()) {
@@ -22,8 +23,12 @@ $high->setStore('/tmp/');
 $high->setMaxTextSize(4096);
 $high->disableInlinePicture();
 
-$msg = new msg();
-$http = new http($high, $msg);
-$http->run();
+$credStore = new \Menshen\LDAPStore($ldap, 'o=artnum');
+$menshen = new \Menshen($credStore);
+if ($menshen->check()) {
+    $msg = new msg();
+    $http = new http($high, $msg);
+    $http->run();
+}
 ldap_unbind($ldap);
 ?>

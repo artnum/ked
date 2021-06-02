@@ -1,10 +1,20 @@
 <?php
 
 require('../src/php/msg.php');
+require('../../Menshen/php/Menshen.php');
+
+$ldap = ldap_connect('ldap://127.0.0.1:9090/');
+ldap_set_option($ldap, LDAP_OPT_PROTOCOL_VERSION, 3);
+ldap_bind($ldap, 'cn=admin,o=artnum', '1234');
+
+$credStore = new \Menshen\LDAPStore($ldap, 'o=artnum');
+$menshen = new \Menshen($credStore);
 
 ignore_user_abort(true);
 header('Cache-Control: no-cache', true);
 header('Content-Type: text/event-stream', true);
+
+if (!$menshen->check()) { error(); exit(); }
 
 function error() {
     echo "event: error\n\n";
