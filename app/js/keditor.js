@@ -4,8 +4,11 @@ function KEditor(container, baseUrl) {
     this.cwd = ''
     this.headerMenu = document.createElement('DIV')
     this.headerMenu.classList.add('kmenu')
-    this.headerMenu._tools = '<div class="tools"><span data-action="add-document"><i class="fas fa-folder-plus"></i> Nouveau document</span></div>'
+    this.headerMenu._tools = '<div class="tools"><span data-action="add-document"><i class="fas fa-folder-plus"></i> Nouveau document</span></div>' +
+        '<div class="search"><form name="search"><input type="text" name="search" value=""/> <button class="kui" type="submit">Rechercher</button></form></div>'
     this.headerMenu.addEventListener('click', this.menuEvents.bind(this))
+    this.headerMenu.addEventListener('submit', this.menuFormSubmit.bind(this))
+
     this.container.appendChild(this.headerMenu)
     this.container.classList.add('keditorRoot')
 
@@ -498,6 +501,20 @@ KEditor.prototype.dropEntry = function (event) {
     })
 }
 
+KEditor.prototype.menuFormSubmit = function (event) {
+    event.preventDefault()
+    const formData = new FormData(event.target)
+    const searchTerm = formData.get('search')
+    const operation = {
+        operation: 'search',
+        term: searchTerm
+    }
+    this.fetch('', operation)
+    .then(result => {
+        this.render(result.data)
+    })
+}
+
 KEditor.prototype.menuEvents = function (event) {
     let actionNode = event.target
 
@@ -868,6 +885,9 @@ KEditor.prototype.renderSingle = function (doc) {
             }
 
             let date = new Date(doc.created)
+            if (isNaN(date.getTime())) {
+                date = new Date()
+            }
             let refresh = true
             htmlnode = document.getElementById(this.buildPath(doc.id, this.cwd))
             if (!htmlnode) {
@@ -1025,7 +1045,7 @@ KEditor.prototype.render = function (root) {
 
     if (this.cwd === '') {
         window.requestAnimationFrame(() => {
-            this.headerMenu.innerHTML = `<span class="kmenu-title">${KED.title ?? ''}</span>${this.headerMenu._tools}`
+            this.headerMenu.innerHTML = `<div class="kmenu-title">${KED.title ?? ''}</div>${this.headerMenu._tools}`
             document.title = `[ked] ${KED.title ?? ''}`
         })
     } else {

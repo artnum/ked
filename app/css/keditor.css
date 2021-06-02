@@ -198,7 +198,11 @@
     margin: 3px 8px;
 }
 
-.kmenu .tools span[data-action] {
+.kmenu .tools {
+    display: inline-block;
+}
+
+.kmenu .tools span[data-action], button.kui {
     background-color: var(--bg2-light-color);
     font-size: 14px;
     cursor: pointer;
@@ -207,14 +211,26 @@
     align-items: center;
     font-family: 'B612 Mono', monospace;
     max-width: 160px;
-}
+    border: none;
+    }
 
-.kmenu .tools span[data-action]:active {
+.kmenu .tools span[data-action]:active, button.kui:active {
     color: var(--white)
 }
 .kmenu .tools .fas, .kmenu .tools .fa {
     font-size: 38px;
     margin: 4px;
+}
+
+.kmenu .search {
+    float: right;
+}
+
+.kmenu .search form {
+    margin: 0;
+    padding: 0;
+    display: flex;
+    align-items: flex-start;
 }
 
 .kmetadata .indicator {
