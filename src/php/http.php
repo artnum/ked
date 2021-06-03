@@ -283,6 +283,21 @@ class http {
             default:
                 $this->errorBadRequest();
                 break;
+            case 'search':
+                $limit = 100;
+                $documents = $this->ked->search($body['term']);
+                if (!$documents) { $documents = []; }
+                $this->ok(json_encode(['documents' => $documents]));
+                break;
+            case 'list-tags':
+                $limit = 100;
+                if (!empty($body['maxsize']) && is_numeric(($body['maxsize'])))  {
+                    $limit = intval($body['maxsize']);
+                }
+                $tags = $this->ked->listTags([$limit, -1]);
+                if (!$tags) { $tags = []; }
+                $this->ok(json_encode(['tags' => $tags]));
+                break;
             case 'search-tags':
                 $limit = 50; // search 50 tags
                 if (empty($body['expression'])) {

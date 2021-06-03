@@ -283,6 +283,17 @@ class high extends ked {
         return $document;
     }
 
+    function search(string $term, $limits = [-1, -1]) {
+        $tags = $this->searchTags($term, $limits);     
+        $result = $this->findByTags($tags, $limits);
+        $result2 = $this->findDocuments($term, $limits);
+        foreach ($result2 as $doc) {
+            $result['documents'][] = $this->filterConvertResult($doc);
+        }
+
+        return $result['documents'];
+    }
+
     function findByTags(array $tags, $limits = [ -1, -1 ]):array {
         $objects = parent::findByTags($tags, $limits);
         $frontObjects = ['documents' => [], 'entries' => [], 'tags' => []];

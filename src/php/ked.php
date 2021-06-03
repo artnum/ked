@@ -380,9 +380,9 @@ class ked {
         return $objects;
     }
 
-    function searchTags(string $expression, array $limits = [-1, -1]):array {
+    function listTags(array $limits = [-1, -1]):array {
         $tags = [];
-        $filter = $this->buildFilter('(&(objectclass=kedTag)(kedIdName=%s*))', $expression);
+        $filter = $this->buildFilter('(objectclass=kedTag)');
         $res = @ldap_search(
             $this->conn,
             $this->tagBase,
@@ -393,11 +393,39 @@ class ked {
             $limits[1],
             LDAP_DEREF_NEVER,
             [
-                [ 'oid' => LDAP_CONTROL_SORTREQUEST, 
-                  'iscritical' => false, 
-                  'value' => [
-                      ['attr' => 'kedIdName']
-                    ]
+                [   
+                    'oid' => LDAP_CONTROL_SORTREQUEST,
+                    'iscritical' => false,
+                    'value' => [ ['attr' => 'kedIdName'] ]
+                ]
+            ]
+        );
+        if (!$res) { $this->ldapFail($this->conn); return $tags; }
+        for ($entry = @ldap_first_entry($this->conn, $res); $entry; $entry = @ldap_next_entry($this->conn, $entry)) {
+            $value = @ldap_get_values($this->conn, $entry, 'kedIdName');
+            if (!$value) { continue; }
+            $tags[] = $value[0];
+        }
+        return $tags;
+    }
+
+    function searchTags(string $expression, array $limits = [-1, -1]):array {
+        $tags = [];
+        $filter = $this->buildFilter('(&(objectclass=kedTag)(kedIdName=*%s*))', $expression);
+        $res = @ldap_search(
+            $this->conn,
+            $this->tagBase,
+            $filter,
+            [ 'kedIdName' ],
+            0,
+            $limits[0],
+            $limits[1],
+            LDAP_DEREF_NEVER,
+            [
+                [
+                    'oid' => LDAP_CONTROL_SORTREQUEST, 
+                    'iscritical' => false, 
+                    'value' => [ ['attr' => 'kedIdName'] ]
                 ]
             ]
         );
@@ -429,7 +457,7 @@ class ked {
 
     /* Find documents metadata for matching name */
     function findDocuments (string $name, array $limits = [-1, -1]):array {
-        if (empty($name)) { return null; }
+        if (empty($name)) { return []; }
         $documents = [];
         $filter = $this->buildFilter('(&(objectclass=kedDocument)(kedName=*%s*))', $name);
         $res = @ldap_search(
