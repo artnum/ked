@@ -3,16 +3,6 @@ function KEditor(container, baseUrl) {
     this.container = container
     this.baseUrl = baseUrl
     this.cwd = ''
-    this.headerMenu = document.createElement('DIV')
-    this.headerMenu.classList.add('kmenu')
-    this.headerMenu._tools = '<div><div class="tools"><span data-action="add-document"><i class="fas fa-folder-plus"></i> Nouveau document</span></div>' +
-        '<div class="search"><form name="search"><input type="text" name="search" value=""/> <button class="kui" type="submit">Rechercher</button></form></div></div>'
-    this.headerMenu.addEventListener('click', this.menuEvents.bind(this))
-    this.headerMenu.addEventListener('submit', this.menuFormSubmit.bind(this))
-
-    this.container.appendChild(this.headerMenu)
-    this.container.classList.add('keditorRoot')
-
     this.currentOpenedDocument = new Map()
     this.tags = new Map()
 
@@ -37,39 +27,6 @@ function KEditor(container, baseUrl) {
         }
     }
 
-    const cuEvent = (event) => {
-        const data = JSON.parse(event.data)
-        const element = document.querySelector(`div[data-pathid="${data.id}"]`)
-        if (element) {
-            this.refreshDocument(element.id)
-        }
-    }
-    const sseSetup = () => {
-        const url = new URL('./events.php', this.baseUrl)
-        crypto.subtle.digest('SHA-256', new TextEncoder().encode(
-            (new Date().getTime()).toString() + (performance.now()).toString() + (navigator.userAgent).toString()
-        ))
-        .then(id => {
-            return this.API.Menshen.qstring(
-                url,
-                'get',
-                MenshenEncoding.buf2b64(id)
-            )
-        })
-        .then(url => { 
-            this.sse = new EventSource(url)
-            this.sse.addEventListener('create', event => cuEvent(event))
-            this.sse.addEventListener('update', event => cuEvent(event))        
-            this.sse.addEventListener('error', event => {
-                this.sse.close()
-                this.sse = null
-                setTimeout(() => {
-                    sseSetup()
-                }, 15000)
-            })
-        })
-    }
-    
     this.data = new Map()
     this.editors = new Map()
 
@@ -85,32 +42,109 @@ function KEditor(container, baseUrl) {
         this.clear()
         this.ls()
     })
-    if (window.location?.hash?.length > 0) {
+    if (!window.location?.hash?.startsWith('#menshen-')) {
         this.cwd = window.location.hash.substring(1)
     }
-    this.API.init()
-    .then((inited) => {
-        if (!inited) {
-            this.authForm()
-        } else {
-            sseSetup()
-            this.replaceState()
-            this.ls()
+    this.authNext()
+}
+
+KEditor.prototype.setupPage = function () {
+    this.headerMenu = document.createElement('DIV')
+    this.headerMenu.classList.add('kmenu')
+    this.headerMenu._tools = '<div><div class="tools"><span data-action="add-document"><i class="fas fa-folder-plus"></i> Nouveau document</span></div>' +
+        '<div class="search"><form name="search"><input type="text" name="search" value=""/> <button class="kui" type="submit">Rechercher</button></form></div></div>'
+    this.headerMenu.addEventListener('click', this.menuEvents.bind(this))
+    this.headerMenu.addEventListener('submit', this.menuFormSubmit.bind(this))
+    this.container.appendChild(this.headerMenu)
+    this.container.classList.add('keditorRoot')
+}
+
+KEditor.prototype.sseSetup = function() {
+    const cuEvent = (event) => {
+        const data = JSON.parse(event.data)
+        const element = document.querySelector(`div[data-pathid="${data.id}"]`)
+        if (element) {
+            this.refreshDocument(element.id)
         }
+    }
+
+    const url = new URL('./events.php', this.baseUrl)
+    crypto.subtle.digest('SHA-256', new TextEncoder().encode(
+        (new Date().getTime()).toString() + (performance.now()).toString() + (navigator.userAgent).toString()
+    ))
+    .then(id => {
+        return this.API.Menshen.qstring(
+            url,
+            'get',
+            MenshenEncoding.buf2b64(id)
+        )
+    })
+    .then(url => { 
+        this.sse = new EventSource(url)
+        this.sse.addEventListener('create', event => cuEvent(event))
+        this.sse.addEventListener('update', event => cuEvent(event))        
+        this.sse.addEventListener('error', event => {
+            this.sse.close()
+            this.sse = null
+            setTimeout(() => {
+                sseSetup()
+            }, 15000)
+        })
     })
 }
 
 KEditor.prototype.authForm = function () {
     const form = document.createElement('FORM')
-    form.innerHTML = `<label for="username">Nom d'utilisateur : <input type="text" name="username" value=""></label><br>
-        <label for="key">Clé privé PEM : <textarea name="key"></textarea></label><br>
-        <button type="submit">Authentifier</button>`
-    document.body.innerHTML = '';
+    form.innerHTML = `<div><label for="username">Nom d'utilisateur : <input type="text" name="username" value=""></label><br>
+        <label for="keyfile">Clé privée : <input type="file" name="keyfile"></label><br>
+        <button type="submit">Authentifier</button></div>`
     document.body.appendChild(form)
     form.addEventListener('submit', event => {
         event.preventDefault()
         const data = new FormData(form)
-        this.API.importAuth(data.get('username'), data.get('key'))
+        
+        if (document.location.hash.startsWith('#menshen-')) {
+            const key = MenshenEncoding.base64Decode(document.location.hash.substring(9).replaceAll('-', '+').replaceAll('_', '/').replaceAll('.', '='))
+            this.API.importAuth(data.get('username'), key)
+            .then(() => {
+                this.authNext()
+            })
+        } else {
+            const file = data.get('keyfile')
+            if (file) {
+                reader = new FileReader()
+                reader.addEventListener('load', event => {
+                    this.API.importAuth(data.get('username'), event.target.result)
+                    .then(() => {
+                        this.authNext()
+                    })
+                })
+                reader.readAsArrayBuffer(file)
+                return
+            }
+        }
+        
+    })
+}
+
+KEditor.prototype.authNext = function () {
+    this.API.init()
+    .then(inited => {
+        if (inited) {
+            return this.API.getUser()
+        }
+        return {ok: false}
+    })
+    .then(result => {
+        if (!result.ok) {
+            this.authForm()
+            return
+        }
+        this.User = result.data
+        this.setupPage()
+        this.sseSetup()
+        this.replaceState()
+        this.ls()
     })
 }
 

@@ -25,9 +25,10 @@ $high->disableInlinePicture();
 
 $credStore = new \Menshen\LDAPStore($ldap, 'o=artnum');
 $menshen = new \Menshen($credStore);
-if ($menshen->check()) {
+if (($user = $menshen->check()) !== false) {
     $msg = new msg();
     $http = new http($high, $msg);
+    $http->setUser($user);
     $http->run();
 }
 ldap_unbind($ldap);

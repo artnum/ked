@@ -10,13 +10,17 @@ class http {
     protected $ked;
     protected $msg;
     protected $acl;
+    protected $user;
     function __construct(high $ked, msg $msg = null)
     {
         $this->ked = $ked;
         $this->msg = $msg;
         $this->acl = new ACL($this->ked);
-        $this->responseStarted = false;
-        $this->user = [ 'dn' => '' ];
+        $this->responseStarted = false;       
+    }
+
+    function setUser($user) {
+        $this->user = $user;
     }
 
     function responseHeaders() {
@@ -282,6 +286,10 @@ class http {
         switch ($body['operation']) {
             default:
                 $this->errorBadRequest();
+                break;
+            case 'get-user':
+                if (!method_exists($this->user, 'toJson')) { $this->errorUnableToOperate(); }
+                $this->ok($this->user->toJson());
                 break;
             case 'search':
                 $limit = 100;

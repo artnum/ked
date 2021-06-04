@@ -32,7 +32,7 @@ KEDApi.prototype.init = function () {
 }
 
 KEDApi.prototype.importAuth = function(username, pemkey) {
-    this.KeyStore.importPrivateKey(pemkey, username, '', 'SHA-256')
+    return this.KeyStore.importPrivateKey(pemkey, username, '', 'SHA-256')
 }
 
 KEDApi.prototype.fetch = function(url, opts = {}) {
@@ -120,6 +120,18 @@ KEDApi.prototype.getDocument = function (path) {
     const operation = {
         operation: 'get-document',
         path
+    }
+    return new Promise((resolve) => {
+        this.post(operation)
+        .then(result => {
+            resolve(result)
+        })
+    })
+}
+
+KEDApi.prototype.getUser = function () {
+    const operation = {
+        operation: 'get-user'
     }
     return new Promise((resolve) => {
         this.post(operation)
