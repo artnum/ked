@@ -779,11 +779,10 @@ KEditor.prototype.uploadText = function (node, content, type = 'text/plain') {
 KEditor.prototype.addTextInteract = function (docNode) {
     const quillNode = document.createElement('div')
     quillNode.innerHTML = `<div></div><button>Sauver</button>`
-    new Promise((resolve, reject) => {
-        window.requestAnimationFrame(() => {
-          docNode.insertBefore(quillNode, docNode.firstElementChild.nextElementSibling)
-          resolve()
-        })
+    
+    KEDAnim.push(() => {
+        docNode.insertBefore(quillNode, docNode.firstElementChild.nextElementSibling)
+
     })
     .then(() => {
         const quill = new Quill(quillNode.firstElementChild, this.quillOpts)
@@ -940,7 +939,7 @@ KEditor.prototype.renderSingle = function (doc) {
                         node.dataset.kedDrageCounter = 0
                     }
                     node.dataset.kedDrageCounter++
-                    window.requestAnimationFrame(() => {
+                    KEDAnim.push(() => {
                         node.classList.add('highlight')
                     })
                     event.preventDefault() 
@@ -949,7 +948,7 @@ KEditor.prototype.renderSingle = function (doc) {
                     let node = event.target
                     while (node && ! node.dataset?.pathid) { node = node.parentNode }
                     node.dataset.kedDrageCounter--
-                    window.requestAnimationFrame(() => {
+                    KEDAnim.push(() => {
                         if (node.dataset.kedDrageCounter <= 0) {
                             node.classList.remove('highlight')
                         }
@@ -1016,13 +1015,15 @@ KEditor.prototype.renderSingle = function (doc) {
             if (node === null) { return }
             const currentNode = document.getElementById(node.id)
             if (currentNode) {
-                window.requestAnimationFrame(() => {
+                KEDAnim.push(() => {
                     if (currentNode.parentNode) { currentNode.parentNode.replaceChild(node, currentNode) }
-                    resolve(node);
+                })
+                .then(() => {
+                    resolve(node)
                 })
                 return;
             }
-            window.requestAnimationFrame(() => {
+            KEDAnim.push(() => {
                 const insCreated = new Date(node.dataset.modified)
                 let insert = null
                 for (let n = this.container.firstElementChild; n; n = n.nextElementSibling) {
@@ -1036,6 +1037,9 @@ KEditor.prototype.renderSingle = function (doc) {
                 this.container.insertBefore(node, insert)
                 resolve(node)
             })
+            .then(() => {
+                resolve(node)
+            })
         })
     })
 }
@@ -1044,22 +1048,20 @@ KEditor.prototype.render = function (root) {
     if (!root.documents) { console.log(root); return }
 
     if (this.cwd === '') {
-        window.requestAnimationFrame(() => {
+        KEDAnim.push(() => {
+            console.log(this)
             this.headerMenu.innerHTML = `<span class="kmenu-title">${KED.title ?? ''}</span>${this.headerMenu._tools}`
             document.title = `[ked] ${KED.title ?? ''}`
         })
     } else {
-        new Promise ((resolve, reject) => {
-            window.requestAnimationFrame(() => {
-                this.headerMenu.innerHTML = `<span data-action="history-back" class="back"><i class="fas fa-arrow-left"></i></span><span class="kmenu-title"></span>${this.headerMenu._tools}`
-                resolve()
-            })
+        KEDAnim.push(() => {
+            this.headerMenu.innerHTML = `<span data-action="history-back" class="back"><i class="fas fa-arrow-left"></i></span><span class="kmenu-title"></span>${this.headerMenu._tools}`
         })
         .then (_ => {
             return this.getInfo(this.cwd)
         })
         .then(info => {
-            window.requestAnimationFrame(() => {
+            KEDAnim.push(() => {
                 this.headerMenu.getElementsByClassName('kmenu-title')[0].innerHTML = info.name
                 document.title = `[ked] ${info.name}`
             })
@@ -1088,7 +1090,7 @@ KEditor.prototype.render = function (root) {
     .then(_ => {
         for (const node of document.getElementsByClassName('document')) {
             if (elementOnPage.indexOf(node.id) === -1) {
-                window.requestAnimationFrame(_ =>{
+                KEDAnim.push(() => {
                     if (node.parentNode) { node.parentNode.removeChild(node) }
                 })
             }
