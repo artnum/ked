@@ -1,4 +1,5 @@
 function KEditor(container, baseUrl) {
+    this.localLocked = new Map()
     this.container = container
     this.baseUrl = baseUrl
     this.cwd = ''
@@ -12,8 +13,8 @@ function KEditor(container, baseUrl) {
     this.container.appendChild(this.headerMenu)
     this.container.classList.add('keditorRoot')
 
-    this.currentOpenedDocument = new Map()
     this.tags = new Map()
+    this.LockedNotFound = new Map()
 
     this.quillOpts = {
         theme: 'snow',
@@ -47,6 +48,8 @@ function KEditor(container, baseUrl) {
         this.sse = new EventSource(new URL('./events.php', this.baseUrl))
         this.sse.addEventListener('create', event => cuEvent(event))
         this.sse.addEventListener('update', event => cuEvent(event))        
+        this.sse.addEventListener('lock', event => this.lockUnlock(event))        
+        this.sse.addEventListener('unlock', event => this.lockUnlock(event))        
         this.sse.addEventListener('error', event => {
             this.sse.close()
             this.sse = null
@@ -76,8 +79,48 @@ function KEditor(container, baseUrl) {
     if (window.location?.hash?.length > 0) {
         this.cwd = window.location.hash.substring(1)
     }
+
+    /* client id is for each browser */
+    this.clientid = localStorage.getItem('ked-client-id')
+    if (!this.clientid) {
+        crypto.subtle.digest(
+            {name: 'SHA-256'},
+            new TextEncoder().encode(`${navigator.userAgent}-${navigator.platform}-${navigator.vendor}-${new Date().toISOString()}`)
+        ).then(hash => {
+            this.clientid = KEDUtils.base64EncodeArrayBuffer(hash)
+            localStorage.setItem('ked-client-id', this.clientid)
+        })
+    }
+
     this.replaceState()
     this.ls()
+}
+
+KEditor.prototype.lockUnlock = function(event) {
+    try {
+        const lock = JSON.parse(event.data)
+        if (lock.clientid === this.clientid) { return }
+        const kedDoc = KEDDocument.search(lock.id)
+    
+        switch(event.type) {
+            case 'lock': 
+                if (kedDoc) {
+                    kedDoc.receiveLock(lock.clientid);
+                } else {
+                    this.LockedNotFound.set(lock.id, lock.clientid)
+                }
+                break
+            case 'unlock':
+                this.LockedNotFound.delete(lock.id)
+                if (kedDoc) {
+                    kedDoc.receiveUnlock(lock.clientid);
+                }
+                break
+        }
+        
+    } catch (e) {
+        console.log(e)
+    }
 }
 
 KEditor.prototype.fetch = function (path, content) {
@@ -224,32 +267,48 @@ KEditor.prototype.buildPath = function (comp0, comp1) {
 }
 
 KEditor.prototype.edit = {
-    quills: function (contentNode) {
+    quills: function (contentNode, docNode) {
         if (contentNode.dataset.edition) {
             const quill = this.editors.get(contentNode.dataset.entryid)
             this.uploadText(contentNode, JSON.stringify(quill.getContents()), 'text/x-quill-delta')
             this.editors.delete(contentNode.dataset.entryid)
             delete quill
             delete contentNode.dataset.edition
+            KEDDocument.get(docNode.id)
+            .then(doc => {
+                if (doc) { doc.unlock(this) }
+            })
             return;
         }
-        contentNode.innerHTML = '<div></div>'
-        contentNode.dataset.edition = '1'
-        let content = this.data.get(contentNode.dataset.entryid)
-        const quill = new Quill(contentNode.firstElementChild, this.quillOpts)
-        quill.setContents(content)
-        this.editors.set(contentNode.dataset.entryid, quill)
+        KEDDocument.get(docNode.id)
+        .then(doc => {
+            if (doc) { doc.lock(this) }
+            contentNode.innerHTML = '<div></div>'
+            contentNode.dataset.edition = '1'
+            let content = this.data.get(contentNode.dataset.entryid)
+            const quill = new Quill(contentNode.firstElementChild, this.quillOpts)
+            quill.setContents(content)
+            this.editors.set(contentNode.dataset.entryid, quill)
+        })
     },
     text: function (contentNode) {
         if (contentNode.dataset.edition) {
             this.uploadText(contentNode, contentNode.firstElementChild.value, 'text/plain')
             delete contentNode.dataset.edition
+            KEDDocument.get(docNode.id)
+            .then(doc => {
+                if (doc) { doc.unlock(this) }
+            })
             return;
         }
-        contentNode.dataset.edition = '1'
-        let content = this.data.get(contentNode.dataset.entryid)
-        contentNode.innerHTML = '<textarea style="width: calc(100% - 8px); height: 380px"></textarea>'
-        contentNode.firstElementChild.value = content
+        KEDDocument.get(docNode.id)
+        .then(doc => {
+            if (doc) { doc.lock(this) }
+            contentNode.dataset.edition = '1'
+            let content = this.data.get(contentNode.dataset.entryid)
+            contentNode.innerHTML = '<textarea style="width: calc(100% - 8px); height: 380px"></textarea>'
+            contentNode.firstElementChild.value = content
+        })
     },
     file: function (contentNode) {
         this.uploadFileInteract(contentNode)
@@ -464,10 +523,13 @@ KEditor.prototype.addDocument = function (title = null, path = null) {
     this.fetch('', operation)
     .then(result => {
         if (!result.ok) { return }
-        if (result.data.id) {
-            this.highlight(result.data.id)
-            this.ls()
+        return KEDDocument.get(result.data.id, this)
+    })
+    .then(kedDoc => {
+        if (kedDoc) {
+            kedDoc.highlight(5)
         }
+        this.ls()
     }) 
 }
 
@@ -529,7 +591,7 @@ KEditor.prototype.menuEvents = function (event) {
 }
 
 KEditor.prototype.docMustOpen = function (docNode) {
-    this.currentOpenedDocument.set(docNode.id, true)
+
 }
 
 KEditor.prototype.submenuEvents = function (event) {
@@ -831,7 +893,7 @@ KEditor.prototype.handleToolsEvents = function (event) {
         case 'edit-entry':
             if (!kcontainerNode.firstElementChild.dataset?.edit) { return }
             if (!this.edit[kcontainerNode.firstElementChild.dataset.edit]) { return }
-            this.edit[kcontainerNode.firstElementChild.dataset.edit](kcontainerNode.firstElementChild)
+            this.edit[kcontainerNode.firstElementChild.dataset.edit](kcontainerNode.firstElementChild, docNode)
             break;
         case 'to-task':
             this.convertToTaskInteract(kcontainerNode.firstElementChild)
@@ -842,23 +904,17 @@ KEditor.prototype.handleToolsEvents = function (event) {
     }
 }
 
-KEditor.prototype.toggleEntriesDisplay = function (event) {
-    let docNode = event.target
-    while (docNode && !docNode.classList.contains('document')) {
-        docNode = docNode.parentNode
-    }
-
-    if (!docNode) { return; }
-
-    if (this.currentOpenedDocument.get(docNode.id)) {
-        this.getInfo(docNode.id).then(doc => {
-            this.currentOpenedDocument.delete(docNode.id)
+KEditor.prototype.toggleEntriesDisplay = function (kedDocument) {
+    if (kedDocument.isOpen()) {
+        this.getInfo(kedDocument.getId())
+        .then(doc => {
+            kedDocument.close()
             this.renderSingle(doc)
         })
     } else {
-        this.getDocument(docNode.id)
+        kedDocument.open()
+        this.getDocument(kedDocument.getId())
         .then(doc => {
-            this.currentOpenedDocument.set(docNode.id, true)
             this.renderSingle(doc)
         })
     }
@@ -869,7 +925,6 @@ KEditor.prototype.renderSingle = function (doc) {
         (new Promise((resolve, reject) => {
             let htmlnode
             if (!doc) { reject(); return; }
-            const opened = this.currentOpenedDocument.get(doc.abspath) || false
             doc.class = 'document'
             const task = {
                 is: doc['+class'].indexOf('task') === -1 ? false : true,
@@ -888,25 +943,20 @@ KEditor.prototype.renderSingle = function (doc) {
                 date = new Date()
             }
             let refresh = true
-            htmlnode = document.getElementById(this.buildPath(doc.id, this.cwd))
-            if (!htmlnode) {
-                refresh = false
-                htmlnode = document.createElement('DIV')
+            const kedDocument = new KEDDocument(doc)
+            if (this.LockedNotFound.has(kedDocument.getRelativeId())) {
+                kedDocument.receiveLock(this.LockedNotFound.get(kedDocument.getRelativeId()))
+                this.LockedNotFound.delete(kedDocument.getRelativeId())
             }
-            htmlnode.innerHTML = `<div class="kmetadata ${doc['+childs'] > 0 ? 'childs' : 'no-child'}">
-                ${task.is ? (task.done ? '<i data-action="set-task-undone" class="fas fa-clipboard-check"></i>' : '<i data-action="set-task-done" class="fas fa-clipboard"></i>'): ''}
-                ${new Intl.DateTimeFormat(navigator.language).format(date)} ${doc.name}
-                <div class="navigation indicator"><span data-action="open-document" class="forward"><i class="fas fa-arrow-right"></i></span></div>
-                <div class="has-childs indicator"><span data-action="toggle-entries"><i class="fas ${opened ? 'fa-folder-open' : 'fa-folder'}"></i></span></div>
-                <div class="ksubmenu">
-                <span data-action="add-text"><i class="fas fa-file-alt"></i></span>
-                <span data-action="upload-file"><i class="fas fa-cloud-upload-alt"></i></span>
-                ${!task.is ? '<span data-action="to-task"><i class="fas fa-tasks"></i></span>' : 
-                    '<span data-action="to-not-task" class="fa-stack"><i class="fas fa-tasks fa-stack-1x"></i><i class="fas fa-slash fa-stack-1x"></i></span>'}
-                <span data-action="delete-document"><i class="fas fa-trash"></i></span>
-                </div>
-                <div class="ktags"><span class="ktags-tools" data-action="add-tag"><i class="fas fa-plus-circle"></i></span></div>
-                </div>`
+
+            kedDocument.addEventListener('delete-document', (event) => { this.deleteDocumentInteract(event.detail.target.getDomNode()); })
+            kedDocument.addEventListener('open-document', (event) => { this.cd(event.detail.target.getId()); this.ls(); })
+            kedDocument.addEventListener('toggle-entries', (event) => { this.toggleEntriesDisplay(event.detail.target) })
+            kedDocument.addEventListener('add-text', (event) => { this.docMustOpen(event.detail.target.getId()); this.addTextInteract(event.detail.target.getDomNode()); })
+            kedDocument.addEventListener('upload-file', (event) => { this.docMustOpen(event.detail.target.getId()); this.uploadFileInteract(event.detail.target.getDomNode()); })
+            kedDocument.addEventListener('add-tag', (event) => { this.addTagInteract(event.detail.target.getDomNode()); })
+
+            htmlnode = kedDocument.getDomNode()
             for (const tag of doc.tags) {
                 let ktag = this.tags.get(tag)
                 if (!ktag) {
@@ -917,12 +967,6 @@ KEditor.prototype.renderSingle = function (doc) {
                 htmlnode.lastElementChild.lastElementChild.insertBefore(ktag.html(), htmlnode.lastElementChild.lastElementChild.firstElementChild)
             }
             if (!refresh) { htmlnode.addEventListener('click', this.submenuEvents.bind(this)) }
-            htmlnode.id = doc.abspath
-            htmlnode.dataset.pathid = doc.id
-            htmlnode.dataset.created = doc.created
-            htmlnode.dataset.modified = doc.modified
-            htmlnode.dataset.childs = doc['+childs']
-            htmlnode.classList.add('document')
             if (this.toHighlight === doc.id) {
                 htmlnode.classList.add('highlight')
                 setTimeout(_ => {
@@ -961,7 +1005,7 @@ KEditor.prototype.renderSingle = function (doc) {
                 htmlnode.classList.add('with-entries')
             }
             const p = []
-            if (doc['+entries'] !== undefined && opened) {
+            if (doc['+entries'] !== undefined && kedDocument.isOpen()) {
                 for (let j = 0; j < doc['+entries'].length; j++) {
                     let entry = doc['+entries'][j]
                     p.push(this.renderEntry(`${this.baseUrl.toString()}/`, entry))
@@ -1049,7 +1093,6 @@ KEditor.prototype.render = function (root) {
 
     if (this.cwd === '') {
         KEDAnim.push(() => {
-            console.log(this)
             this.headerMenu.innerHTML = `<span class="kmenu-title">${KED.title ?? ''}</span>${this.headerMenu._tools}`
             document.title = `[ked] ${KED.title ?? ''}`
         })
@@ -1074,17 +1117,25 @@ KEditor.prototype.render = function (root) {
     for (let i = 0; i < root.documents.length; i++) {
         elementOnPage.push(root.documents[i].abspath)
         if (root.documents[i]['+class'].indexOf('entry') !== -1) { continue; }
-        let r
-        if (this.currentOpenedDocument.get(root.documents[i].abspath)) {
-            r = new Promise((resolve, reject) => {
-                this.getDocument(root.documents[i].abspath)
-                .then(doc => { this.renderSingle(doc).then(node => resolve(node)) })
-            })
-        } else {
-            r = this.renderSingle(root.documents[i])
-        }
-        p.push(r)
-        chain = chain.then(r)
+        KEDDocument.get(root.documents[i].abspath, this)
+        .then(kedDoc => {
+            let r
+            if (!kedDoc) {
+                r = Promise.resolve()
+                chain = chain.then(r)
+                return
+            }
+            if (kedDoc.isOpen()) {
+                r = new Promise((resolve, reject) => {
+                    this.getDocument(root.documents[i].abspath)
+                    .then(doc => { this.renderSingle(doc).then(node => resolve(node)) })
+                })
+            } else {
+                r = this.renderSingle(root.documents[i])
+            }
+            p.push(r)
+            chain = chain.then(r)
+        })
     }
     Promise.all(p)
     .then(_ => {
@@ -1096,4 +1147,22 @@ KEditor.prototype.render = function (root) {
             }
         }
     })
+}
+
+KEditor.prototype.lock = function (idOrDoc) {
+    const operation = {
+        operation: 'lock',
+        clientid: this.clientid,
+        anyid: idOrDoc instanceof KEDDocument ? idOrDoc.getRelativeId() : idOrDoc    
+    }
+    return this.fetch('', operation)
+}
+
+KEditor.prototype.unlock = function (idOrDoc) {
+    const operation = {
+        operation: 'unlock',
+        clientid: this.clientid,
+        anyid: idOrDoc instanceof KEDDocument ? idOrDoc.getRelativeId() : idOrDoc    
+    }
+    return this.fetch('', operation)
 }

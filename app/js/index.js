@@ -5,6 +5,9 @@ window.addEventListener('load', (event) => {
     const scripts = [
         '../js/keditor.js',
         '../js/ktags.js',
+        '../js/anim.js',
+        '../js/document.js',
+        '../js/utils.js',
         '../node_modules/quill/dist/quill.min.js'
     ]
 

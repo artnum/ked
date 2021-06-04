@@ -26,6 +26,7 @@ flush();
 $ping = 0;
 $pingCnt = 0;
 $exit = false;
+$rest = '';
 do {
     $message = socket_read($socket, 256);
     if ($message === '' || $message === false) {
@@ -36,16 +37,36 @@ do {
             default: $exit = true; break;
         }
     } else {
-        $payload = $msgAuth->verify($message);
-        if ($payload) {
-            if ($payload === 'exit') { $exit = true; }
+        if ($rest) {
+            $message = $rest . $message;
+            $rest = '';
+        }
+        do {
+            $end = strpos($message, "\n");
+            $msg = substr($message, 0, $end);
+            if ($end === strlen($message) - 1) { $rest = ''; $message = ''; }
             else {
-                $parts = explode(':', $payload, 2);
-                if (count($parts) !== 2) { $exit = true; }
+                $message = substr($message, $end + 1);
+            }
+            $payload = $msgAuth->verify($msg);
+            if ($payload) {
+                if ($payload === 'exit') { $exit = true; }
                 else {
-                    printf('event: %s' . PHP_EOL . 'data: {"id": "%s"}' . PHP_EOL . PHP_EOL, $parts[0], $parts[1]);
+                    $parts = explode(':', $payload, 2);
+                    if (count($parts) !== 2) { $exit = true; }
+                    else {
+                        $subparts = explode('\\', $parts[1], 2);
+                        if (count($subparts) !== 2) {
+                            printf('event: %s' . PHP_EOL . 'data: {"id": "%s"}' . PHP_EOL . PHP_EOL, $parts[0], $parts[1]);
+                        } else {
+                            printf('event: %s' . PHP_EOL . 'data: {"id": "%s", "clientid": "%s"}' . PHP_EOL . PHP_EOL, $parts[0], $subparts[0], $subparts[1]);
+                        }
+                    }
                 }
             }
+        } while(strpos($message, "\n") !== false);
+        if (strlen($message) > 0) {
+            $rest = $message;
         }
     }
     ob_flush();

@@ -491,8 +491,21 @@ class http {
                 $anyDn = $this->ked->pathToDn($body['path'], false);
                 if ($anyDn === NULL) { $this->errorNotFound(); }
                 $deleted = $this->ked->deleteByDn($anyDn);
-                if ($this->msg) { $this->msg->delete($body['path']); }
+                if ($this->msg) { $this->msg->delete($this->ked->idFromPath($body['path'])); }
                 $this->ok(json_encode(['path' => $body['path'], 'deleted' => $deleted]));
+                break;
+            case 'lock':
+                if (empty($body['clientid'])) { $this->errorBadRequest(); }
+                if (empty($body['anyid'])) { $this->errorBadRequest(); }
+                if ($this->msg) { $this->msg->lock($body['anyid'], $body['clientid']); }
+                $this->ok(json_encode(['lock' => true]));
+                break;
+            case 'unlock':
+                var_dump($body);
+                if (empty($body['clientid'])) { $this->errorBadRequest(); }
+                if (empty($body['anyid'])) { $this->errorBadRequest(); }
+                if ($this->msg) { $this->msg->unlock($body['anyid'], $body['clientid']); }
+                $this->ok(json_encode(['lock' => false]));
                 break;
         }
     }

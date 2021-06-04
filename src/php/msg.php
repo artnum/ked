@@ -28,12 +28,12 @@ class msg {
         $this->msg('exit');
     }
 
-    function lock ($id) {
-        $this->msg('lock:' . $id);
+    function lock ($id, $clientid) {
+        $this->msg('lock:' . $id . '\\' . $clientid);
     }
 
-    function unlock ($id) {
-        $this->msg('unlock:' . $id);
+    function unlock ($id, $clientid) {
+        $this->msg('unlock:' . $id . '\\' . $clientid);
     }
 
     function update ($id) {

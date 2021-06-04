@@ -48,7 +48,7 @@ do {
             $payload = $msgAuth->verify($data);
             if ($payload) {
                 foreach ($clients as $k => $client) {
-                    if (@socket_write($client, $data) === false) {
+                    if (@socket_write($client, $data . "\n") === false) {
                         socket_shutdown($client);
                         socket_close($client);
                         unset($clients[$k]);

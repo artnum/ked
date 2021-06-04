@@ -10,6 +10,7 @@
     --highlight-light-color: hsla(90, 65%, 30%, 0.5);
     --bg2-color: hsla(245, 65%, 30%, 1);
     --bg2-light-color: hsla(90, 65%, 30%, 0.5);
+    --locked-color: hsla(20, 100%, 55%, 1);
 }
 
 .keditorRoot {
@@ -89,6 +90,10 @@
     margin: 0 0 1ex 0;
     padding: 4px;
     min-height: 64px;
+}
+
+.document.locked .kmetadata {
+    background-color: var(--locked-color);
 }
 
 .document .indicator.has-childs {
