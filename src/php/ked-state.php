@@ -20,7 +20,6 @@ class state {
             $kedRootType = @ldap_get_values($this->ldap, $entry, 'kedRootType');
             if (!$kedRootType) { continue; }
             if ($kedRootType['count'] <= 0) { continue; }
-            error_log($kedRootType[0]);
             $dn = @ldap_get_dn($this->ldap, $entry);
             if ($kedRootType[0] === 'state') {
                 return $dn;
@@ -78,10 +77,8 @@ class state {
             'kedType' => 'lock'
         ];
         
-        if ($this->haslock($clientid, $objectdn)) { return false; }
-        error_log(var_export($object, true));
+        if ($this->islocked($objectdn)) { return false; }
         $dn = 'kedId=' . ldap_escape($clientid, '', LDAP_ESCAPE_DN) . '+kedType=lock+kedContent=' . ldap_escape($object['kedContent'], '', LDAP_ESCAPE_DN)  . ',' . $this->base;
-        error_log($dn);
         $res = @ldap_read($this->ldap, $dn, '(objectclass=*)', [ 'kedTimestamp' ]);
         if ($res) {
             $entry = @ldap_first_entry($this->ldap, $res);
@@ -100,6 +97,19 @@ class state {
             return false;
         }
         return true;
+    }
+
+    function islocked($objectdn) {
+        $res = @ldap_search(
+            $this->ldap,
+            $this->base, 
+            '(&(kedObjectDn=' . ldap_escape($objectdn, '', LDAP_ESCAPE_FILTER) . ')(kedType=lock))',
+            [ 'kedTimestamp' ]
+        );
+        if (!$res) { return false; }
+        $entry = @ldap_first_entry($this->ldap, $res);
+        if (!$entry) { return false; }
+        return ldap_get_dn($this->ldap, $entry);
     }
 
     function haslock($clientid, $objectdn) {
