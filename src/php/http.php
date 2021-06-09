@@ -16,7 +16,29 @@ class http {
         $this->ked = $ked;
         $this->msg = $msg;
         $this->acl = new ACL($this->ked);
-        $this->responseStarted = false;       
+        $this->responseStarted = false;
+        $this->user = null;
+        $this->configuration = [
+            'disable-file-upload' => false,
+            'disable-apache-browse' => false,
+            'disable-task' => false
+        ];
+    }
+
+    function config(string $name, $value = null) {
+        if ($value === null) {
+            if (!isset($this->configuration[$name])) { return null; }
+            return $this->configuration['name'];
+        }
+        $this->configuration[$name] = $value;
+        return $this->configuration[$name];
+    }
+
+    function config_merge($config) {
+        foreach ($config as $k => $v) {
+            $this->configuration[$k] = $v;
+        }
+        return;
     }
 
     function setUser($user) {
@@ -209,9 +231,12 @@ class http {
                     }
                 }
                 $info = $this->ked->getAll($path, false);
-                if (!$this->acl->can($this->user['dn'], 'access', $info['__dn'])) { $this->errorForbidden(); }
+                if (!$this->acl->can($this->user, 'access', $info['__dn'])) { $this->errorForbidden(); }
                 if ($info === null) { $this->errorNotFound(); }
                 if (in_array('document', $info['+class'])) {
+                    if ($this->config('disable-apache-browse')) {
+                        $this->errorForbidden();
+                    }
                     $childs = $this->ked->listDirectory($info['__dn']);
                     $this->printDir($info, $childs);
                 } else {
@@ -360,7 +385,7 @@ class http {
                     $parent = $this->ked->pathToDn($body['path']);
                     if ($parent === null) { $this->errorNotFound(); }
                 }
-                if (!$this->acl->can($this->user['dn'], 'create:sub', $parent ?? '')) { $this->errorForbidden(); }
+                if (!$this->acl->can($this->user, 'create:sub', $parent ?? '')) { $this->errorForbidden(); }
                 $application = null;
                 if (!empty($body['application'])) {
                     $application = $body['application'];
@@ -401,7 +426,7 @@ class http {
             case 'get-document':
                 if (empty($body['path'])) { $this->errorBadRequest(); }
                 $docDn = $this->ked->pathToDn($body['path']);
-                if (!$this->acl->can($this->user['dn'], 'access', $docDn)) { $this->errorForbidden(); }
+                if (!$this->acl->can($this->user, 'access', $docDn)) { $this->errorForbidden(); }
                 if ($docDn === null) { $this->errorNotFound(); }
                 $document = $this->ked->getDocument($docDn, true);
                 $this->ok(json_encode($document));
@@ -435,6 +460,7 @@ class http {
                         }
                         break;
                     case 'image':
+                        if ($this->config('disable-file-upload')) { $this->errorForbidden(); }
                         /* unsupported format are as blob */
                         if (!$this->ked->isSupportedImage($body['_file']['tmp_name'])) {
                             if ($update) {
@@ -451,6 +477,7 @@ class http {
                         }
                         break;
                     default:
+                        if ($this->config('disable-file-upload')) { $this->errorForbidden(); }
                         if ($update) {
                             $id = $this->ked->updateBinaryEntry($body['path'], $body['_file']['tmp_name'], $body['_file']['type'], $application);
                         } else {
@@ -466,6 +493,7 @@ class http {
                 $this->ok(json_encode(['id' => $id]));
                 break;
             case 'to-not-task':
+                if ($this->config('disable-task')) { $this->errorForbidden(); }
                 if (empty($body['path'])) { $this->errorBadRequest(); }
                 if (!$this->ked->anyToNotTask($body['path'])) { $this->errorUnableToOperate(); }
                 if ($this->msg) { $this->msg->create($body['path']); }
@@ -474,6 +502,7 @@ class http {
             case 'update-task':
                 // fall through
             case 'to-task':
+                if ($this->config('disable-task')) { $this->errorForbidden(); }
                 if (empty($body['path'])) { $this->errorBadRequest(); }
                 $params = [];
                 foreach ([ 'taskPrevious', 'taskEnd', 'taskDone' ] as $key) {
@@ -499,8 +528,21 @@ class http {
                 $anyDn = $this->ked->pathToDn($body['path'], false);
                 if ($anyDn === NULL) { $this->errorNotFound(); }
                 $deleted = $this->ked->deleteByDn($anyDn);
-                if ($this->msg) { $this->msg->delete($body['path']); }
+                if ($this->msg) { $this->msg->delete($this->ked->idFromPath($body['path'])); }
                 $this->ok(json_encode(['path' => $body['path'], 'deleted' => $deleted]));
+                break;
+            case 'lock':
+                if (empty($body['clientid'])) { $this->errorBadRequest(); }
+                if (empty($body['anyid'])) { $this->errorBadRequest(); }
+                if ($this->msg) { $this->msg->lock($body['anyid'], $body['clientid']); }
+                $this->ok(json_encode(['lock' => true]));
+                break;
+            case 'unlock':
+                var_dump($body);
+                if (empty($body['clientid'])) { $this->errorBadRequest(); }
+                if (empty($body['anyid'])) { $this->errorBadRequest(); }
+                if ($this->msg) { $this->msg->unlock($body['anyid'], $body['clientid']); }
+                $this->ok(json_encode(['lock' => false]));
                 break;
         }
     }

@@ -232,6 +232,11 @@ class high extends ked {
         return implode(self::PATH_SEPARATOR, $path);
     }
 
+    function idFromPath (string $path):string {
+        $elements = explode(self::PATH_SEPARATOR, $path);
+        return array_pop($elements);
+    }
+
     function addDocument (string $name, ?string $parent, $application = null, $tags = []) {
         $options = [];
         if ($application !== null) {

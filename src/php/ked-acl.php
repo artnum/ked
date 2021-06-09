@@ -13,8 +13,8 @@ class ACL {
      * $ACL->can('user', 'update', 'document')
      * ... 
      */
-    function can (string $userDn, string $access, string $objectDn):bool {
-        $object = $this->ked->getRawLdapObjectByDn($objectDn);
+    function can ($userDn, string $access, string $objectDn):bool {
+        /*$object = $this->ked->getRawLdapObjectByDn($objectDn);
         if (in_array('kedTag', $object['objectclass'])) {
             return $this->canTag($userDn, $access, $object);
         }
@@ -23,7 +23,7 @@ class ACL {
         }
         if ($userDn === '') {
             return $this->canAnonymousUser($access, $object);
-        }
+        }*/
 
         return true;
     }

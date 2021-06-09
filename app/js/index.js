@@ -7,8 +7,12 @@ window.addEventListener('load', (event) => {
         '../js/keditor.js',
         '../js/ktags.js',
         '../js/api.js',
+        '../js/anim.js',
+        '../js/document.js',
+        '../js/utils.js',
         '../node_modules/quill/dist/quill.min.js',
-        '../node_modules/jsqr/dist/jsQR.js'
+        '../node_modules/jsqr/dist/jsQR.js',
+
     ]
 
     const csss = [

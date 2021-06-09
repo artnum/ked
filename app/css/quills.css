@@ -1,0 +1,35 @@
+:root {
+    --tab-space: 3ch;
+}
+
+.ql-indent-1 {
+    margin-left: calc(1 * var(--tab-space));
+}
+
+.ql-indent-2 {
+    margin-left: calc(2 * var(--tab-space));
+}
+
+.ql-indent-3 {
+    margin-left: calc(3 * var(--tab-space));
+}
+
+.ql-indent-4 {
+    margin-left: calc(4 * var(--tab-space));
+}
+
+.ql-indent-5 {
+    margin-left: calc(5 * var(--tab-space));
+}
+
+.ql-indent-6 {
+    margin-left: calc(6 * var(--tab-space));
+}
+
+.ql-indent-7 {
+    margin-left: calc(7 * var(--tab-space));
+}
+
+.ql-indent-8 {
+    margin-left: calc(8 * var(--tab-space));
+}
