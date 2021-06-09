@@ -25,7 +25,7 @@ KEDAnimator.prototype.run = function () {
         })
     })
     .then(() => {
-        if (this.animList.length === 0) {
+        if (this.animList.length > 0) {
             this.run()
         }
         this._run = false
