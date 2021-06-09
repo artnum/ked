@@ -94,7 +94,8 @@ KEditor.prototype.sseSetup = function() {
             MenshenEncoding.buf2b64(id)
         )
     })
-    .then(url => { 
+    .then(url => {
+        url.searchParams.append('clientid', this.clientid)
         this.sse = new EventSource(url)
         this.sse.addEventListener('create', event => cuEvent(event))
         this.sse.addEventListener('update', event => cuEvent(event))        
@@ -262,7 +263,7 @@ KEditor.prototype.refreshDocument = function (docPath) {
 
 KEditor.prototype.ls = function () {
     return new Promise((resolve, reject) => {
-        this.fetch(this.cwd, {operation: 'list-document'})
+        this.API.listDocument(this.cwd)
         .then(result =>{
             if (!result.ok) { this.error(result.data); return }
             return this.render(result.data)
@@ -272,7 +273,7 @@ KEditor.prototype.ls = function () {
     })
 }
 
-KEditor.prototype.selecteTag = function (event) {
+KEditor.prototype.selectedTag = function (event) {
     const tags = []
     for(const tag of this.tags) {
         if (tag[1].state) {
@@ -283,7 +284,7 @@ KEditor.prototype.selecteTag = function (event) {
         return this.ls()
     }
     
-    this.fetch('', {operation: 'search-by-tags', tags})
+    this.API.searchByTags(tags)
     .then(result => {
         if (!result.ok) { this.error(result.data); return}
         return this.render(result.data)
@@ -426,13 +427,14 @@ KEditor.prototype.renderEntry = function (path, entry) {
                 subresolve(htmlnode)
                 return
             case 'text':
-                fetch(new URL(`${path}/${entry.abspath}?mod=${entry.modified}`))
+                this.API.fetch(new URL(`${path}/${entry.abspath}?mod=${entry.modified}`))
                 .then(response => {
                     if (!response.ok) { resolve(null); return; }
                     response.text()
                     .then(content => {
                         let type = entry.type
                         subtype = type.split('/', 2)
+                        console.log(subtype)
                         if (subtype[1] === undefined) { resolve(null); return }
                         switch (subtype[1]) {
                             case 'html':
@@ -490,7 +492,7 @@ KEditor.prototype.renderEntry = function (path, entry) {
                         subresolve(htmlnode)
                         return                       
                     case 'message/rfc822':
-                        fetch(new URL(`${path}/${entry.abspath}?mod=${entry.modified}`))
+                        this.API.fetch(new URL(`${path}/${entry.abspath}?mod=${entry.modified}`))
                         .then(response => {
                             if (!response.ok) { return null; }
                             return response.text()
@@ -530,7 +532,7 @@ KEditor.prototype.deleteEntryInteract = function (docNode, entryNode) {
     })
     .then (confirm => {
         if (confirm) {
-            this.fetch('', {operation: 'delete', path: entryNode.id})
+            this.API.delete(entryNode.id)
             .then(_ => {
                 this.refreshDocument(docNode.id)
             })
@@ -566,11 +568,14 @@ KEditor.prototype.deleteDocumentInteract = function (docNode) {
 }
 
 KEditor.prototype.deleteDocument = function (docNode) {
-    const operation = {
-        operation: 'delete',
-        path: this.buildPath(this.cwd, docNode.dataset.pathid)
-    }
-    this.fetch('', operation)
+    this.API.delete(docNode.id)
+    .then(result => {
+        if (result.ok) {
+            const doc = KEDDocument.registered(result.data.path)
+            console.log(doc)
+            if (doc) { doc.remove() }
+        }
+    })
 }
 
 KEditor.prototype.createTag = function (name = null, related = []) {
@@ -774,13 +779,15 @@ KEditor.prototype.addDocumentInteract = function (path) {
         formNode.classList.add('kform-inline')
         formNode.addEventListener('submit', event => {
             event.preventDefault()
+            event.stopPropagation()
             const fdata = new FormData(event.target)
             event.target.parentNode.removeChild(event.target)
             resolve(fdata.get('name'))
-        })
+        }, {capture: true})
         formNode.addEventListener('reset', event => {
+            event.stopPropagation()
             event.target.parentNode.removeChild(event.target)
-        })
+        }, {capture: true})
         formNode.innerHTML = `<input type="text" placeholder="Nom / titre" name="name" /><button type="submit">Créer</button><button type="reset">Annuler</button>`
         docNode.appendChild(formNode)
     })
@@ -1027,7 +1034,7 @@ KEditor.prototype.renderSingle = function (doc) {
                 let ktag = this.tags.get(tag)
                 if (!ktag) {
                     ktag = new KTag(tag)
-                    ktag.addEventListener('change', this.selecteTag.bind(this))
+                    ktag.addEventListener('change', this.selectedTag.bind(this))
                     this.tags.set(tag, ktag)
                 }
                 htmlnode.lastElementChild.lastElementChild.insertBefore(ktag.html(), htmlnode.lastElementChild.lastElementChild.firstElementChild)
@@ -1219,7 +1226,7 @@ KEditor.prototype.lock = function (idOrDoc) {
     const operation = {
         operation: 'lock',
         clientid: this.clientid,
-        anyid: idOrDoc instanceof KEDDocument ? idOrDoc.getRelativeId() : idOrDoc    
+        anyid: idOrDoc instanceof KEDDocument ? idOrDoc.getId() : idOrDoc    
     }
     return this.fetch('', operation)
 }
@@ -1228,7 +1235,7 @@ KEditor.prototype.unlock = function (idOrDoc) {
     const operation = {
         operation: 'unlock',
         clientid: this.clientid,
-        anyid: idOrDoc instanceof KEDDocument ? idOrDoc.getRelativeId() : idOrDoc    
+        anyid: idOrDoc instanceof KEDDocument ? idOrDoc.getId() : idOrDoc    
     }
     return this.fetch('', operation)
 }

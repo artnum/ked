@@ -12,7 +12,6 @@ window.addEventListener('load', (event) => {
         '../js/utils.js',
         '../node_modules/quill/dist/quill.min.js',
         '../node_modules/jsqr/dist/jsQR.js',
-
     ]
 
     const csss = [

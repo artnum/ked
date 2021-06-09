@@ -175,3 +175,42 @@ KEDApi.prototype.searchTags = function(expression, maxsize = 5) {
         })
     })
 }
+
+KEDApi.prototype.listDocument = function (path) {
+    const operation = {
+        operation: 'list-document',
+        path
+    }
+    return new Promise((resolve) => {
+        this.post(operation)
+        .then(result => {
+            resolve(result)
+        })
+    })
+}
+
+KEDApi.prototype.searchByTags = function (tags) {
+    const operation = {
+        operation: 'search-by-tags',
+        tags
+    }
+    return new Promise((resolve) => {
+        this.post(operation)
+        .then(result => {
+            resolve(result)
+        })
+    })
+}
+
+KEDApi.prototype.delete = function (path) {
+    const operation = {
+        operation: 'delete',
+        path
+    }
+    return new Promise((resolve) => {
+        this.post(operation)
+        .then(result => {
+            resolve(result)
+        })
+    })
+}

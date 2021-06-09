@@ -135,7 +135,7 @@ KEDDocument.prototype.meta = function() {
 
 KEDDocument.prototype.remove = function () {
     if (this.domNode) {
-        this.domNode.parentNode.removeChild(domNode)
+        this.domNode.parentNode.removeChild(this.domNode)
         this.domNode = undefined
     }
 }
