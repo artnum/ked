@@ -100,6 +100,14 @@ class ked {
         return $this->conn;
     }
 
+    function getBase() {
+        return $this->dirBase;
+    }
+
+    function getDocumentBase() {
+        return $this->base;
+    }
+
     function setTagsBase (string $tagsBase):void {
         $this->tagsBase = $tagsBase;
     }
@@ -201,7 +209,7 @@ class ked {
         $dn = sprintf('%s,%s', $rdn[0], $parent);
         $res = @ldap_add($this->rwconn, $dn, $document);
         if (!$res) { $this->ldapFail($this->rwconn); return null; }
-        return $rdn[1];
+        return $dn;
     }
 
     function createEntry (string $docDn, ?string $content, array $options = []):?string {

@@ -30,6 +30,8 @@ if (($user = $menshen->check()) !== false) {
     $http = new http($high, $msg);
     $http->setUser($user);
     $http->run();
+} else {
+    http_response_code(403);
 }
 ldap_unbind($ldap);
 ?>

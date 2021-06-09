@@ -265,7 +265,8 @@ class high extends ked {
             $tagsDn[] = $this->rootTag['dn'];
         }
         $options['tags'] = $tagsDn;
-        return $this->createDocument($name, $options);
+        $dn = $this->createDocument($name, $options);
+        return $this->dnToPath($dn);
     }
 
     function getDocument (string $docDn, $extended = false):array {

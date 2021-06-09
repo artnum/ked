@@ -1,12 +1,23 @@
 <?php
 
+require('../src/php/ked-state.php');
 require('../src/php/msg.php');
 require('../../Menshen/php/Menshen.php');
+
+function get_client_ip() {
+    foreach (['HTTP_CLIENT_IP', 'HTTP_X_FORWARDED_FOR', 'HTTP_X_FORWARDED', 'HTTP_X_CLUSTER_CLIENT_IP', 'HTTP_FORWARDED_FOR', 'HTTP_FORWARDED', 'REMOTE_ADDR']as $k){
+        if (!empty($_SERVER[$k])) {
+            $ips = explode(',', $_SERVER[$k]);
+            return trim($ips[0]);
+        }
+    }
+}
 
 $ldap = ldap_connect('ldap://127.0.0.1:9090/');
 ldap_set_option($ldap, LDAP_OPT_PROTOCOL_VERSION, 3);
 ldap_bind($ldap, 'cn=admin,o=artnum', '1234');
 
+$state = new ked\state('o=artnum', $ldap);
 $credStore = new \Menshen\LDAPStore($ldap, 'o=artnum');
 $menshen = new \Menshen($credStore);
 
@@ -14,7 +25,12 @@ ignore_user_abort(true);
 header('Cache-Control: no-cache', true);
 header('Content-Type: text/event-stream', true);
 
-if (!$menshen->check()) { error(); exit(); }
+if (!($user = $menshen->check())) { error(); exit(); }
+
+error_log('client id "' . $_REQUEST['clientid'] . '" USER : "' .  $user->toJson() . "\"\n");
+
+$clientid = $_REQUEST['clientid'];
+$state->connection($_REQUEST['clientid'], $user->getDbId(), get_client_ip());
 
 function error() {
     echo "event: error\n\n";
@@ -91,6 +107,8 @@ do {
     }
     sleep(1);
 } while(!$exit);
+
+$state->disconnection($clientid);
 
 socket_write($socket, $msgAuth->sign('exit'));
 socket_close($socket);

@@ -3,6 +3,7 @@ namespace ked;
 
 require ('formats.php');
 require ('ked-acl.php');
+require ('ked-state.php');
 
 use Normalizer;
 
@@ -16,6 +17,7 @@ class http {
         $this->ked = $ked;
         $this->msg = $msg;
         $this->acl = new ACL($this->ked);
+        $this->states = new state($this->ked->getBase(), $this->ked->getLdapConn(true));
         $this->responseStarted = false;
         $this->user = null;
         $this->configuration = [
@@ -294,7 +296,7 @@ class http {
                 if ($body === null) { $this->errorBodyContent(); }
                 if (empty($body['operation'])) { $this->errorBadRequest(); }
                 /* body path in PATH_INFO is logical */
-                if (empty($body['path'])) {
+                if (!isset($body['path'])) {
                     if (!empty($_SERVER['PATH_INFO'])) { $body['path'] = str_replace('/', '', $_SERVER['PATH_INFO']); }
                 }
                 $this->postOperation($body);
@@ -318,6 +320,9 @@ class http {
                 break;
             case 'search':
                 $limit = 100;
+                if (!isset($body['term']) || empty($body['term']) || $body['term'] === null) {
+                    $this->errorBadRequest();
+                }
                 $documents = $this->ked->search($body['term']);
                 if (!$documents) { $documents = []; }
                 $this->ok(json_encode(['documents' => $documents]));
@@ -400,7 +405,7 @@ class http {
                 }
                 $id = $this->ked->addDocument($body['name'], $parent, $application, $tags);
                 if ($id === null) { $this->errorUnableToOperate(); }
-                if ($this->msg) { $this->msg->create($id); }
+                if ($this->msg) { $this->msg->create($this->ked->idFromPath($id)); }
                 $this->ok(json_encode(['id' => $id]));
                 break;
             case 'list-document':
@@ -426,8 +431,8 @@ class http {
             case 'get-document':
                 if (empty($body['path'])) { $this->errorBadRequest(); }
                 $docDn = $this->ked->pathToDn($body['path']);
-                if (!$this->acl->can($this->user, 'access', $docDn)) { $this->errorForbidden(); }
                 if ($docDn === null) { $this->errorNotFound(); }
+                if (!$this->acl->can($this->user, 'access', $docDn)) { $this->errorForbidden(); }
                 $document = $this->ked->getDocument($docDn, true);
                 $this->ok(json_encode($document));
                 break;
@@ -534,14 +539,19 @@ class http {
             case 'lock':
                 if (empty($body['clientid'])) { $this->errorBadRequest(); }
                 if (empty($body['anyid'])) { $this->errorBadRequest(); }
-                if ($this->msg) { $this->msg->lock($body['anyid'], $body['clientid']); }
-                $this->ok(json_encode(['lock' => true]));
+                $dn = $this->ked->pathToDn($body['anyid']);
+                if (!$dn) { $this->errorNotFound(); }
+                $lock = $this->states->lock($body['clientid'], $dn);
+                if ($lock) { if ($this->msg) { $this->msg->lock($this->ked->idFromPath($body['anyid']), $body['clientid']); } }
+                $this->ok(json_encode(['lock' => $lock ? true : false]));
                 break;
             case 'unlock':
-                var_dump($body);
                 if (empty($body['clientid'])) { $this->errorBadRequest(); }
                 if (empty($body['anyid'])) { $this->errorBadRequest(); }
-                if ($this->msg) { $this->msg->unlock($body['anyid'], $body['clientid']); }
+                $dn = $this->ked->pathToDn($body['anyid']);
+                if (!$dn) { $this->errorNotFound(); }
+                $this->states->unlock($body['clientid'], $dn);
+                if ($this->msg) { $this->msg->unlock($this->ked->idFromPath($body['anyid']), $body['clientid']); }
                 $this->ok(json_encode(['lock' => false]));
                 break;
         }

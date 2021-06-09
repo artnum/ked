@@ -13,15 +13,15 @@ class ACL {
      * $ACL->can('user', 'update', 'document')
      * ... 
      */
-    function can ($userDn, string $access, string $objectDn):bool {
+    function can ($user, string $access, string $objectDn):bool {
         /*$object = $this->ked->getRawLdapObjectByDn($objectDn);
         if (in_array('kedTag', $object['objectclass'])) {
-            return $this->canTag($userDn, $access, $object);
+            return $this->canTag($user, $access, $object);
         }
         if (in_array('kedAcl', $object['objectclass'])) {
-            return $this->canAcl($userDn, $access, $object);
+            return $this->canAcl($user, $access, $object);
         }
-        if ($userDn === '') {
+        if ($user === null) {
             return $this->canAnonymousUser($access, $object);
         }*/
 
@@ -36,12 +36,12 @@ class ACL {
         return true;
     }
 
-    protected function canTag (string $userDn, string $access, array $object):bool {
-        if ($userDn === '') { return false; }
+    protected function canTag ($user, string $access, array $object):bool {
+        if ($user === null) { return false; }
         return true;
     }
-    protected function canAcl (string $userDn, string $access, array $object):bool {
-        if ($userDn === '') { return false; }
+    protected function canAcl ($user, string $access, array $object):bool {
+        if ($user === null) { return false; }
         return true;
     }
 }

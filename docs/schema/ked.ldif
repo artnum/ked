@@ -158,6 +158,19 @@ olcAttributeTypes: (kedAttr:23 NAME 'kedIdName'
   ORDERING caseIgnoreOrderingMatch
   SINGLE-VALUE
  )
+olcAttributeTypes: (kedAttr:24 NAME 'kedObjectDn'
+  DESC 'DN of any object'
+  EQUALITY distinguishedNameMatch
+  SYNTAX 1.3.6.1.4.1.1466.115.121.1.12
+ )
+olcAttributeTypes: (kedAttr:25 NAME 'kedType'
+  DESC 'Type of an object'
+  SYNTAX 1.3.6.1.4.1.1466.115.121.1.15
+  EQUALITY caseExactMatch
+  SUBSTR caseExactSubstringsMatch
+  ORDERING caseExactOrderingMatch
+  SINGLE-VALUE
+ )
 olcObjectClasses: (kedClass:1 NAME 'kedEntry'
   SUP top
   STRUCTURAL
@@ -204,4 +217,11 @@ olcObjectClasses: (kedClass:7 NAME 'kedRoot'
   STRUCTURAL
   DESC 'Root of ked tree'
   MUST ( kedId $ kedRootType )
+ )
+olcObjectClasses: (kedClass:8 NAME 'kedState'
+  SUP top
+  STRUCTURAL
+  DESC 'A state (connection, lock, ...)'
+  MUST ( kedId $ kedObjectDn $ kedType $ kedTimestamp )
+  MAY ( kedContent )
  )
