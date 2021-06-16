@@ -57,6 +57,20 @@ class state {
         return;
     }
 
+    function getconnected () {
+        $res = @ldap_search($this->ldap, $this->base, '(kedType=connection)', [ 'kedObjectDn', 'kedTimestamp' ]);
+        if (!$res) { return []; }
+        $users = [];
+        for($entry = @ldap_first_entry($this->ldap, $res); $entry; $entry = ldap_next_entry($this->ldap, $res)) {
+            $dn = @ldap_get_values($this->ldap, $entry, 'kedObjectDn');
+            if (!$dn) { continue; }
+            $ts = @ldap_get_values($this->ldap, $entry, 'kedTimestamp');
+            if (!$ts) { continue; }
+            $users[] = [ 'dn' => $dn[0], 'timestamp' => $ts[0] ];
+        }
+        return $users;
+    }
+
     function disconnection ($clientid) {
         $dn = 'kedId=' . ldap_escape($clientid, '', LDAP_ESCAPE_DN) . '+kedType=connection,' . $this->base;
         $res = @ldap_delete($this->ldap, $dn);

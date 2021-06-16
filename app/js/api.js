@@ -13,22 +13,63 @@ KEDApi.prototype.removeEventListener = function(signal, callback, options) {
     this.EvtTarget.removeEventListener(signal, callabck, options)
 }
 
-KEDApi.prototype.init = function () {
+KEDApi.prototype.hasKey = function (username) {
     return new Promise((resolve, reject) => {
-        this.KeyStore.getAuth()
+        this.KeyStore.hasAuth(username)
+        .then(resolve)
+        .catch(reason => {
+            console.log(reason)
+        })
+    })
+}
+
+KEDApi.prototype.getPass = function () {
+    return new Promise((resolve, reject) => {
+        this.KeyStore.exportPKeyPin()
         .then(key => {
+            resolve(key)
+        })
+    })
+}
+
+KEDApi.prototype.logout = function () {
+    this.Menshen.clear()
+    this.KeyStore.clear()
+}
+
+KEDApi.prototype.init = function (username, password) {
+    return new Promise((resolve, reject) => {
+        this.KeyStore.importPKeyPin(username, password)
+        .then(() => {
+            return this.KeyStore.getAuth(username)
+        }).then(key => {
             if (!key) {
                 resolve(false)
             } else {
-                this.Menshen.setPrivateKey(key.pkey)
-                this.Menshen.setClientId(key.cid)
-                resolve(true)
+                let pkey
+                if (key.pkey instanceof CryptoKey) {
+                    pkey = this.Menshen.setPrivateKey(key.pkey)
+                } else {
+                    pkey = this.Menshen.setPkcs8PrivateKey(key.pkey)
+                }
+                pkey.then(() => {
+                    this.Menshen.setClientId(key.cid)
+                    resolve(true)
+                })
+                .catch(reason => {
+                    console.log(reason)
+                    resolve(false)
+                })
             }
         })
         .catch(reason => {
-            reject(reason)
+            resolve(false)
         })
     })
+}
+
+KEDApi.prototype.setPassword = function(password) {
+    return this.KeyStore.setPKeyPin(password)
 }
 
 KEDApi.prototype.importAuth = function(username, pemkey) {
@@ -209,6 +250,15 @@ KEDApi.prototype.delete = function (path) {
     }
     return new Promise((resolve) => {
         this.post(operation)
+        .then(result => {
+            resolve(result)
+        })
+    })
+}
+
+KEDApi.prototype.getUsers = function () {
+    return new Promise((resolve) => {
+        this.post({operation: 'connected'})
         .then(result => {
             resolve(result)
         })

@@ -60,7 +60,7 @@ function KEditor(container, baseUrl) {
         })
     }
 
-    this.authNext()
+    this.authStart()
 }
 
 KEditor.prototype.setupPage = function () {
@@ -113,40 +113,73 @@ KEditor.prototype.sseSetup = function() {
 
 KEditor.prototype.authForm = function () {
     const form = document.createElement('FORM')
+    form.id = 'AuthForm'
     form.innerHTML = `<div><label for="username">Nom d'utilisateur : <input type="text" name="username" value=""></label><br>
-        <label for="keyfile">Clé privée : <input type="file" name="keyfile"></label><br>
-        <button type="submit">Authentifier</button></div>`
+        <label for="password">Mot de passe : <input type="password" name="password" value=""></label><br>
+        <label for="keyfile" id="privImport" style="display: none">Clé privée : <input type="file" name="keyfile"></label><br>
+        <button type="submit">Suivant</button></div>`
     document.body.appendChild(form)
+    form.addEventListener('change', event => {
+        const data = new FormData(form)
+        if (data.get('username')) {
+            this.API.hasKey(data.get('username'))
+            .then(has => {
+                if (!has) {
+                    form.dataset.importAuth = '1'
+                    document.getElementById('privImport').style.removeProperty('display')
+                }
+            })
+        }
+    })
     form.addEventListener('submit', event => {
         event.preventDefault()
         const data = new FormData(form)
-        
-        if (document.location.hash.startsWith('#menshen-')) {
-            const key = MenshenEncoding.base64Decode(document.location.hash.substring(9).replaceAll('-', '+').replaceAll('_', '/').replaceAll('.', '='))
-            this.API.importAuth(data.get('username'), key)
-            .then(() => {
-                this.authNext()
-            })
-        } else {
-            const file = data.get('keyfile')
-            if (file) {
-                reader = new FileReader()
-                reader.addEventListener('load', event => {
-                    this.API.importAuth(data.get('username'), event.target.result)
-                    .then(() => {
-                        this.authNext()
-                    })
+        if (form.dataset.importAuth === '1') {
+            if (document.location.hash.startsWith('#menshen-')) {
+                const key = MenshenEncoding.base64Decode(document.location.hash.substring(9).replaceAll('-', '+').replaceAll('_', '/').replaceAll('.', '='))
+                this.API.importAuth(data.get('username'), key)
+                .then(() => {
+                    this.authNext(data.get('username'), data.get('password'))
                 })
-                reader.readAsArrayBuffer(file)
-                return
+            } else {
+                const file = data.get('keyfile')
+                if (file) {
+                    reader = new FileReader()
+                    reader.addEventListener('load', event => {
+                        this.API.importAuth(data.get('username'), event.target.result)
+                        .then(() => {
+                            this.authNext(data.get('username'), data.get('password'))
+                        })
+                    })
+                    reader.readAsArrayBuffer(file)
+                    return
+                }
             }
+        } else {
+            this.authNext(data.get('username'), data.get('password'))
         }
         
     })
 }
 
-KEditor.prototype.authNext = function () {
-    this.API.init()
+KEditor.prototype.authStop = function () {
+    localStorage.removeItem(`KED/username@${this.baseUrl}`)
+    localStorage.removeItem(`KED/password@${this.baseUrl}`)
+    this.API.logout()
+}
+
+KEditor.prototype.authStart = function () {
+    const username = localStorage.getItem(`KED/username@${this.baseUrl}`)
+    const password = localStorage.getItem(`KED/password@${this.baseUrl}`)
+    if (!username) {
+        this.authForm()
+    } else {
+        this.authNext(username, JSON.parse(password))
+    }
+}
+
+KEditor.prototype.authNext = function (username, password) {
+    this.API.init(username, password)
     .then(inited => {
         if (inited) {
             return this.API.getUser()
@@ -159,6 +192,11 @@ KEditor.prototype.authNext = function () {
             return
         }
         this.User = result.data
+        localStorage.setItem(`KED/username@${this.baseUrl}`, username)
+        this.API.getPass()
+        .then(pass => {
+            localStorage.setItem(`KED/password@${this.baseUrl}`, JSON.stringify(pass))
+        })
         this.setupPage()
         this.sseSetup()
         this.replaceState()
@@ -1151,6 +1189,9 @@ KEditor.prototype.renderSingle = function (doc) {
                         break
                     }
                 }
+                if (insert === null) {
+                    insert = document.getElementById('ked-footer')
+                }
                 this.container.insertBefore(node, insert)
                 resolve(node)
             })
@@ -1219,6 +1260,23 @@ KEditor.prototype.render = function (root) {
                 })
             }
         }
+        this.API.getUsers()
+        .then(result => {
+            if (!result.ok) { return }
+            if (!result.data.users) { return }
+            let footer = document.getElementById('ked-footer')
+            if (!footer) {
+                footer = document.createElement('footer')
+                footer.id = 'ked-footer'
+                this.container.appendChild(footer)
+            }
+            footer.innerHTML = ''
+            for (const user of result.data.users) {
+                const userDom = document.createElement('DIV')
+                userDom.innerHTML = `<span>${user.name}</span>`
+                footer.appendChild(userDom)
+            }
+        })
     })
 }
 

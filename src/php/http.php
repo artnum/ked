@@ -20,6 +20,7 @@ class http {
         $this->states = new state($this->ked->getBase(), $this->ked->getLdapConn(true));
         $this->responseStarted = false;
         $this->user = null;
+        $this->userStore = null;
         $this->configuration = [
             'disable-file-upload' => false,
             'disable-apache-browse' => false,
@@ -41,6 +42,10 @@ class http {
             $this->configuration[$k] = $v;
         }
         return;
+    }
+
+    function setUserStore($userstore) {
+        $this->userStore = $userstore;
     }
 
     function setUser($user) {
@@ -553,6 +558,20 @@ class http {
                 $this->states->unlock($body['clientid'], $dn);
                 if ($this->msg) { $this->msg->unlock($this->ked->idFromPath($body['anyid']), $body['clientid']); }
                 $this->ok(json_encode(['lock' => false]));
+                break;
+            case 'connected':
+                $users = $this->states->getconnected();
+                $display = [];
+                foreach ($users as $user) {
+                    error_log(var_export($user, true));
+                    $userObject = $this->userStore->getUserByDbId($user['dn']);
+                    $name = $userObject->getDisplayName();
+                    $display[] = [
+                        'name' => $name,
+                        'timestamp' => $user['timestamp']
+                    ];
+                }
+                $this->ok(json_encode(['users' => $display]));
                 break;
         }
     }

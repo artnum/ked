@@ -1,5 +1,6 @@
 <?php
 
+require('conf/ked.php');
 require('../src/php/ked-state.php');
 require('../src/php/msg.php');
 require('../../Menshen/php/Menshen.php');
@@ -13,12 +14,24 @@ function get_client_ip() {
     }
 }
 
-$ldap = ldap_connect('ldap://127.0.0.1:9090/');
+$ldap = ldap_connect(
+    $KEDConfiguration['ldap'][0]['uri']
+);
 ldap_set_option($ldap, LDAP_OPT_PROTOCOL_VERSION, 3);
-ldap_bind($ldap, 'cn=admin,o=artnum', '1234');
+ldap_bind(
+    $ldap,
+    $KEDConfiguration['ldap'][0]['creds']['user'],
+    $KEDConfiguration['ldap'][0]['creds']['password']
+);
 
-$state = new ked\state('o=artnum', $ldap);
-$credStore = new \Menshen\LDAPStore($ldap, 'o=artnum');
+$state = new ked\state(
+    $KEDConfiguration['ldap'][0]['base'], 
+    $ldap
+);
+$credStore = new \Menshen\LDAPStore(
+    $ldap,
+    $KEDConfiguration['ldap'][0]['base']
+);
 $menshen = new \Menshen($credStore);
 
 ignore_user_abort(true);
@@ -26,8 +39,6 @@ header('Cache-Control: no-cache', true);
 header('Content-Type: text/event-stream', true);
 
 if (!($user = $menshen->check())) { error(); exit(); }
-
-error_log('client id "' . $_REQUEST['clientid'] . '" USER : "' .  $user->toJson() . "\"\n");
 
 $clientid = $_REQUEST['clientid'];
 $state->connection($_REQUEST['clientid'], $user->getDbId(), get_client_ip());
@@ -40,10 +51,16 @@ function error() {
 
 $socket = @socket_create(AF_INET, SOCK_STREAM, SOL_TCP);
 if (!$socket) { error(); exit(0); }
-if (!@socket_connect($socket, '127.0.0.1', 8531)) { error(); exit(0); }
+if (!
+    @socket_connect(
+        $socket, 
+        $KEDConfiguration['message'][0]['address'],
+        $KEDConfiguration['message'][0]['port']
+    )
+) { error(); exit(0); }
 socket_set_nonblock($socket);
 
-$msgAuth = new ked\msgAuth('ked-demo-key');
+$msgAuth = new ked\msgAuth($KEDConfiguration['message'][0]['key']);
 
 echo "event: hello\ndata: {\"hello\": \"world\"};\n\n";
 ob_flush();

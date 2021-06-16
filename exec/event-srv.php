@@ -1,20 +1,30 @@
 <?php
-
-use ked\msgAuth;
-
+require('../web/conf/ked.php');
 require('../src/php/msg.php');
 pcntl_async_signals(true);
 
 $socket = socket_create(AF_INET, SOCK_STREAM, SOL_TCP);
 if (!$socket) { die('error socket creation'); }
-if (!socket_bind($socket, '127.0.0.1', 8531)) { die('error socket bind'); }
+if (!
+    @socket_connect(
+        $socket, 
+        $KEDConfiguration['message'][0]['address'],
+        $KEDConfiguration['message'][0]['port']
+    )
+) { die('error socket bind'); }
 socket_listen($socket);
 
 $msgSocket = socket_create(AF_INET, SOCK_DGRAM, SOL_UDP);
 if (!$msgSocket) { die('error socket creation'); }
-if (!socket_bind($msgSocket, '127.0.0.1', 8531)) { die ('error msg socket bind'); }
+if (!
+    socket_bind(
+        $msgSocket,
+        $KEDConfiguration['message'][0]['address'],
+        $KEDConfiguration['message'][0]['port']
+    )
+) { die ('error msg socket bind'); }
 
-$msgAuth = new ked\msgAuth('ked-demo-key');
+$msgAuth = new ked\msgAuth($KEDConfiguration['message'][0]['key']);
 
 $exit = false;
 $clients = [];
