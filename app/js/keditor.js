@@ -111,13 +111,17 @@ KEditor.prototype.sseSetup = function() {
     })
 }
 
-KEditor.prototype.authForm = function () {
-    const form = document.createElement('FORM')
-    form.id = 'AuthForm'
-    form.innerHTML = `<div><label for="username">Nom d'utilisateur : <input type="text" name="username" value=""></label><br>
-        <label for="password">Mot de passe : <input type="password" name="password" value=""></label><br>
-        <label for="keyfile" id="privImport" style="display: none">Clé privée : <input type="file" name="keyfile"></label><br>
-        <button type="submit">Suivant</button></div>`
+KEditor.prototype.authForm = function (nextTry = false) {
+    const form = document.getElementById('KEDAuthForm') || document.createElement('FORM')
+    form.id = 'KEDAuthForm'
+    console.log(nextTry)
+    form.innerHTML = `<div>
+        ${nextTry ? '<div class="error">Erreur d\'authentification</div>' : ''}
+        <label for="username"><span>Nom d'utilisateur :</span><input type="text" name="username" value=""></label><br>
+        <label for="password"><span>Mot de passe :</span><input type="password" name="password" value=""></label><br>
+        <label for="keyfile" id="privImport" style="display: none"><span>Clé privée :</span><input type="file" name="keyfile"></label><br>
+        <button type="submit">Authentifier</button>
+        </div>`
     document.body.appendChild(form)
     form.addEventListener('change', event => {
         const data = new FormData(form)
@@ -135,30 +139,34 @@ KEditor.prototype.authForm = function () {
         event.preventDefault()
         const data = new FormData(form)
         if (form.dataset.importAuth === '1') {
-            if (document.location.hash.startsWith('#menshen-')) {
-                const key = MenshenEncoding.base64Decode(document.location.hash.substring(9).replaceAll('-', '+').replaceAll('_', '/').replaceAll('.', '='))
-                this.API.importAuth(data.get('username'), key)
-                .then(() => {
-                    this.authNext(data.get('username'), data.get('password'))
-                })
-            } else {
-                const file = data.get('keyfile')
-                if (file) {
-                    reader = new FileReader()
-                    reader.addEventListener('load', event => {
-                        this.API.importAuth(data.get('username'), event.target.result)
-                        .then(() => {
-                            this.authNext(data.get('username'), data.get('password'))
-                        })
+            this.API.setPassword(data.get('password'))
+            .then(() => {
+                if (document.location.hash.startsWith('#menshen-')) {
+                    const key = MenshenEncoding.base64Decode(document.location.hash.substring(9).replaceAll('-', '+').replaceAll('_', '/').replaceAll('.', '='))
+                    this.API.importAuth(data.get('username'), key)
+                    .then(() => {
+                        this.authNext(data.get('username'), data.get('password'))
                     })
-                    reader.readAsArrayBuffer(file)
-                    return
+                } else {
+                    const file = data.get('keyfile')
+                    if (file) {
+                        reader = new FileReader()
+                        reader.addEventListener('load', event => {
+                            this.API.importAuth(data.get('username'), event.target.result)
+                            .then(() => {
+                                this.authNext(data.get('username'), data.get('password'))
+                            })
+                        })
+                        reader.readAsArrayBuffer(file)
+                        return
+                    } else {
+                        this.authForm(true)
+                    }
                 }
-            }
+            })
         } else {
             this.authNext(data.get('username'), data.get('password'))
         }
-        
     })
 }
 
@@ -188,7 +196,7 @@ KEditor.prototype.authNext = function (username, password) {
     })
     .then(result => {
         if (!result.ok) {
-            this.authForm()
+            this.authForm(true)
             return
         }
         this.User = result.data
@@ -197,6 +205,14 @@ KEditor.prototype.authNext = function (username, password) {
         .then(pass => {
             localStorage.setItem(`KED/password@${this.baseUrl}`, JSON.stringify(pass))
         })
+        const form = document.getElementById('KEDAuthForm')
+        if (form) {
+            KEDAnim.push(() => {
+                if (form.parentNode) {
+                    form.parentNode.removeChild(form) 
+                }
+            })
+        }
         this.setupPage()
         this.sseSetup()
         this.replaceState()
@@ -1270,12 +1286,22 @@ KEditor.prototype.render = function (root) {
                 footer.id = 'ked-footer'
                 this.container.appendChild(footer)
             }
-            footer.innerHTML = ''
+            KEDAnim.push(() => { footer.innerHTML = '' })
             for (const user of result.data.users) {
                 const userDom = document.createElement('DIV')
-                userDom.innerHTML = `<span>${user.name}</span>`
-                footer.appendChild(userDom)
+                userDom.classList.add('kedConnected')
+                userDom.innerHTML = `<span class="username">${user.name}</span></span>`
+                KEDAnim.push(() => { footer.appendChild(userDom) })
             }
+            const exitButton = document.createElement('BUTTON')
+            exitButton.classList.add('kui')
+            exitButton.id = 'KEDLogout'
+            exitButton.innerHTML = 'Se déconnecter'
+            KEDAnim.push(() => { footer.appendChild(exitButton) })
+            exitButton.addEventListener('click', () => {
+                this.authStop()
+                window.location.reload()
+            })
         })
     })
 }
