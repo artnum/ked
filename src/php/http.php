@@ -563,7 +563,6 @@ class http {
                 $users = $this->states->getconnected();
                 $display = [];
                 foreach ($users as $user) {
-                    error_log(var_export($user, true));
                     $userObject = $this->userStore->getUserByDbId($user['dn']);
                     $name = $userObject->getDisplayName();
                     $display[] = [
