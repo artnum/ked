@@ -6,7 +6,7 @@ pcntl_async_signals(true);
 $socket = socket_create(AF_INET, SOCK_STREAM, SOL_TCP);
 if (!$socket) { die('error socket creation'); }
 if (!
-    @socket_connect(
+    socket_bind(
         $socket, 
         $KEDConfiguration['message'][0]['address'],
         $KEDConfiguration['message'][0]['port']
