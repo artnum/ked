@@ -1287,7 +1287,10 @@ KEditor.prototype.render = function (root) {
                 this.container.appendChild(footer)
             }
             KEDAnim.push(() => { footer.innerHTML = '' })
+            const listed = []
             for (const user of result.data.users) {
+                if (listed.indexOf(user.name) !== -1) { continue }
+                listed.push(user.name)
                 const userDom = document.createElement('DIV')
                 userDom.classList.add('kedConnected')
                 userDom.innerHTML = `<span class="username">${user.name}</span></span>`
