@@ -45,7 +45,11 @@ $credStore = new \Menshen\LDAPStore(
 $menshen = new \Menshen($credStore);
 
 if (($user = $menshen->check()) !== false) {
-    $msg = new msg();
+    $msg = new msg(
+        $KEDConfiguration['message'][0]['address'],
+        $KEDConfiguration['message'][0]['port'],
+        $KEDConfiguration['message'][0]['key']
+    );
     $http = new http($high, $msg);
     $http->setUser($user);
     $http->setUserStore($credStore);
