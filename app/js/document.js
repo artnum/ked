@@ -7,6 +7,15 @@ function KEDDocument (doc) {
         kedDocument.EvtTarget = new EventTarget()
         kedDocument.installedEvents = []
     }
+
+    if (kedDocument.state === undefined) {
+        kedDocument.state = {
+            open: false,
+            highlighted: false,
+            locked: false
+        }
+    }
+    this.changes = kedDocument.compare(doc)
     kedDocument.doc = doc
     kedDocument.domNode = kedDocument.getDomNode()
     if (!kedDocument.domNode) {
@@ -20,43 +29,35 @@ function KEDDocument (doc) {
         kedDocument.domNode.dataset.created = kedDocument.doc.created
         kedDocument.domNode.dataset.modified = kedDocument.doc.modified
         kedDocument.domNode.dataset.childs = kedDocument.doc['+childs']
-    }
-
-    if (kedDocument.state === undefined) {
-        kedDocument.state = {
-            open: false,
-            highlighted: false,
-            locked: false
+     
+        const task = {
+            is: kedDocument.doc['+class'].indexOf('task') === -1 ? false : true,
+            done: false,
+            end: null,
+            previous: null
         }
-    }
-
-    const task = {
-        is: kedDocument.doc['+class'].indexOf('task') === -1 ? false : true,
-        done: false,
-        end: null,
-        previous: null
-    }
-    if (task.is) {
-        if (doc['taskDone'] !== undefined) {
-            task.done = true
+        if (task.is) {
+            if (doc['taskDone'] !== undefined) {
+                task.done = true
+            }
         }
+     
+        kedDocument.domNode.innerHTML = 
+            `<div class="kmetadata ${doc['+childs'] > 0 ? 'childs' : 'no-child'}">
+            ${task.is ? (task.done ? '<i data-action="set-task-undone" class="fas fa-clipboard-check"></i>' : '<i data-action="set-task-done" class="fas fa-clipboard"></i>'): ''}
+            <span id="name-${doc.id}">${doc.name}</span>
+            <div class="navigation indicator"><span data-action="open-document" class="forward"><i class="fas fa-arrow-right"></i></span></div>
+            <div class="has-childs indicator"><span data-action="toggle-entries"><i name="open" class="fas fa-folder"></i></span></div>
+            <div class="ksubmenu">
+            <span data-action="add-text"><i class="fas fa-file-alt"></i></span>
+            <span data-action="upload-file"><i class="fas fa-cloud-upload-alt"></i></span>
+            ${!task.is ? '<span data-action="to-task"><i class="fas fa-tasks"></i></span>' : 
+                '<span data-action="to-not-task" class="fa-stack"><i class="fas fa-tasks fa-stack-1x"></i><i class="fas fa-slash fa-stack-1x"></i></span>'}
+            <span data-action="delete-document"><i class="fas fa-trash"></i></span>
+            </div>
+            <div id="tag-${doc.id}" class="ktags"><span class="ktags-tools" data-action="add-tag"><i class="fas fa-plus-circle"></i></span></div>
+            </div>`
     }
-    let opened = false
-    kedDocument.domNode.innerHTML = 
-        `<div class="kmetadata ${doc['+childs'] > 0 ? 'childs' : 'no-child'}">
-        ${task.is ? (task.done ? '<i data-action="set-task-undone" class="fas fa-clipboard-check"></i>' : '<i data-action="set-task-done" class="fas fa-clipboard"></i>'): ''}
-        ${new Intl.DateTimeFormat(navigator.language).format(new Date(doc.created))} ${doc.name}
-        <div class="navigation indicator"><span data-action="open-document" class="forward"><i class="fas fa-arrow-right"></i></span></div>
-        <div class="has-childs indicator"><span data-action="toggle-entries"><i name="open" class="fas fa-folder"></i></span></div>
-        <div class="ksubmenu">
-        <span data-action="add-text"><i class="fas fa-file-alt"></i></span>
-        <span data-action="upload-file"><i class="fas fa-cloud-upload-alt"></i></span>
-        ${!task.is ? '<span data-action="to-task"><i class="fas fa-tasks"></i></span>' : 
-            '<span data-action="to-not-task" class="fa-stack"><i class="fas fa-tasks fa-stack-1x"></i><i class="fas fa-slash fa-stack-1x"></i></span>'}
-        <span data-action="delete-document"><i class="fas fa-trash"></i></span>
-        </div>
-        <div class="ktags"><span class="ktags-tools" data-action="add-tag"><i class="fas fa-plus-circle"></i></span></div>
-        </div>`
 
     kedDocument.meta() // set metadata
     kedDocument.register()
@@ -114,6 +115,7 @@ KEDDocument.prototype.handleClickEvent = function (event) {
     this.EvtTarget.dispatchEvent(newEvent)
 }
 
+/* events are installed only once */
 KEDDocument.prototype.addEventListener = function (event, callback, options = {}) {
     if (this.installedEvents.indexOf(event) !== -1) { return }    
     this.EvtTarget.addEventListener(event, callback, options)
@@ -135,8 +137,11 @@ KEDDocument.prototype.meta = function() {
 
 KEDDocument.prototype.remove = function () {
     if (this.domNode) {
-        this.domNode.parentNode.removeChild(this.domNode)
-        this.domNode = undefined
+        const domNode = this.domNode
+        KEDAnim.push(() => { console.log(domNode); domNode.parentNode.removeChild(domNode) })
+        try {
+            this.domNode = undefined
+        } catch (e) { /* ignore  */ }
     }
 }
 
@@ -153,6 +158,7 @@ KEDDocument.prototype.getRelativeId = function () {
 }
 
 KEDDocument.prototype.applyStates = function () {
+    if (!this.domNode) { return }
     const oNode = this.domNode.querySelector('i[name="open"]')
     if (this.state.open) {
         KEDAnim.push(() => {
@@ -201,7 +207,6 @@ KEDDocument.prototype.highlight = function (timer = 0) {
     this.state.highlight = true
     if (timer > 0) {
         setTimeout(() => {
-            this.domNode.
             this.lowlight()
             this.applyStates()
         }, timer * 1000)
@@ -239,4 +244,69 @@ KEDDocument.prototype.receiveUnlock = function (clientid) {
     }
     this.state.locked = false
     this.applyStates()
+}
+
+/* compare incoming data from actual data */
+KEDDocument.prototype.compare = function (doc) {
+    const changes = []
+    for (const attr of [
+        '+childs',
+        '+class',
+        '+entries',
+        '+history',
+        'created',
+        'modified',
+        'name',
+        'tags'
+    ]) {
+        if (!this.doc) {
+            changes.push(attr)
+            continue
+        }
+        if (
+            Array.isArray(this.doc[attr]) && !Array.isArray(doc[attr]) ||
+            !Array.isArray(this.doc[attr]) && Array.isArray(doc[attr])
+        ) {
+            /* 0 length array are equal to 0 */
+            if (Array.isArray(this.doc[attr])) {
+                if (this.doc[attr].length === doc[attr]) {
+                    continue
+                }
+            }
+            if (Array.isArray(doc[attr])) {
+                if (doc[attr].length === this.doc[attr]) {
+                    continue
+                }
+            }
+            changes.push(attr)
+            continue
+        }
+        if (Array.isArray(this.doc[attr]) && Array.isArray(doc[attr])) {
+            if (this.doc[attr].length !== doc[attr].length) {
+                changes.push(attr);
+                continue
+            }
+            if (this.doc[attr].length === 0) { continue; }
+            let changed = false
+            for (const value of this.doc[attr]) {
+                if (doc[attr].indexOf(value) === -1) {
+                    changes.push(attr)
+                    changed = true
+                    break
+                }
+            }
+            if (changed) { continue } 
+            for (const value of doc[attr]) {
+                if (this.doc[attr].indexOf(value) === -1) {
+                    changes.push(attr)
+                    break
+                }
+            }
+            continue
+        }
+        if (String(this.doc[attr]) !== String(doc[attr])) {
+            changes.push(attr)
+        }
+    }
+    return changes
 }

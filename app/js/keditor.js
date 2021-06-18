@@ -72,10 +72,15 @@ KEditor.prototype.setupPage = function () {
 
 KEditor.prototype.sseSetup = function() {
     const cuEvent = (event) => {
-        const data = JSON.parse(event.data)
-        const element = document.querySelector(`div[data-pathid="${data.id}"]`)
-        if (element) {
-            this.refreshDocument(element.id)
+        try {
+            const data = JSON.parse(event.data)
+            if (!data.id) { return; }
+            const element = document.querySelector(`div[data-pathid="${data.id}"]`)
+            if (element) {
+                this.refreshDocument(element.id)
+            }
+        } catch (e) {
+            this.error(e)
         }
     }
 
@@ -140,10 +145,16 @@ KEditor.prototype.authForm = function (nextTry = false) {
             this.API.setPassword(data.get('password'))
             .then(() => {
                 if (document.location.hash.startsWith('#menshen-')) {
+                    const pemkey = document.location.hash.substring(9).replaceAll('-', '+').replaceAll('_', '/').replaceAll('.', '=')
+                    console.log(pemkey)
                     const key = MenshenEncoding.base64Decode(document.location.hash.substring(9).replaceAll('-', '+').replaceAll('_', '/').replaceAll('.', '='))
+                    console.log(key)
                     this.API.importAuth(data.get('username'), key)
                     .then(() => {
                         this.authNext(data.get('username'), data.get('password'))
+                    })
+                    .catch(reason => {
+                        this.error(reason)
                     })
                 } else {
                     const file = data.get('keyfile')
@@ -653,7 +664,6 @@ KEditor.prototype.deleteDocument = function (docNode) {
     .then(result => {
         if (result.ok) {
             const doc = KEDDocument.registered(result.data.path)
-            console.log(doc)
             if (doc) { doc.remove() }
         }
     })
@@ -747,8 +757,11 @@ KEditor.prototype.menuEvents = function (event) {
     }
 }
 
-KEditor.prototype.docMustOpen = function (docNode) {
-
+KEditor.prototype.docMustOpen = function (nodeId) {
+    KEDDocument.get(nodeId, this.API)
+    .then(kedDoc => {
+        kedDoc.open()
+    })
 }
 
 KEditor.prototype.submenuEvents = function (event) {
@@ -787,6 +800,7 @@ KEditor.prototype.addTagInteract = function (docNode) {
         })
         form.addEventListener('reset', event => {
             event.target.parentNode.removeChild(event.target)
+            resolve([null, false])
         })
         form.innerHTML = `<div class="kform-inline"><input type="text" placeholder="Tag" name="tag" autocomplete="off"></input>
             '<button type="submit">Ajouter</button><button type="reset">Annuler</button></div>
@@ -795,15 +809,17 @@ KEditor.prototype.addTagInteract = function (docNode) {
             if (event.target.value.length <= 0) { return; }
             this.API.searchTags(event.target.value, KED?.tags?.searchMaxSize)
             .then(response => {
+                form.lastElementChild.innerHTML = ''
                 if (!response.ok) { return; }
                 if (!response.data.tags) { return; }
                 if (response.data.tags.length <= 0) { return; }
                 let existing = form.lastElementChild.firstElementChild
+                let tags = []
                 for (const tag of response.data.tags) {
                     const div = existing || document.createElement('DIV')
                     if (!existing) {
                         div.addEventListener('click', event => {
-                            form.parentNode.removeChild(form)
+                            KEDAnim.push(() => { form.parentNode.removeChild(form) })
                             resolve([event.target.dataset.tag, false])
                             return;
                         })
@@ -811,30 +827,32 @@ KEditor.prototype.addTagInteract = function (docNode) {
                     div.classList.add('ktag')
                     div.dataset.tag = tag
                     div.innerHTML = `<i class="fas fa-hashtag"></i>${tag}`
-                    if (!existing) { form.lastElementChild.appendChild(div) }
+                    if (!existing) { KEDAnim.push(() => { form.lastElementChild.appendChild(div) }) }
                     if (existing) { existing = existing.nextElementSibling }
-                }
-                if (existing) {
-                    let next
-                    while (existing) {
-                        next = existing.nextElementSibling
-                        existing.parentNode.removeChild(existing)
-                        existing = next
-                    }
-                }
+                    tags.push(tag)
+                }            
             })
         })
-        docNode.insertBefore(form, docNode.getElementsByClassName('kmetadata')[0].nextElementSibling)
+        KEDAnim.push(() => { docNode.insertBefore(form, docNode.getElementsByClassName('kmetadata')[0].nextElementSibling) })
+        .then(() => {
+            form.querySelector('input[type="text"]').focus()
+        })
     })
     .then (([tag, create]) => {
+        if (!tag) { return }
         if (create) {
             this.createTag(tag)
             .then(result => {
                 this.addDocumentTag(docNode.id, result.data.id)
+                this.addTagInteract(docNode)
             })
         } else {
             this.addDocumentTag(docNode.id, tag)
+            this.addTagInteract(docNode)
         }
+    })
+    .catch(reason => {
+        this.error(reason)
     })
 }
 
@@ -846,9 +864,9 @@ KEditor.prototype.addDocumentTag = function (path, tag) {
             path,
             tag
         }
-        this.fetch('', operation).then(result => {
-            this.clear()
-            this.ls()
+        this.fetch('', operation)
+        .catch(reason => {
+            this.error(reason)
         })
     })   
 }
@@ -994,11 +1012,9 @@ KEditor.prototype.uploadText = function (node, content, type = 'text/plain') {
 
 KEditor.prototype.addTextInteract = function (docNode) {
     const quillNode = document.createElement('div')
-    quillNode.innerHTML = `<div></div><button>Sauver</button>`
-    
+    quillNode.innerHTML = `<div></div><button class="kui">Sauver</button>`
     KEDAnim.push(() => {
         docNode.insertBefore(quillNode, docNode.firstElementChild.nextElementSibling)
-
     })
     .then(() => {
         const quill = new Quill(quillNode.firstElementChild, this.quillOpts)
@@ -1015,7 +1031,12 @@ KEditor.prototype.addTextInteract = function (docNode) {
             formData.append('file', new File([JSON.stringify(deltaContent)], name, {type: "text/x-quill-delta;charset=utf-8"}))
             formData.append('_filename', name)
             this.fetch('', formData)
-            .then(_ => { this.refreshDocument(docNode.id) })
+            .then(_ => {
+                this.refreshDocument(docNode.id)
+                .then(() => {
+                    KEDAnim.push(() => { quillNode.parentNode.removeChild(quillNode) })
+                })
+            })
         })
     })
 }
@@ -1111,14 +1132,16 @@ KEditor.prototype.renderSingle = function (doc) {
             kedDocument.addEventListener('add-tag', (event) => { this.addTagInteract(event.detail.target.getDomNode()); })
 
             htmlnode = kedDocument.getDomNode()
+            const tagNode = htmlnode.querySelector(`#tag-${kedDocument.getRelativeId()}`)
             for (const tag of doc.tags) {
+                if (tagNode.querySelector(`[data-tagid="${tag}"]`)) { continue; }
                 let ktag = this.tags.get(tag)
                 if (!ktag) {
                     ktag = new KTag(tag)
                     ktag.addEventListener('change', this.selectedTag.bind(this))
                     this.tags.set(tag, ktag)
                 }
-                htmlnode.lastElementChild.lastElementChild.insertBefore(ktag.html(), htmlnode.lastElementChild.lastElementChild.firstElementChild)
+                tagNode.insertBefore(ktag.html(), tagNode.firstElementChild)
             }
             if (!refresh) { htmlnode.addEventListener('click', this.submenuEvents.bind(this)) }
             if (this.toHighlight === doc.id) {
@@ -1164,6 +1187,16 @@ KEditor.prototype.renderSingle = function (doc) {
                     let entry = doc['+entries'][j]
                     p.push(this.renderEntry(`${this.baseUrl.toString()}/`, entry))
                 }
+            } else if (!kedDocument.isOpen()) {
+                for (let child = htmlnode.firstElementChild; child;) {
+                    const node = child
+                    child = child.nextElementSibling
+                    if (node.classList.contains('kentry-container')) {
+                        KEDAnim.push(() => {
+                            node.parentNode.removeChild(node)
+                        })
+                    }
+                }
             }
             if (p.length > 0) { htmlnode.classList.add('opened-entries') }
             Promise.all(p)
@@ -1190,8 +1223,10 @@ KEditor.prototype.renderSingle = function (doc) {
                             if (document.getElementById(entryContainer.id)) {
                                 const p = document.getElementById(entryContainer.id).parentNode
                                 p.removeChild(document.getElementById(entryContainer.id))
-                            } 
-                            htmlnode.insertBefore(entryContainer, htmlnode.firstChild.nextElementSibling)
+                            }
+                            let before = htmlnode.firstElementChild
+                            while (before && (before.classList.contains('kmetadata') || before.nodeName === 'FORM')) { before = before.nextElementSibling }
+                            htmlnode.insertBefore(entryContainer, before)
                             entryContainer.classList.add('flowed')
                             break
                     }
@@ -1217,12 +1252,7 @@ KEditor.prototype.renderSingle = function (doc) {
             if (node === null) { return }
             const currentNode = document.getElementById(node.id)
             if (currentNode) {
-                KEDAnim.push(() => {
-                    if (currentNode.parentNode) { currentNode.parentNode.replaceChild(node, currentNode) }
-                })
-                .then(() => {
-                    resolve(node)
-                })
+                resolve(currentNode)
                 return;
             }
             KEDAnim.push(() => {

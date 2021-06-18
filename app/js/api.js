@@ -176,7 +176,10 @@ KEDApi.prototype.post = function(body) {
                     case 405: ret.data = 'Méthode non-supportée'; break
                     case 500: ret.data = 'Serveur en difficulté'; break
                 }
-                this.EvtTarget.dispatchEvent(new ErrorEvent('error', {message: ret.data}))
+                /* object not found can be normal, don't trigger an error display here */
+                if (response.status !== 404) {
+                    this.EvtTarget.dispatchEvent(new ErrorEvent('error', {message: ret.data}))
+                }
                 resolve(ret)
                 return null
             }
