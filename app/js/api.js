@@ -5,8 +5,29 @@ function KEDApi (uri) {
     this.Menshen = new Menshen({version: 2})
 }
 
+KEDApi.prototype.getClientId = function () {
+    return new Promise((resolve, reject) => {
+        this.clientid = localStorage.getItem('ked-client-id')
+        if (!this.clientid) {
+            crypto.subtle.digest(
+                {name: 'SHA-256'},
+                new TextEncoder().encode(`${navigator.userAgent}-${navigator.platform}-${navigator.vendor}-${new Date().toISOString()}`)
+            ).then(hash => {
+                this.clientid = KEDUtils.base64EncodeArrayBuffer(hash)
+                localStorage.setItem('ked-client-id', this.clientid)
+                resolve(this.clientid)
+            })
+            .catch(reason => {
+                reason instanceof Error ? reject(reason) : reject(new Error(reason))
+            })
+        } else {
+            resolve(this.clientid)
+        }
+    })
+}
+
 KEDApi.prototype.addEventListener = function(signal, callback, options) {
-    this.EvtTarget.addEventListener(signal, callaback, options)
+    this.EvtTarget.addEventListener(signal, callback, options)
 }
 
 KEDApi.prototype.removeEventListener = function(signal, callback, options) {
@@ -88,20 +109,10 @@ KEDApi.prototype.fetch = function(url, opts = {}) {
             }
             opts.headers[k]
         }
-        new Promise((resolve, reject) => {
-            const id = 
-                (new Date().getTime()).toString() +
-                (performance.now()).toString() +
-                (navigator.userAgent).toString()
-            crypto.subtle.digest(
-                'SHA-256',
-                new TextEncoder().encode(id)
-            )
-            .then(hash => {
-                opts.headers.set('X-Request-Id', MenshenEncoding.buf2b64(hash))
-                resolve(opts)
-            })
-            .catch(reason => reject(reason))
+        this.getRandomId()
+        .then(rid => {
+            opts.headers.set('X-Request-Id', rid)
+            return opts
         })
         .then(opts => {
             return this.Menshen.fetch(url, opts)
@@ -110,6 +121,37 @@ KEDApi.prototype.fetch = function(url, opts = {}) {
             resolve(response)
         })
         .catch(reason => { reject(reason) })
+    })
+}
+
+KEDApi.prototype.getRandomId = function () {
+    if (!this.getRandomId.count) {
+        this.getRandomId.count = 0
+    }
+    this.getRandomId.count++
+    return new Promise((resolve, reject) => {
+        this.getClientId()
+        .then(clientid => {
+            const rand = crypto.getRandomValues(new Uint8Array(6)) // 8 b64 chars
+            resolve(`${clientid}${this.getRandomId.count}${MenshenEncoding.buf2b64(rand)}`) 
+        })
+        .catch(reason => {
+            reject(reason)
+        })
+    })
+}
+
+KEDApi.prototype.getUrl = function (url) {
+    return new Promise((resolve, reject) => {
+        this.getRandomId()
+        .then(rid => {
+            const resultURL = url instanceof URL ? url : new URL(url)
+            return this.Menshen.qstring(resultURL, 'GET', rid)
+        })
+        .then(url => {
+            resolve(url)
+        })
+        .catch(reason => reject(reason))
     })
 }
 
@@ -134,7 +176,13 @@ KEDApi.prototype.post = function(body) {
                     case 405: ret.data = 'Méthode non-supportée'; break
                     case 500: ret.data = 'Serveur en difficulté'; break
                 }
+                this.EvtTarget.dispatchEvent(new ErrorEvent('error', {message: ret.data}))
                 resolve(ret)
+                return null
+            }
+            if (!response.headers.get('Content-Type').startsWith('application/json')) {
+                resolve({ok: false, netError: false, data: 'Mauvais format de données'})
+                this.EvtTarget.dispatchEvent(new ErrorEvent('error', {message: 'Mauvais format de données'}))
                 return null
             }
             return response.json()
@@ -148,6 +196,7 @@ KEDApi.prototype.post = function(body) {
         })
         .catch(reason => {
             console.log(reason)
+            this.EvtTarget.dispatchEvent(new ErrorEvent('error', {message: reason instanceof Error ? reason.message : resaon}))
             resolve({
                 ok: false,
                 netError: true,

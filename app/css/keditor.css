@@ -1,4 +1,5 @@
 @import url('https://fonts.googleapis.com/css2?family=B612+Mono:wght@400;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=PT+Sans&display=swap');
 @import url('quills.css');
 
 :root {
@@ -12,7 +13,20 @@
     --bg2-color: hsla(245, 65%, 30%, 1);
     --bg2-light-color: hsla(90, 65%, 30%, 0.5);
     --locked-color: hsla(20, 100%, 55%, 1);
+    --alert-border-color: red;
+    --alert-bg-color: hsla(360, 100%, 85%, 1);
+    --alert-color: red;
+    --button-bg-color: hsla(90, 45%, 20%, 1);
+    --button-border-color: black;
+    --button-color: white;
+    --button-bg-active-color: hsla(90, 45%, 40%, 1);
+    --button-border-active-color: black;
+    --button-active-color: black;
+    --button-bg-hover-color: hsla(90, 45%, 30%, 1);
+    --button-border-hover-color: black;
+    --button-hover-color: white;
 }
+
 
 #KEDLogout {
     float: right;
@@ -254,20 +268,34 @@
 }
 
 .kmenu .tools span[data-action], button.kui {
-    background-color: var(--bg2-light-color);
+    background-color: var(--button-bg-color);
+    color: var(--button-color);
+    border: 2px solid var(--button-border-color);
     font-size: 14px;
     cursor: pointer;
-    display: flex;
+    display: inline-flex;
     height: 36px;
+    max-height: 36px;
     align-items: center;
-    font-family: 'B612 Mono', monospace;
-    max-width: 160px;
-    border: none;
-    }
+    justify-content: center;
+    font-family: 'PT Sans', sans-serif;
+    max-width: 180px;
+    min-width: 80px;
+    padding: 0 5px 0 5px;
+}
+
+.kmenu .tools span[data-action]:hover, button.kui:hover {
+    background-color: var(--button-bg-hover-color);
+    color: var(--button-hover-color);
+    border: 2px solid var(--button-border-hover-color);
+}
 
 .kmenu .tools span[data-action]:active, button.kui:active {
-    color: var(--white)
+    background-color: var(--button-bg-active-color);
+    color: var(--button-active-color);
+    border: 2px solid var(--button-border-active-color);
 }
+
 .kmenu .tools .fas, .kmenu .tools .fa {
     font-size: 38px;
     margin: 4px;
@@ -327,6 +355,30 @@
 
 .ktags-tools {
     margin-left: 1ch;
+}
+
+.kederror {
+    border: 2px solid var(--alert-border-color);
+    color: var(--alert-color);
+    background-color: var(--alert-bg-color);
+    padding: 2px;
+    font-size: 14px;
+    font-family: 'PT Sans', sans-serif;
+    min-height: 36px;
+}
+
+.kederror form {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.kederror .message {
+    margin: 0 1ch 0 1ch;
+    flex-grow: 2;
+}
+.kederror .fas {
+    margin: 0 0 0 1ch;
 }
 
 @media only screen and (max-width: 860px) {

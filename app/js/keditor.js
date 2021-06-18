@@ -49,18 +49,14 @@ function KEditor(container, baseUrl) {
     }
 
     /* client id is for each browser */
-    this.clientid = localStorage.getItem('ked-client-id')
-    if (!this.clientid) {
-        crypto.subtle.digest(
-            {name: 'SHA-256'},
-            new TextEncoder().encode(`${navigator.userAgent}-${navigator.platform}-${navigator.vendor}-${new Date().toISOString()}`)
-        ).then(hash => {
-            this.clientid = KEDUtils.base64EncodeArrayBuffer(hash)
-            localStorage.setItem('ked-client-id', this.clientid)
-        })
-    }
-
-    this.authStart()
+    this.API.getClientId()
+    .then(clientid => {
+        this.clientid = clientid
+        this.authStart()
+    })
+    this.API.addEventListener('error', (event) => {
+        this.error(event.message)
+    })
 }
 
 KEditor.prototype.setupPage = function () {
@@ -114,7 +110,6 @@ KEditor.prototype.sseSetup = function() {
 KEditor.prototype.authForm = function (nextTry = false) {
     const form = document.getElementById('KEDAuthForm') || document.createElement('FORM')
     form.id = 'KEDAuthForm'
-    console.log(nextTry)
     form.innerHTML = `<div>
         ${nextTry ? '<div class="error">Erreur d\'authentification</div>' : ''}
         <label for="username"><span>Nom d'utilisateur :</span><input type="text" name="username" value=""></label><br>
@@ -291,9 +286,30 @@ KEditor.prototype.highlight = function (id) {
 }
 
 KEditor.prototype.error = function (data) {
-    if (typeof data === 'string') {
-        alert(data)
+    let str = ''
+    const errorDiv = document.createElement('DIV')
+    errorDiv.classList.add('kederror')
+    if (data instanceof Error) {
+        str = data.message
+    } else if (typeof data === 'string') {
+        str = data
+    } else {
+        str = 'Erreur inconnue'
     }
+    errorDiv.innerHTML = `<form><i class="fas fa-exclamation-circle"> </i><span class="message">${str}</span><button class="kui" type="submit">Ok</button></form>`
+    KEDAnim.push(() => {
+        this.container.insertBefore(errorDiv, this.container.firstElementChild)
+    })
+    errorDiv.addEventListener('submit', (event) => {
+        event.preventDefault()
+        event.stopPropagation()
+        let node = event.target
+        while (node && !node.classList.contains('kederror')) { node = node.parentNode }
+        if (!node.parentNode) { return }
+        KEDAnim.push(() => {
+            node.parentNode.removeChild(node)
+        })
+    }, {capture: true})
 }
 
 KEditor.prototype.getDocument = function (docPath) {
@@ -463,38 +479,103 @@ KEditor.prototype.renderEntry = function (path, entry) {
         if (!entry.type) { resolve(null); return; }
         let htmlnode;
         let subtype = entry.type.split('/', 2)
-        switch(subtype[0]) {
-            case 'video':
-                htmlnode = document.createElement('VIDEO')
-                htmlnode.src =`${path}/${entry.abspath}?mod=${entry.modified}`
-                htmlnode.classList.add('kvideo')
-                htmlnode.setAttribute('width', '200px')
-                htmlnode.setAttribute('height', '200px')
-                htmlnode.setAttribute('controls', '')
-                htmlnode.dataset.edit = 'file'
-                subresolve(htmlnode)
-                return
-            case 'image':
-                htmlnode = document.createElement('A')
-                htmlnode.href = `${path}/${entry.abspath}?mod=${entry.modified}`
-                htmlnode.target = '_blank'
-                htmlnode.style.backgroundImage = `url('${path}/${entry.abspath}!browser?mod=${entry.modified}')`
-                htmlnode.classList.add('klink')
-                htmlnode.dataset.edit = 'file'
-                subresolve(htmlnode)
-                return
-            case 'text':
-                this.API.fetch(new URL(`${path}/${entry.abspath}?mod=${entry.modified}`))
-                .then(response => {
-                    if (!response.ok) { resolve(null); return; }
-                    response.text()
-                    .then(content => {
-                        let type = entry.type
-                        subtype = type.split('/', 2)
-                        console.log(subtype)
-                        if (subtype[1] === undefined) { resolve(null); return }
-                        switch (subtype[1]) {
-                            case 'html':
+        Promise.all([
+            this.API.getUrl(`${path}/${entry.abspath}?mod=${entry.modified}`),
+            this.API.getUrl(`${path}/${entry.abspath}!browser?mod=${entry.modified}`)
+        ])
+        .then(([url1, url2]) => {
+            switch(subtype[0]) {
+                case 'video':
+                    htmlnode = document.createElement('VIDEO')
+                    htmlnode.src = url1
+                    htmlnode.classList.add('kvideo')
+                    htmlnode.setAttribute('width', '200px')
+                    htmlnode.setAttribute('height', '200px')
+                    htmlnode.setAttribute('controls', '')
+                    htmlnode.dataset.edit = 'file'
+                    subresolve(htmlnode)
+                    return
+                case 'image':
+                    htmlnode = document.createElement('A')
+                    htmlnode.href = url1
+                    htmlnode.target = '_blank'
+                    htmlnode.style.backgroundImage = `url('${url2}')`
+                    htmlnode.classList.add('klink')
+                    htmlnode.dataset.edit = 'file'
+                    subresolve(htmlnode)
+                    return
+                case 'text':
+                    this.API.fetch(new URL(`${path}/${entry.abspath}?mod=${entry.modified}`))
+                    .then(response => {
+                        if (!response.ok) { resolve(null); return; }
+                        response.text()
+                        .then(content => {
+                            let type = entry.type
+                            subtype = type.split('/', 2)
+                            if (subtype[1] === undefined) { resolve(null); return }
+                            switch (subtype[1]) {
+                                case 'html':
+                                    let x = document.createElement('HTML')
+                                    x.innerHTML = content
+                                    htmlnode = document.createElement('DIV')
+                                    htmlnode.innerHTML = x.getElementsByTagName('BODY')[0].innerHTML
+                                    htmlnode.classList.add('htmltext')
+                                    subresolve(htmlnode)
+                                    return
+                                case 'x-quill-delta':
+                                    /* we display a transformed version, so keep data as original form */
+                                    this.data.set(entry.id, JSON.parse(content))
+                                    const tmpContainer = document.createElement('DIV')
+                                    const quill = new Quill(tmpContainer)
+                                    quill.setContents(this.data.get(entry.id))
+                                    htmlnode = document.createElement('DIV')
+                                    htmlnode.innerHTML = quill.root.innerHTML
+                                    htmlnode.classList.add('quilltext')
+                                    htmlnode.dataset.edit = 'quills'
+                                    subresolve(htmlnode)
+                                    return
+                                default:
+                                    this.data.set(entry.id, content)
+                                    htmlnode = document.createElement('DIV')
+                                    htmlnode.innerHTML = content
+                                    htmlnode.classList.add('plaintext')
+                                    htmlnode.dataset.edit = 'text'
+                                    subresolve(htmlnode)
+                                    return
+                            }
+                        })
+                        .catch(_ => resolve(null))
+                    })
+                    .catch(_ => resolve(null))
+                    return
+                default: 
+                    switch (entry.type) {
+                        default:
+                            htmlnode = document.createElement('A')
+                            htmlnode.classList.add('klink')
+                            htmlnode.target = '_blank'
+                            htmlnode.href = url1
+                            htmlnode.innerHTML = `<span class="name">${EntryName}</span>`
+                            htmlnode.dataset.edit = 'file'
+                            subresolve(htmlnode)
+                            return
+                        case 'application/pdf':
+                            htmlnode = document.createElement('A')
+                            htmlnode.href = url1
+                            htmlnode.target = '_blank'
+                            htmlnode.style.backgroundImage = `url('${url2}')`
+                            htmlnode.classList.add('klink')
+                            htmlnode.dataset.edit = 'file'
+                            subresolve(htmlnode)
+                            return                       
+                        case 'message/rfc822':
+                            this.API.fetch(new URL(`${path}/${entry.abspath}?mod=${entry.modified}`))
+                            .then(response => {
+                                if (!response.ok) { return null; }
+                                return response.text()
+                            })      
+                            .then(content => {
+                                if (content === null) { return; }
                                 let x = document.createElement('HTML')
                                 x.innerHTML = content
                                 htmlnode = document.createElement('DIV')
@@ -502,71 +583,14 @@ KEditor.prototype.renderEntry = function (path, entry) {
                                 htmlnode.classList.add('htmltext')
                                 subresolve(htmlnode)
                                 return
-                            case 'x-quill-delta':
-                                /* we display a transformed version, so keep data as original form */
-                                this.data.set(entry.id, JSON.parse(content))
-                                const tmpContainer = document.createElement('DIV')
-                                const quill = new Quill(tmpContainer)
-                                quill.setContents(this.data.get(entry.id))
-                                htmlnode = document.createElement('DIV')
-                                htmlnode.innerHTML = quill.root.innerHTML
-                                htmlnode.classList.add('quilltext')
-                                htmlnode.dataset.edit = 'quills'
-                                subresolve(htmlnode)
-                                return
-                            default:
-                                this.data.set(entry.id, content)
-                                htmlnode = document.createElement('DIV')
-                                htmlnode.innerHTML = content
-                                htmlnode.classList.add('plaintext')
-                                htmlnode.dataset.edit = 'text'
-                                subresolve(htmlnode)
-                                return
-                        }
-                    })
-                    .catch(_ => resolve(null))
-                })
-                .catch(_ => resolve(null))
-                return
-            default: 
-                switch (entry.type) {
-                    default:
-                        htmlnode = document.createElement('A')
-                        htmlnode.classList.add('klink')
-                        htmlnode.target = '_blank'
-                        htmlnode.href = `${path}/${entry.abspath}?mod=${entry.modified}`
-                        htmlnode.innerHTML = `<span class="name">${EntryName}</span>`
-                        htmlnode.dataset.edit = 'file'
-                        subresolve(htmlnode)
-                        return
-                    case 'application/pdf':
-                        htmlnode = document.createElement('A')
-                        htmlnode.href = `${path}/${entry.abspath}?mod=${entry.modified}`
-                        htmlnode.target = '_blank'
-                        htmlnode.style.backgroundImage = `url('${path}/${entry.abspath}!browser?mod=${entry.modified}')`
-                        htmlnode.classList.add('klink')
-                        htmlnode.dataset.edit = 'file'
-                        subresolve(htmlnode)
-                        return                       
-                    case 'message/rfc822':
-                        this.API.fetch(new URL(`${path}/${entry.abspath}?mod=${entry.modified}`))
-                        .then(response => {
-                            if (!response.ok) { return null; }
-                            return response.text()
-                        })      
-                        .then(content => {
-                            if (content === null) { return; }
-                            let x = document.createElement('HTML')
-                            x.innerHTML = content
-                            htmlnode = document.createElement('DIV')
-                            htmlnode.innerHTML = x.getElementsByTagName('BODY')[0].innerHTML
-                            htmlnode.classList.add('htmltext')
-                            subresolve(htmlnode)
-                            return
-                        })
-                        break;
-                }
-        }
+                            })
+                            break;
+                    }
+            }
+        })
+        .catch(reason => {
+            reject(reason)
+        })
     })
 }
 
@@ -1184,6 +1208,10 @@ KEditor.prototype.renderSingle = function (doc) {
                 }
                 resolve(htmlnode)
             })
+            .catch(reason => {
+                const str = reason instanceof Error ? reason.message : reason
+                this.error(`Impossible d'affcher les entrées, "${str}"`)
+            })
         }))
         .then(node => {
             if (node === null) { return }
@@ -1218,6 +1246,7 @@ KEditor.prototype.renderSingle = function (doc) {
                 resolve(node)
             })
         })
+
     })
 }
 

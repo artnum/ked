@@ -57,6 +57,26 @@ class http {
         header('Accept-Charset: utf-8');
         header('Accept: application/json');
         header('Cache-Control: no-store', true);
+        switch($this->outputType) {
+            case 'json':
+                header('Content-Type: application/json', true); break;
+            case 'html':
+                header('Content-Type: text/html', true); break;
+            case 'text':
+                header('Content-Type: text/plain', true); break;
+        }
+    }
+
+    function setJsonOut () {
+        $this->outputType = 'json';
+    }
+
+    function setHtmlOut() {
+        $this->outputType = 'html';
+    }
+
+    function setTextOut() {
+        $this->outputType = 'text';
     }
 
     function errorUnsupportedMethod () {
@@ -118,7 +138,7 @@ class http {
     }
 
     function printDir ($dir, $childs) {
-        header('Content-Type: text/html');
+        $this->setHtmlOut();
         $root = false;
         if (in_array('root', $dir['+class'])) { $root = true; }
 
@@ -304,6 +324,7 @@ class http {
                 if (!isset($body['path'])) {
                     if (!empty($_SERVER['PATH_INFO'])) { $body['path'] = str_replace('/', '', $_SERVER['PATH_INFO']); }
                 }
+                $this->setJsonOut();
                 $this->postOperation($body);
                 break;
             case 'head':
