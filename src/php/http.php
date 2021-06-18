@@ -26,6 +26,7 @@ class http {
             'disable-apache-browse' => false,
             'disable-task' => false
         ];
+        $this->outputType = '';
     }
 
     function config(string $name, $value = null) {
