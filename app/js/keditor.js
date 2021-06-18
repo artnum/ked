@@ -131,6 +131,9 @@ KEditor.prototype.authForm = function (nextTry = false) {
                 if (!has) {
                     form.dataset.importAuth = '1'
                     document.getElementById('privImport').style.removeProperty('display')
+                } else {
+                    form.dataset.importAuth = '0'
+                    document.getElementById('privImport').style.setProperty('display', 'none')
                 }
             })
         }
