@@ -283,6 +283,15 @@
     display: inline-block;
 }
 
+.ksubmenu {
+    margin: 4px 0 2px 0;
+}
+
+.ktool {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+}
 .kmenu .tools span[data-action], button.kui {
     background-color: var(--button-bg-color);
     color: var(--button-color);
@@ -340,10 +349,6 @@ button.danger.kui:active {
 .kmenu .tools .fas, .kmenu .tools .fa {
     font-size: 38px;
     margin: 4px;
-}
-
-.kmenu .search {
-    float: right;
 }
 
 .kmenu .search form {
@@ -430,10 +435,7 @@ button.danger.kui:active {
     }
     .ktags {
         clear: both;
-        height: 3em;
-    }
-    .ksubmenu {
-        display: none;
+        min-height: 3em;
     }
     .kentry-container.squared {
         width: 100%;

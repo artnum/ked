@@ -68,7 +68,7 @@ function KEditor(container, baseUrl) {
 KEditor.prototype.setupPage = function () {
     this.headerMenu = document.createElement('DIV')
     this.headerMenu.classList.add('kmenu')
-    this.headerMenu._tools = '<div><div class="tools"><span data-action="add-document"><i class="fas fa-folder-plus"></i> Nouveau document</span></div>' +
+    this.headerMenu._tools = '<div class="ktool"><div class="tools"><span data-action="add-document"><i class="fas fa-folder-plus"></i> Nouveau document</span></div>' +
         '<div class="search"><form name="search"><input type="text" name="search" value=""/> <button class="kui" type="submit">Rechercher</button></form></div></div>'
     this.headerMenu.addEventListener('click', this.menuEvents.bind(this))
     this.headerMenu.addEventListener('submit', this.menuFormSubmit.bind(this))

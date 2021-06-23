@@ -43,20 +43,18 @@ function KEDDocument (doc) {
         }
      
         kedDocument.domNode.innerHTML = 
-            `<div class="kmetadata ${doc['+childs'] > 0 ? 'childs' : 'no-child'}">
-            ${task.is ? (task.done ? '<i data-action="set-task-undone" class="fas fa-clipboard-check"></i>' : '<i data-action="set-task-done" class="fas fa-clipboard"></i>'): ''}
-            <span id="name-${doc.id}">${doc.name}</span>
-            <div class="navigation indicator"><span data-action="open-document" class="forward"><i class="fas fa-arrow-right"></i></span></div>
-            <div class="has-childs indicator"><span data-action="toggle-entries"><i name="open" class="fas fa-folder"></i></span></div>
-            <div class="ksubmenu">
-            <span data-action="add-text"><i class="fas fa-file-alt"></i></span>
-            <span data-action="upload-file"><i class="fas fa-cloud-upload-alt"></i></span>
-            ${!task.is ? '<span data-action="to-task"><i class="fas fa-tasks"></i></span>' : 
-                '<span data-action="to-not-task" class="fa-stack"><i class="fas fa-tasks fa-stack-1x"></i><i class="fas fa-slash fa-stack-1x"></i></span>'}
-            <span data-action="delete-document"><i class="fas fa-trash"></i></span>
-            </div>
-            <div id="tag-${doc.id}" class="ktags"><span class="ktags-tools" data-action="add-tag"><i class="fas fa-plus-circle"></i></span></div>
-            </div>`
+            `<div class="kmetadata ${doc['+childs'] > 0 ? 'childs' : 'no-child'}">` +
+            `${task.is ? (task.done ? '<i data-action="set-task-undone" class="fas fa-clipboard-check"></i>' : '<i data-action="set-task-done" class="fas fa-clipboard"></i>'): ''}` +
+            `<span id="name-${doc.id}">${doc.name}</span>` +
+            `<div class="navigation indicator"><span data-action="open-document" class="forward"><i class="fas fa-arrow-right"></i></span></div>` +
+            `<div class="has-childs indicator"><span data-action="toggle-entries"><i name="open" class="fas fa-folder"></i></span></div>` +
+            `<div class="ksubmenu">` +
+            `<button class="kui small" data-action="add-text"><i class="fas fa-file-alt"> </i>&nbsp;Texte</button>` +
+            `<button class="kui small" data-action="upload-file"><i class="fas fa-cloud-upload-alt"> </i>&nbsp;Fichier</button>` +
+            `<button class="kui small danger" data-action="delete-document"><i class="fas fa-trash"> </i>&nbsp;Supprimer</button>` +
+            `</div>` +
+            `<div id="tag-${doc.id}" class="ktags"><span class="ktags-tools" data-action="add-tag"><i class="fas fa-plus-circle"></i></span></div>` +
+            `</div>`
     }
 
     if (doc['+lock']) {
