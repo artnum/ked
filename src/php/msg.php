@@ -24,8 +24,8 @@ class msg {
         socket_close($this->socket);
     }
 
-    function exit() {
-        $this->msg('exit');
+    function exit($clientid) {
+        $this->msg('exit:' . $clientid);
     }
 
     function lock ($id, $clientid) {
@@ -36,16 +36,28 @@ class msg {
         $this->msg('unlock:' . $id . '\\' . $clientid);
     }
 
-    function update ($id) {
-        $this->msg('update:' . $id);
+    function update ($id, $clientid) {
+        if ($clientid === null) {
+            $this->msg('update:' . $id);
+        } else {
+            $this->msg('update:' . $id . '\\' . $clientid);
+        }
     }
 
-    function delete ($path) {
-        $this->msg('delete:' . $path);
+    function delete ($path, $clientid) {
+        if ($clientid === null) {
+            $this->msg('delete:' . $path);
+        } else {
+            $this->msg('delete:' . $path . '\\' . $clientid);
+        }
     }
 
-    function create($id) {
-        $this->msg('create:' . $id);
+    function create($id, $clientid) {
+        if ($clientid === null) {
+            $this->msg('create:' . $id);
+        } else {
+            $this->msg('create:' . $id . '\\' . $clientid);
+        }
     }
 
     function msg($msg) {

@@ -15,6 +15,7 @@ class high extends ked {
     protected $store = null;
     protected $maxTextSize = 20480;
     protected $inlinePicture = true;
+    protected $locker = null;
 
     function disableInlinePicture() {
         $this->inlinePicture = false;
@@ -35,6 +36,10 @@ class high extends ked {
             return true;
         }
         return false;
+    }
+
+    function setLocker (state $locker) {
+        $this->locker = $locker;
     }
 
     function createStorePath (string $path):bool {
@@ -109,6 +114,9 @@ class high extends ked {
         if (!$res) { $this->ldapFail($this->conn); return null; }
         for ($entry = @ldap_first_entry($this->conn, $res); $entry; $entry = @ldap_next_entry($this->conn, $entry)) {
             $object = $this->getLdapObject($this->conn, $entry);
+            if ($this->locker) {
+                $object['+lock'] = $this->locker->islocked($object['__dn']);
+            }
             $h = $this->getEntryHistory($currentDir, $object['id']);
             $object['+history'] = [];
             foreach ($h as $_h) {
@@ -272,6 +280,10 @@ class high extends ked {
     function getDocument (string $docDn, $extended = false):array {
         $document = parent::getDocument($docDn);
 
+        if ($this->locker) {
+            $document['+lock'] = $this->locker->islocked($document['__dn']);
+        }
+
         $document['+childs'] = $this->countDocumentChilds($document['__dn']);
         if ($extended) {
             $document['+entries'] = $this->listDocumentEntries($document['__dn']);
@@ -287,6 +299,14 @@ class high extends ked {
         $document = $this->filterConvertResult($document);
 
         return $document;
+    }
+
+    function getEntry (string $entryDn) {
+        $entry = $this->getCurrentEntryByDn($entryDn);
+        if ($entry) {
+            $entry = $this->filterConvertResult($entry);
+        }
+        return $entry;
     }
 
     function search(string $term, $limits = [-1, -1]) {

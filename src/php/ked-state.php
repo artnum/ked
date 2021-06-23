@@ -81,7 +81,7 @@ class state {
         return;
     }
 
-    function lock ($clientid, $objectdn) {
+    function lock ($clientid, $objectdn, &$currentLock) {
         $object = [
             'objectClass' => 'kedState',
             'kedId' => $clientid,
@@ -91,7 +91,8 @@ class state {
             'kedType' => 'lock'
         ];
         
-        if ($this->islocked($objectdn)) { return false; }
+        $currentLock = $this->islocked($objectdn);
+        if ($currentLock && $currentLock !== $clientid) { return false; }
         $dn = 'kedId=' . ldap_escape($clientid, '', LDAP_ESCAPE_DN) . '+kedType=lock+kedContent=' . ldap_escape($object['kedContent'], '', LDAP_ESCAPE_DN)  . ',' . $this->base;
         $res = @ldap_read($this->ldap, $dn, '(objectclass=*)', [ 'kedTimestamp' ]);
         if ($res) {
@@ -118,12 +119,15 @@ class state {
             $this->ldap,
             $this->base, 
             '(&(kedObjectDn=' . ldap_escape($objectdn, '', LDAP_ESCAPE_FILTER) . ')(kedType=lock))',
-            [ 'kedTimestamp' ]
+            [ 'kedTimestamp', 'kedId' ]
         );
         if (!$res) { return false; }
         $entry = @ldap_first_entry($this->ldap, $res);
         if (!$entry) { return false; }
-        return ldap_get_dn($this->ldap, $entry);
+        $clientid = @ldap_get_values($this->ldap, $entry, 'kedId');
+        if (!$clientid) { return false; }
+        if ($clientid['count'] < 1) { return false; }
+        return $clientid[0];
     }
 
     function haslock($clientid, $objectdn) {

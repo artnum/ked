@@ -12,12 +12,17 @@ class http {
     protected $msg;
     protected $acl;
     protected $user;
+    protected $clientid;
+    protected $requestid;
     function __construct(high $ked, msg $msg = null)
     {
         $this->ked = $ked;
         $this->msg = $msg;
+        $this->requestid = null;
+        $this->clientid = null;
         $this->acl = new ACL($this->ked);
         $this->states = new state($this->ked->getBase(), $this->ked->getLdapConn(true));
+        $this->ked->setLocker($this->states);
         $this->responseStarted = false;
         $this->user = null;
         $this->userStore = null;
@@ -27,6 +32,7 @@ class http {
             'disable-task' => false
         ];
         $this->outputType = '';
+        $this->processHeaders();
     }
 
     function config(string $name, $value = null) {
@@ -36,6 +42,15 @@ class http {
         }
         $this->configuration[$name] = $value;
         return $this->configuration[$name];
+    }
+
+    function processHeaders () {
+        if (!empty($_SERVER['HTTP_X_CLIENT_ID'])) {
+            $this->clientid = $_SERVER['HTTP_X_CLIENT_ID'];
+        }
+        if (!empty($_SERVER['HTTP_X_REQUEST_ID'])) {
+            $this->requestid = $_SERVER['HTTP_X_REQUEST_ID'];
+        }
     }
 
     function config_merge($config) {
@@ -405,7 +420,7 @@ class http {
                 }
                 $id = $this->ked->addDocumentTag($body['path'], $body['tag']);
                 if ($id === null) { $this->errorNotFound(); }
-                if ($this->msg) { $this->msg->update($id); }
+                if ($this->msg) { $this->msg->update($id, $this->clientid); }
                 $this->ok(json_encode(['id' => $id]));
                 break;
             case 'create-document':
@@ -432,7 +447,7 @@ class http {
                 }
                 $id = $this->ked->addDocument($body['name'], $parent, $application, $tags);
                 if ($id === null) { $this->errorUnableToOperate(); }
-                if ($this->msg) { $this->msg->create($this->ked->idFromPath($id)); }
+                if ($this->msg) { $this->msg->create($this->ked->idFromPath($id), $this->clientid); }
                 $this->ok(json_encode(['id' => $id]));
                 break;
             case 'list-document':
@@ -462,6 +477,14 @@ class http {
                 if (!$this->acl->can($this->user, 'access', $docDn)) { $this->errorForbidden(); }
                 $document = $this->ked->getDocument($docDn, true);
                 $this->ok(json_encode($document));
+                break;
+            case 'get-entry':
+                if (empty($body['path'])) { $this->errorBadRequest(); }
+                $entryDn = $this->ked->pathToDn($body['path'], false);
+                if ($entryDn === null) { $this->errorNotFound(); }
+                if (!$this->acl->can($this->user, 'access', $entryDn)) { $this->errorForbidden(); }
+                $entry = $this->ked->getEntry($entryDn);
+                $this->ok(json_encode(['entry' => $entry]));
                 break;
             case 'add-entry':
             case 'update-entry':
@@ -520,7 +543,7 @@ class http {
                 if ($id === null) { $this->errorUnableToOperate(); }
                 if ($this->msg) { 
                     $path = explode(',', $id);
-                    $this->msg->update($path[count($path) - 2]); 
+                    $this->msg->update($path[count($path) - 2], $this->clientid); 
                 }
                 $this->ok(json_encode(['id' => $id]));
                 break;
@@ -528,7 +551,7 @@ class http {
                 if ($this->config('disable-task')) { $this->errorForbidden(); }
                 if (empty($body['path'])) { $this->errorBadRequest(); }
                 if (!$this->ked->anyToNotTask($body['path'])) { $this->errorUnableToOperate(); }
-                if ($this->msg) { $this->msg->create($body['path']); }
+                if ($this->msg) { $this->msg->create($body['path'], $this->clientid); }
                 return $this->ok(json_encode(['path' => $body['path'], 'modified' => true]));
                 break;
             case 'update-task':
@@ -552,7 +575,7 @@ class http {
                     $modified = $this->ked->anyToTask($body['path'], $params);
                 }
                 if (!$modified) { $this->errorUnableToOperate(); }
-                if ($this->msg) { $this->msg->create($body['path']); }
+                if ($this->msg) { $this->msg->create($body['path'], $this->clientid); }
                 $this->ok(json_encode(['path' => $body['path'], 'modified' => $modified]));
                 break;
             case 'delete':
@@ -560,25 +583,26 @@ class http {
                 $anyDn = $this->ked->pathToDn($body['path'], false);
                 if ($anyDn === NULL) { $this->errorNotFound(); }
                 $deleted = $this->ked->deleteByDn($anyDn);
-                if ($this->msg) { $this->msg->delete($this->ked->idFromPath($body['path'])); }
+                if ($this->msg) { $this->msg->delete($this->ked->idFromPath($body['path']), $this->clientid); }
                 $this->ok(json_encode(['path' => $body['path'], 'deleted' => $deleted]));
                 break;
             case 'lock':
-                if (empty($body['clientid'])) { $this->errorBadRequest(); }
+                if ($this->clientid === null) { $this->errorBadRequest(); }
                 if (empty($body['anyid'])) { $this->errorBadRequest(); }
                 $dn = $this->ked->pathToDn($body['anyid']);
                 if (!$dn) { $this->errorNotFound(); }
-                $lock = $this->states->lock($body['clientid'], $dn);
-                if ($lock) { if ($this->msg) { $this->msg->lock($this->ked->idFromPath($body['anyid']), $body['clientid']); } }
-                $this->ok(json_encode(['lock' => $lock ? true : false]));
+                $currentlock = null;
+                $lock = $this->states->lock($this->clientid, $dn, $currentlock);
+                if ($lock) { if ($this->msg) { $this->msg->lock($this->ked->idFromPath($body['anyid']), $this->clientid); } }
+                $this->ok(json_encode(['lock' => $lock ? true : false, 'current' => $currentlock]));
                 break;
             case 'unlock':
-                if (empty($body['clientid'])) { $this->errorBadRequest(); }
+                if ($this->clientid === null) { $this->errorBadRequest(); }
                 if (empty($body['anyid'])) { $this->errorBadRequest(); }
                 $dn = $this->ked->pathToDn($body['anyid']);
                 if (!$dn) { $this->errorNotFound(); }
-                $this->states->unlock($body['clientid'], $dn);
-                if ($this->msg) { $this->msg->unlock($this->ked->idFromPath($body['anyid']), $body['clientid']); }
+                $this->states->unlock($this->clientid, $dn);
+                if ($this->msg) { $this->msg->unlock($this->ked->idFromPath($body['anyid']), $this->clientid); }
                 $this->ok(json_encode(['lock' => false]));
                 break;
             case 'connected':
