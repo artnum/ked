@@ -510,6 +510,38 @@ class high extends ked {
         try {
             /* generate a thumbnail 400x400 max */
             $im = new Imagick($file);
+            switch ($im->getImageOrientation()) {
+                case Imagick::ORIENTATION_TOPLEFT:
+                    break;
+                case Imagick::ORIENTATION_TOPRIGHT:
+                    $im->flopImage();
+                    break;
+                case Imagick::ORIENTATION_BOTTOMRIGHT:
+                    $im->rotateImage("#000", 180);
+                    break;
+                case Imagick::ORIENTATION_BOTTOMLEFT:
+                    $im->flopImage();
+                    $im->rotateImage("#000", 180);
+                    break;
+                case Imagick::ORIENTATION_LEFTTOP:
+                    $im->flopImage();
+                    $im->rotateImage("#000", -90);
+                    break;
+                case Imagick::ORIENTATION_RIGHTTOP:
+                    $im->rotateImage("#000", 90);
+                    break;
+                case Imagick::ORIENTATION_RIGHTBOTTOM:
+                    $im->flopImage();
+                    $im->rotateImage("#000", 90);
+                    break;
+                case Imagick::ORIENTATION_LEFTBOTTOM:
+                    $im->rotateImage("#000", -90);
+                    break;
+                default: // Invalid orientation
+                    break;
+            }
+            $im->setImageOrientation(Imagick::ORIENTATION_TOPLEFT);
+
             $imageType = $im->getImageMimeType();
             $size = $im->getSize();
             $im->setImageFormat('jpeg');
