@@ -15,7 +15,7 @@ KTag.prototype.html = function () {
     }
     node.classList.add('ktag')
     node.dataset.tagid = this.tag
-    node.innerHTML = `<i class="fas fa-hashtag"> </i>${this.tag}`
+    node.innerHTML = `<i class="fas fa-hashtag"></i>${this.tag}`
     node.addEventListener('click', this.toggle.bind(this))
     return node;
 }
@@ -28,6 +28,6 @@ KTag.prototype.toggle = function (event) {
         event.target.classList.add('selected')
         this.state = true
     }
-    this.eventTarget.dispatchEvent(new Event('change', {target: this}))
+    this.eventTarget.dispatchEvent(new CustomEvent('change', {detail: this}))
     return this.state
 }

@@ -85,7 +85,7 @@ class ked {
             $rootTag = $this->findTag('__root__');
             if (!$rootTag) { return false; }
         }
-        
+
         $this->rootTag = $rootTag;
         return true;
     }
@@ -288,6 +288,37 @@ class ked {
         return $related;
     }
 
+    function findActiveTags (array $limits = [100, -1]) {
+        $filter = $this->buildFilter('(&(objectclass=kedDocument)(kedRelatedTag=*))');
+        $res = @ldap_search(
+            $this->conn,
+            $this->base,
+            $filter,
+            [ 'kedRelatedTag' ],
+            0,
+            $limits[0],
+            $limits[1]
+        );
+        if (!$res) { $this->ldapFail($this->conn); return []; }
+        $tags = [];
+        for ($entry = @ldap_first_entry($this->conn, $res); $entry; $entry = ldap_next_entry($this->conn, $entry)) {
+            $values = @ldap_get_values($this->conn, $entry, 'kedRelatedTag');
+            if (!$values) { continue; }
+            if ($values['count'] <= 0) { continue; }
+            for ($i = 0; $i < $values['count']; $i++) {
+                if ($this->rootTag['dn'] === $values[$i]) { continue; } // skip root tag
+                $name = $this->getTagName($values[$i]);    
+                if (!isset($tags[$name])) {
+                    $tags[$name] = [
+                        'count' => 0
+                    ];
+                }
+                $tags[$name]['count']++;
+            }
+        }
+        return $tags;
+    }
+
     function findTag (string $tag, array $limits = [-1, -1]):?array {
         $filter = $this->buildFilter('(&(objectclass=kedTag)(kedIdName=%s))', $this->sanitizeString($tag));
         $res = @ldap_search(
@@ -439,6 +470,7 @@ class ked {
         );
         if (!$res) { $this->ldapFail($this->conn); return $tags; }
         for ($entry = @ldap_first_entry($this->conn, $res); $entry; $entry = @ldap_next_entry($this->conn, $entry)) {
+            if ($this->rootTag['dn'] === ldap_get_dn($this->conn, $entry)) { continue; }
             $value = @ldap_get_values($this->conn, $entry, 'kedIdName');
             if (!$value) { continue; }
             if ($value['count'] <= 0) { continue; }

@@ -359,3 +359,12 @@ KEDApi.prototype.unlock = function (idOrDoc) {
         })
     })
 }
+
+KEDApi.prototype.activeTags = function () {
+    return new Promise(resolve => {
+        this.post({operation: 'get-active-tags'})
+        .then(result => {
+            resolve(result)
+        })
+    })
+}

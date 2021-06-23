@@ -618,6 +618,9 @@ class http {
                 }
                 $this->ok(json_encode(['users' => $display]));
                 break;
+            case 'get-active-tags':
+                $this->ok(json_encode(['tags' => $this->ked->findActiveTags()]));
+                break;
         }
     }
 }

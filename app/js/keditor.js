@@ -65,10 +65,46 @@ function KEditor(container, baseUrl) {
     }
 }
 
+KEditor.prototype.updateActiveTags = function () {
+    this.API.activeTags()
+    .then(result => {
+        if (result.ok) { this.ActiveTags = result.data.tags }
+    })
+}
+
+KEditor.prototype.showTags = function () {
+    const tagOverlay = document.createElement('DIV')
+    tagOverlay.id = 'ktagOverlay'
+    for (const tag in this.ActiveTags) {
+        let ktag = this.tags.get(tag)
+        if (!ktag) {
+            ktag = new KTag(tag)
+            this.tags.set(tag, ktag)
+            ktag.addEventListener('change', _ => {
+                this.selectedTag()
+            })
+        }
+        tagOverlay.appendChild(ktag.html())
+    }
+    const closeButton = document.createElement('BUTTON')
+    closeButton.innerHTML = 'Fermer'
+    closeButton.classList.add('kui')
+    closeButton.addEventListener('click', () => {
+        KEDAnim.push(() => {
+            document.body.removeChild(document.getElementById('ktagOverlay'))
+        })
+    })
+    tagOverlay.appendChild(closeButton)
+    KEDAnim.push(() => { document.body.appendChild(tagOverlay)})
+}
+
 KEditor.prototype.setupPage = function () {
+    this.updateActiveTags()
+    setInterval(this.updateActiveTags.bind(this), 60000)
     this.headerMenu = document.createElement('DIV')
     this.headerMenu.classList.add('kmenu')
-    this.headerMenu._tools = '<div class="ktool"><div class="tools"><span data-action="add-document"><i class="fas fa-folder-plus"></i> Nouveau document</span></div>' +
+    this.headerMenu._tools = '<div class="ktool"><div class="tools"><button class="kui" data-action="add-document"><i class="fas fa-folder-plus"></i> Nouveau document</button></div>' +
+        '<div class="tools"><button class="kui" data-action="show-tags"><i class="fas fa-tags"> </i>&nbsp;Liste des tags</button></div>' +
         '<div class="search"><form name="search"><input type="text" name="search" value=""/> <button class="kui" type="submit">Rechercher</button></form></div></div>'
     this.headerMenu.addEventListener('click', this.menuEvents.bind(this))
     this.headerMenu.addEventListener('submit', this.menuFormSubmit.bind(this))
@@ -806,7 +842,7 @@ KEditor.prototype.menuEvents = function (event) {
     switch(actionNode.dataset.action) {
         case 'history-back': history.back(); break
         case 'add-document':  this.addDocumentInteract(this.cwd); break
-
+        case 'show-tags': this.showTags(); break
     }
 }
 
@@ -1241,14 +1277,22 @@ KEditor.prototype.renderSingle = function (doc) {
             htmlnode = kedDocument.getDomNode()
             const tagNode = htmlnode.querySelector(`#tag-${kedDocument.getRelativeId()}`)
             for (const tag of doc.tags) {
-                if (tagNode.querySelector(`[data-tagid="${tag}"]`)) { continue; }
                 let ktag = this.tags.get(tag)
                 if (!ktag) {
                     ktag = new KTag(tag)
                     ktag.addEventListener('change', this.selectedTag.bind(this))
                     this.tags.set(tag, ktag)
                 }
-                tagNode.insertBefore(ktag.html(), tagNode.firstElementChild)
+                tagDom = tagNode.querySelector(`[data-tagid="${tag}"]`)
+                if (tagDom) {
+                    if (ktag.state) {
+                        tagDom.classList.add('selected')
+                    } else {
+                        tagDom.classList.remove('selected')
+                    }
+                } else {
+                    tagNode.insertBefore(ktag.html(), tagNode.firstElementChild)
+                }
             }
             if (!refresh) { htmlnode.addEventListener('click', this.submenuEvents.bind(this)) }
             if (this.toHighlight === doc.id) {
