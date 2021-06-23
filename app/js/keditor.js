@@ -114,69 +114,73 @@ KEditor.prototype.sseSetup = function() {
 
 KEditor.prototype.authForm = function (nextTry = false) {
     const form = document.getElementById('KEDAuthForm') || document.createElement('FORM')
-    form.id = 'KEDAuthForm'
-    form.innerHTML = `<div>
-        ${nextTry ? '<div class="error">Erreur d\'authentification</div>' : ''}
-        <label for="username"><span>Nom d'utilisateur :</span><input type="text" name="username" value=""></label><br>
-        <label for="password"><span>Mot de passe :</span><input type="password" name="password" value=""></label><br>
-        <label for="keyfile" id="privImport" style="display: none"><span>Clé privée :</span><input type="file" name="keyfile"></label><br>
-        <button type="submit">Authentifier</button>
-        </div>`
-    document.body.appendChild(form)
-    form.addEventListener('change', event => {
-        const data = new FormData(form)
-        if (data.get('username')) {
-            this.API.hasKey(data.get('username'))
-            .then(has => {
-                if (!has) {
-                    form.dataset.importAuth = '1'
-                    document.getElementById('privImport').style.removeProperty('display')
-                } else {
-                    form.dataset.importAuth = '0'
-                    document.getElementById('privImport').style.setProperty('display', 'none')
-                }
-            })
-        }
+    KEDAnim.push(() => {
+        form.innerHTML = `<div>
+            ${nextTry ? '<div class="error">Erreur d\'authentification</div>' : ''}
+            <label for="username"><span>Nom d'utilisateur :</span><input type="text" name="username" value=""></label><br>
+            <label for="password"><span>Mot de passe :</span><input type="password" name="password" value=""></label><br>
+            <label for="keyfile" id="privImport" style="display: none"><span>Clé privée :</span><input type="file" name="keyfile"></label><br>
+            <button type="submit">Authentifier</button>
+            </div>`
     })
-    form.addEventListener('submit', event => {
-        event.preventDefault()
-        const data = new FormData(form)
-        if (form.dataset.importAuth === '1') {
-            this.API.setPassword(data.get('password'))
-            .then(() => {
-                if (document.location.hash.startsWith('#menshen-')) {
-                    const pemkey = document.location.hash.substring(9).replaceAll('-', '+').replaceAll('_', '/').replaceAll('.', '=')
-                    console.log(pemkey)
-                    const key = MenshenEncoding.base64Decode(document.location.hash.substring(9).replaceAll('-', '+').replaceAll('_', '/').replaceAll('.', '='))
-                    console.log(key)
-                    this.API.importAuth(data.get('username'), key)
-                    .then(() => {
-                        this.authNext(data.get('username'), data.get('password'))
-                    })
-                    .catch(reason => {
-                        this.error(reason)
-                    })
-                } else {
-                    const file = data.get('keyfile')
-                    if (file) {
-                        reader = new FileReader()
-                        reader.addEventListener('load', event => {
-                            this.API.importAuth(data.get('username'), event.target.result)
-                            .then(() => {
-                                this.authNext(data.get('username'), data.get('password'))
-                            })
-                        })
-                        reader.readAsArrayBuffer(file)
-                        return
+    if (!form.parentNode) {
+        form.id = 'KEDAuthForm'
+        document.body.appendChild(form)
+        form.addEventListener('change', event => {
+            const data = new FormData(form)
+            if (data.get('username')) {
+                this.API.hasKey(data.get('username'))
+                .then(has => {
+                    if (!has) {
+                        form.dataset.importAuth = '1'
+                        document.getElementById('privImport').style.removeProperty('display')
                     } else {
-                        this.authForm(true)
+                        form.dataset.importAuth = '0'
+                        document.getElementById('privImport').style.setProperty('display', 'none')
                     }
-                }
-            })
-        } else {
-            this.authNext(data.get('username'), data.get('password'))
-        }
-    })
+                })
+            }
+        })
+        form.addEventListener('submit', event => {
+            event.preventDefault()
+            const data = new FormData(form)
+            if (form.dataset.importAuth === '1') {
+                this.API.setPassword(data.get('password'))
+                .then(() => {
+                    if (document.location.hash.startsWith('#menshen-')) {
+                        const pemkey = document.location.hash.substring(9).replaceAll('-', '+').replaceAll('_', '/').replaceAll('.', '=')
+                        console.log(pemkey)
+                        const key = MenshenEncoding.base64Decode(document.location.hash.substring(9).replaceAll('-', '+').replaceAll('_', '/').replaceAll('.', '='))
+                        console.log(key)
+                        this.API.importAuth(data.get('username'), key)
+                        .then(() => {
+                            this.authNext(data.get('username'), data.get('password'))
+                        })
+                        .catch(reason => {
+                            this.error(reason)
+                        })
+                    } else {
+                        const file = data.get('keyfile')
+                        if (file) {
+                            reader = new FileReader()
+                            reader.addEventListener('load', event => {
+                                this.API.importAuth(data.get('username'), event.target.result)
+                                .then(() => {
+                                    this.authNext(data.get('username'), data.get('password'))
+                                })
+                            })
+                            reader.readAsArrayBuffer(file)
+                            return
+                        } else {
+                            this.authForm(true)
+                        }
+                    }
+                })
+            } else {
+                this.authNext(data.get('username'), data.get('password'))
+            }
+        })
+    }
 }
 
 KEditor.prototype.authStop = function () {
