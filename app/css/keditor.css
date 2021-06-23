@@ -47,11 +47,12 @@
     position: fixed;
     top: 0;
     left: 0;
-    width: 100vw;
-    height: 100vh;
+    width: calc(100vw - 24px);
+    height: calc(100vh - 24px);
     margin: 0;
     padding: 12px;
     background-color: var(--overlay-bg-color);
+    overflow: auto;
 }
 
 #ktagOverlay .ktag {
@@ -229,7 +230,7 @@
 .kform-inline {
     display: flex;
     align-items: center;
-    
+    flex-wrap: wrap;
 }
 
 .kform-autocomplete .ktags {

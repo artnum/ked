@@ -421,7 +421,7 @@ class http {
                 $id = $this->ked->addDocumentTag($body['path'], $body['tag']);
                 if ($id === null) { $this->errorNotFound(); }
                 if ($this->msg) { $this->msg->update($id, $this->clientid); }
-                $this->ok(json_encode(['id' => $id]));
+                $this->ok(json_encode(['id' => $id, 'tag' => $body['tag']]));
                 break;
             case 'create-document':
                 $parent = null;

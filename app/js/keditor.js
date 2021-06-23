@@ -928,17 +928,37 @@ KEditor.prototype.addTagInteract = function (docNode) {
         })
     })
     .then (([tag, create]) => {
-        if (!tag) { return }
-        if (create) {
-            this.createTag(tag)
-            .then(result => {
-                this.addDocumentTag(docNode.id, result.data.id)
+        return new Promise(resolve => {
+            if (!tag) { resolve(null); return }
+            if (create) {
+                this.createTag(tag)
+                .then(result => {
+                    this.addTagInteract(docNode)
+                    this.addDocumentTag(docNode.id, result.data.id)
+                    .then(result => {
+                        resolve(result)
+                    })
+                })
+            } else {
                 this.addTagInteract(docNode)
+                this.addDocumentTag(docNode.id, tag)
+                .then(result => {
+                    resolve(result)
+                })
+            }
+        })
+        .then(result => {
+            if (!result.ok) { return; }
+            const ktag = new KTag(result.data.tag)
+            this.tags.set(ktag.tag, ktag)
+            tagNode = docNode.querySelector(`#tag-${result.data.id}`)
+            KEDAnim.push(() => {
+                if (tagNode) {
+                    tagNode.insertBefore(ktag.html(), tagNode.firstElementChild)
+                }
             })
-        } else {
-            this.addDocumentTag(docNode.id, tag)
-            this.addTagInteract(docNode)
-        }
+            this.updateActiveTags()
+        })
     })
     .catch(reason => {
         this.error(reason)
@@ -954,6 +974,9 @@ KEditor.prototype.addDocumentTag = function (path, tag) {
             tag
         }
         this.fetch('', operation)
+        .then(result => {
+            resolve(result)
+        })
         .catch(reason => {
             this.error(reason)
         })
