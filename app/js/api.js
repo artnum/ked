@@ -109,7 +109,11 @@ KEDApi.prototype.fetch = function(url, opts = {}) {
             }
             opts.headers[k]
         }
-        this.getRandomId()
+        this.getClientId()
+        .then(clientId => {
+            opts.headers.set('X-Client-Id', clientId)
+            return this.getRandomId()
+        })
         .then(rid => {
             opts.headers.set('X-Request-Id', rid)
             return opts
@@ -311,6 +315,45 @@ KEDApi.prototype.delete = function (path) {
 KEDApi.prototype.getUsers = function () {
     return new Promise((resolve) => {
         this.post({operation: 'connected'})
+        .then(result => {
+            resolve(result)
+        })
+    })
+}
+
+KEDApi.prototype.getEntry = function (path) {
+    const operation = {
+        operation: 'get-entry',
+        path
+    }
+    return new Promise(resolve => {
+        this.post(operation)
+        .then(result => {
+            resolve(result)
+        })
+    })
+}
+
+KEDApi.prototype.lock = function (idOrDoc) {
+    const operation = {
+        operation: 'lock',
+        anyid: idOrDoc instanceof KEDDocument ? idOrDoc.getId() : idOrDoc    
+    }
+    return new Promise(resolve => {
+        this.post(operation)
+        .then(result => {
+            resolve(result)
+        })
+    })
+}
+
+KEDApi.prototype.unlock = function (idOrDoc) {
+    const operation = {
+        operation: 'unlock',
+        anyid: idOrDoc instanceof KEDDocument ? idOrDoc.getId() : idOrDoc    
+    }
+    return new Promise(resolve => {
+        this.post(operation)
         .then(result => {
             resolve(result)
         })

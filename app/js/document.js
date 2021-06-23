@@ -59,6 +59,10 @@ function KEDDocument (doc) {
             </div>`
     }
 
+    if (doc['+lock']) {
+        kedDocument.state.locked = doc['+lock']
+    }
+
     kedDocument.meta() // set metadata
     kedDocument.register()
     kedDocument.applyStates()
@@ -217,11 +221,26 @@ KEDDocument.prototype.lowlight = function () {
     this.state.highlight = false
 }
 
+KEDDocument.prototype.isLockable = function (api) {
+    return new Promise(resolve => {
+        // not locked so I can 
+        if (!this.state.locked) { resolve(true); return }
+        api.getClientId()
+        .then(clientid => {
+            if (clientid === this.state.locked) { resolve(true); return}
+            resolve(false)
+        })
+    })
+}
+
 KEDDocument.prototype.lock = function (api) {
-    this.state.locked = true
-    api.lock(this)
-    .then(() => {
-        this.applyStates()
+    api.getClientId()
+    .then(clientid => {
+        this.state.locked = clientid
+        api.lock(this)
+        .then(() => {
+            this.applyStates()
+        })
     })
 }
 

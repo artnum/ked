@@ -12,13 +12,15 @@ window.addEventListener('load', (event) => {
         '../js/utils.js',
         '../node_modules/quill/dist/quill.min.js',
         '../node_modules/jsqr/dist/jsQR.js',
+        '../node_modules/lightbox2/dist/js/lightbox-plus-jquery.min.js'
     ]
 
     const csss = [
         '../css/keditor.css',
         '../css/ktags.css',
         '../node_modules/@fortawesome/fontawesome-free/css/all.min.css',
-        '../node_modules/quill/dist/quill.snow.css'
+        '../node_modules/quill/dist/quill.snow.css',
+        '../node_modules/lightbox2/dist/css/lightbox.min.css'
     ]
     
     const allLoaded = []

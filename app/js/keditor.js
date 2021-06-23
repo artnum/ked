@@ -57,6 +57,12 @@ function KEditor(container, baseUrl) {
     this.API.addEventListener('error', (event) => {
         this.error(event.message)
     })
+
+    if (lightbox) {
+        lightbox.option({
+            wrapAround: true
+        })
+    }
 }
 
 KEditor.prototype.setupPage = function () {
@@ -75,10 +81,24 @@ KEditor.prototype.sseSetup = function() {
         try {
             const data = JSON.parse(event.data)
             if (!data.id) { return; }
-            const element = document.querySelector(`div[data-pathid="${data.id}"]`)
-            if (element) {
-                this.refreshDocument(element.id)
-            }
+            new Promise(resolve => {
+                if (data.clientid) {
+                    this.API.getClientId()
+                    .then(clientid => {
+                        if (data.clientid === clientid) { resolve(false) ;}
+                        else { resolve(true) }
+                    })
+                } else {
+                    resolve(true)
+                }
+            })
+            .then(process => {
+                if (!process) { return; }
+                const element = document.querySelector(`div[data-pathid="${data.id}"]`)
+                if (element) {
+                    this.refreshDocument(element.id)
+                }
+            })
         } catch (e) {
             this.error(e)
         }
@@ -426,23 +446,42 @@ KEditor.prototype.buildPath = function (comp0, comp1) {
     if (comp0 !== ',') { return `${comp0},${comp1}`}
 }
 
+KEditor.prototype.updateEntry = function (entryId) {
+    this.API.getEntry(entryId)
+    .then(result => {
+        return result.data.entry
+    })
+    .then(entry => {
+        return this.renderEntry(`${this.baseUrl.toString()}/`, entry)
+    })
+    .then(domNode => {
+        const oldDom = document.getElementById(domNode.id)
+        if (oldDom) {
+            KEDAnim.push(() => {
+                oldDom.parentNode.replaceChild(domNode, oldDom)
+            })
+        }
+    })
+}
+
 KEditor.prototype.edit = {
     quills: function (contentNode, docNode) {
-        if (contentNode.dataset.edition) {
-            const quill = this.editors.get(contentNode.dataset.entryid)
-            this.uploadText(contentNode, JSON.stringify(quill.getContents()), 'text/x-quill-delta')
-            this.editors.delete(contentNode.dataset.entryid)
-            delete quill
-            delete contentNode.dataset.edition
-            KEDDocument.get(docNode.id)
-            .then(doc => {
-                if (doc) { doc.unlock(this) }
-            })
-            return;
-        }
-        KEDDocument.get(docNode.id)
-        .then(doc => {
-            if (doc) { doc.lock(this) }
+        return new Promise(resolve => {
+            if (contentNode.dataset.edition) {
+                resolve(false)
+                const quill = this.editors.get(contentNode.dataset.entryid)
+                this.uploadText(contentNode, JSON.stringify(quill.getContents()), 'text/x-quill-delta')
+                .then(result => {
+                    this.editors.delete(contentNode.dataset.entryid)
+                    delete quill
+                    delete contentNode.dataset.edition
+                    if (result.ok) {
+                        this.updateEntry(result.data.id)
+                    }
+                })
+                return;
+            }
+            resolve(true)
             contentNode.innerHTML = '<div></div>'
             contentNode.dataset.edition = '1'
             let content = this.data.get(contentNode.dataset.entryid)
@@ -452,26 +491,31 @@ KEditor.prototype.edit = {
         })
     },
     text: function (contentNode) {
-        if (contentNode.dataset.edition) {
-            this.uploadText(contentNode, contentNode.firstElementChild.value, 'text/plain')
-            delete contentNode.dataset.edition
-            KEDDocument.get(docNode.id)
-            .then(doc => {
-                if (doc) { doc.unlock(this) }
-            })
-            return;
-        }
-        KEDDocument.get(docNode.id)
-        .then(doc => {
-            if (doc) { doc.lock(this) }
+        return new Promise(resolve => {
+            if (contentNode.dataset.edition) {
+                resolve(false)
+                this.uploadText(contentNode, contentNode.firstElementChild.value, 'text/plain')
+                .then(result => {
+                    delete contentNode.dataset.edition
+                    if (result.ok) {
+                        this.updateEntry(result.data.id)
+                    }
+                })
+                return;
+            }
+            resolve(true)
             contentNode.dataset.edition = '1'
             let content = this.data.get(contentNode.dataset.entryid)
             contentNode.innerHTML = '<textarea style="width: calc(100% - 8px); height: 380px"></textarea>'
             contentNode.firstElementChild.value = content
+            
         })
     },
     file: function (contentNode) {
-        this.uploadFileInteract(contentNode)
+        return new Promise(resolve => {
+            resolve(false)
+            this.uploadFileInteract(contentNode)
+        })
     }
 }
 
@@ -514,6 +558,8 @@ KEditor.prototype.renderEntry = function (path, entry) {
                     htmlnode = document.createElement('A')
                     htmlnode.href = url1
                     htmlnode.target = '_blank'
+                    htmlnode.dataset.lightbox = `${path}`
+                    htmlnode.dataset.title = oname || ''
                     htmlnode.style.backgroundImage = `url('${url2}')`
                     htmlnode.classList.add('klink')
                     htmlnode.dataset.edit = 'file'
@@ -630,7 +676,10 @@ KEditor.prototype.deleteEntryInteract = function (docNode, entryNode) {
         if (confirm) {
             this.API.delete(entryNode.id)
             .then(_ => {
-                this.refreshDocument(docNode.id)
+                const node = document.getElementById(`container-${entryNode.id}`)
+                KEDAnim.push(() => {
+                    if (node) { node.parentNode.removeChild(node) }
+                })
             })
         }
     })
@@ -911,7 +960,7 @@ KEditor.prototype.convertToTaskInteract = function (docNode) {
     const formData = new FormData()
     formData.append('operation', 'to-task')
     if (docNode.dataset.entryid) {
-        formData.append('path', this.buildPath(this.cwd, this.buildPath(docNode.dataset.parentid, docNode.dataset.entryid)))
+        formData.append('path', this.buildPath(this.cwd, this.buildPath(docNode.id.parentid, docNode.dataset.entryid)))
     } else {
         formData.append('path', this.buildPath(this.cwd, docNode.dataset.pathid))
     }
@@ -1003,15 +1052,14 @@ KEditor.prototype.uploadFile = function (node, event) {
 
 KEditor.prototype.uploadText = function (node, content, type = 'text/plain') {
     const op = node.dataset.entryid ? 'update-entry' : 'add-entry'
-    const path = op === 'update-entry' ? this.buildPath(this.cwd, this.buildPath(node.dataset.parentid, node.dataset.entryid)) :  this.buildPath(this.cwd, node.dataset.pathid)
+    const path = op === 'update-entry' ? node.id :  this.buildPath(this.cwd, node.dataset.pathid)
     const formData = new FormData()
     const name = `${new Date().toISOString()}`
     formData.append('operation', op)
     formData.append('path', path)
     formData.append('file', new File([content], name, {type: `${type};charset=utf-8`}))
     formData.append('_filename', name)
-    this.fetch('', formData)
-    .then(_ => {this.ls()})
+    return this.fetch('', formData)
 }
 
 KEditor.prototype.addTextInteract = function (docNode) {
@@ -1052,35 +1100,90 @@ KEditor.prototype.clear = function () {
 KEditor.prototype.handleToolsEvents = function (event) {
     event.stopPropagation()
     let kcontainerNode = event.target
-
-    while (kcontainerNode && !kcontainerNode.classList.contains('kentry-container')) { kcontainerNode = kcontainerNode.parentNode }
-    if (!kcontainerNode) { return }
-
-    let ktoolsNode = event.target
-    while (ktoolsNode && !ktoolsNode.dataset?.action) { ktoolsNode = ktoolsNode.parentNode}
-    if (!ktoolsNode) { return }
-
+    
     let docNode = kcontainerNode
     while (docNode && !docNode.classList.contains('document')) {
         docNode = docNode.parentNode
     }
 
-    switch(ktoolsNode.dataset.action) {
-        case 'delete-entry':
-            this.deleteEntryInteract(docNode, kcontainerNode.firstElementChild)
-            break;
-        case 'edit-entry':
-            if (!kcontainerNode.firstElementChild.dataset?.edit) { return }
-            if (!this.edit[kcontainerNode.firstElementChild.dataset.edit]) { return }
-            this.edit[kcontainerNode.firstElementChild.dataset.edit](kcontainerNode.firstElementChild, docNode)
-            break;
-        case 'to-task':
-            this.convertToTaskInteract(kcontainerNode.firstElementChild)
-            break;
-        case 'to-not-task':
-            this.convertToNotTaskInteract(kcontainerNode.firstElementChild)
-            break;
-    }
+    KEDDocument.get(docNode.id, this.API)
+    .then(doc => {
+        doc.isLockable(this.API)
+        .then(lockable => {        
+            if (!lockable) { return; }
+
+            while (kcontainerNode && !kcontainerNode.classList.contains('kentry-container')) { kcontainerNode = kcontainerNode.parentNode }
+            if (!kcontainerNode) { return }
+
+            let ktoolsNode = event.target
+            while (ktoolsNode && !ktoolsNode.dataset?.action) { ktoolsNode = ktoolsNode.parentNode }
+            if (!ktoolsNode) { return }
+
+            switch(ktoolsNode.dataset.action) {
+                case 'delete-entry':
+                    this.deleteEntryInteract(docNode, kcontainerNode.firstElementChild)
+                    break;
+                case 'edit-entry':
+                    KEDDocument.get(docNode.id, this.API)
+                    .then(doc => {
+                        if (!kcontainerNode.firstElementChild.dataset?.edit) { return }
+                        if (!this.edit[kcontainerNode.firstElementChild.dataset.edit]) { return }
+                        this.edit[kcontainerNode.firstElementChild.dataset.edit](kcontainerNode.firstElementChild, docNode)
+                        .then(onEdit => {
+                            if (onEdit) {
+                                doc.lock(this.API)
+                                const cancel = document.createElement('button')
+                                cancel.innerHTML = '<i class="fas fa-ban"> </i>&nbsp;Annuler'
+                                cancel.classList.add('kui', 'small')
+                                cancel.dataset.action = 'stop-edit'
+                                KEDAnim.push(() => {
+                                    ktoolsNode.innerHTML = '<i class="fas fa-save"> </i>&nbsp;Enregistrer' 
+                                    ktoolsNode.parentNode.insertBefore(cancel, ktoolsNode.nextElementSibling)
+                                })
+                            } else {
+                                doc.unlock(this.API)
+                                KEDAnim.push(() => {
+                                    ktoolsNode.innerHTML = '<i class="fas fa-edit"> </i>&nbsp;Éditer' 
+                                    if (ktoolsNode.nextElementSibling.dataset.action === 'stop-edit') {
+                                        ktoolsNode.parentNode.removeChild(ktoolsNode.nextElementSibling)
+                                    }
+                                })
+                            }
+                        })
+                    })
+                    break;
+                case 'stop-edit':
+                    KEDDocument.get(docNode.id, this.API)
+                    .then(doc => {
+                        doc.unlock(this.API)
+                        this.API.getEntry(kcontainerNode.id.split('-', 2)[1])
+                        .then(result => {
+                            return result.data.entry
+                        })
+                        .then(entry => {
+                            return this.renderEntry(`${this.baseUrl.toString()}/`, entry)
+                        })
+                        .then(domNode => {
+                            const oldNode = document.getElementById(domNode.id)
+                            let editButton = ktoolsNode
+                            while (editButton && editButton.dataset.action !== 'edit-entry') { editButton = editButton.previousElementSibling }
+                            KEDAnim.push(() => {
+                                oldNode.parentNode.replaceChild(domNode, oldNode)
+                                if (editButton) { editButton.innerHTML = '<i class="fas fa-edit"> </i>&nbsp;Éditer' }
+                                ktoolsNode.parentNode.removeChild(ktoolsNode)
+                            })
+                        })
+                    })
+                    break
+                case 'to-task':
+                    this.convertToTaskInteract(kcontainerNode.firstElementChild)
+                    break;
+                case 'to-not-task':
+                    this.convertToNotTaskInteract(kcontainerNode.firstElementChild)
+                    break;
+            }
+        })
+    })
 }
 
 KEditor.prototype.toggleEntriesDisplay = function (kedDocument) {
@@ -1236,11 +1339,8 @@ KEditor.prototype.renderSingle = function (doc) {
                     }
                     const entryTools = document.createElement('DIV')
                     entryTools.classList.add('kentry-tools')
-                    entryTools.innerHTML = `<span data-action="edit-entry"><i class="fas fa-edit"></i></span>
-                        ${nodes[i].dataset.task ? 
-                            '<span data-action="to-not-task" class="fa-stack"><i class="fas fa-tasks fa-stack-1x"></i><i class="fas fa-slash fa-stack-1x"></i></span>' 
-                            : '<span data-action="to-task"><i class="fas fa-tasks"></i></span>'}
-                            <span data-action="delete-entry"><i class="fas fa-trash"></i></span>`
+                    entryTools.innerHTML = `<button class="kui small" data-action="edit-entry"><i class="fas fa-edit"> </i>&nbsp;Éditer</button>`
+                        +`<button class="kui danger small" data-action="delete-entry"><i class="fas fa-trash"></i>&nbsp;Supprimer</button>`
                         + `<span class="name">${nodes[i].dataset.name}</span>`
                     entryTools.addEventListener('click', this.handleToolsEvents.bind(this))
                     entryContainer.appendChild(entryTools)
@@ -1373,22 +1473,4 @@ KEditor.prototype.render = function (root) {
             })
         })
     })
-}
-
-KEditor.prototype.lock = function (idOrDoc) {
-    const operation = {
-        operation: 'lock',
-        clientid: this.clientid,
-        anyid: idOrDoc instanceof KEDDocument ? idOrDoc.getId() : idOrDoc    
-    }
-    return this.fetch('', operation)
-}
-
-KEditor.prototype.unlock = function (idOrDoc) {
-    const operation = {
-        operation: 'unlock',
-        clientid: this.clientid,
-        anyid: idOrDoc instanceof KEDDocument ? idOrDoc.getId() : idOrDoc    
-    }
-    return this.fetch('', operation)
 }
