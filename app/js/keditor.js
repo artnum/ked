@@ -948,6 +948,7 @@ KEditor.prototype.addTagInteract = function (docNode) {
             }
         })
         .then(result => {
+            if (!result) { return; }
             if (!result.ok) { return; }
             const ktag = new KTag(result.data.tag)
             this.tags.set(ktag.tag, ktag)
