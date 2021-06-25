@@ -68,14 +68,17 @@ function KEditor(container, baseUrl) {
 KEditor.prototype.updateActiveTags = function () {
     this.API.activeTags()
     .then(result => {
-        if (result.ok) { this.ActiveTags = result.data.tags }
+        if (result.ok) { 
+            this.ActiveTags = result.data.tags
+        }
     })
 }
 
 KEditor.prototype.showTags = function () {
     const tagOverlay = document.createElement('DIV')
     tagOverlay.id = 'ktagOverlay'
-    for (const tag in this.ActiveTags) {
+    const keys = Object.keys(this.ActiveTags).sort((a, b) => { return a.localeCompare(b) })
+    for (const tag of keys) {
         let ktag = this.tags.get(tag)
         if (!ktag) {
             ktag = new KTag(tag)
@@ -84,7 +87,7 @@ KEditor.prototype.showTags = function () {
                 this.selectedTag()
             })
         }
-        tagOverlay.appendChild(ktag.html())
+        tagOverlay.appendChild(ktag.html(`(${this.ActiveTags[tag].count})`))
     }
     const closeButton = document.createElement('BUTTON')
     closeButton.innerHTML = 'Fermer'

@@ -7,6 +7,11 @@
     text-transform: capitalize;
 }
 
+.ktag .addon {
+    font-size: 0.8em;
+    margin-left: 1ch;
+}
+
 .ktag.selected {
     color: var(--light-bg-color);
     background-color: var(--bg2-color);

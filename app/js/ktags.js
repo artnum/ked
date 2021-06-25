@@ -8,7 +8,7 @@ KTag.prototype.addEventListener = function (type, listener, options) {
     this.eventTarget.addEventListener(type, listener, options)
 }
 
-KTag.prototype.html = function () {
+KTag.prototype.html = function (addon) {
     const node = document.createElement('span')
     if (this.state) {
         node.classList.add('selected')    
@@ -16,6 +16,9 @@ KTag.prototype.html = function () {
     node.classList.add('ktag')
     node.dataset.tagid = this.tag
     node.innerHTML = `<i class="fas fa-hashtag"></i>${this.tag}`
+    if (typeof addon === 'string') {
+        node.innerHTML += `<span class="addon">${addon}</span>`
+    }
     node.addEventListener('click', this.toggle.bind(this))
     return node;
 }
