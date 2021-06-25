@@ -1,4 +1,5 @@
 <?php
+exit(0); // disabled
 include ('vendor/autoload.php');
 
 use Sabre\DAV;
