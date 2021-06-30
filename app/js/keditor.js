@@ -5,9 +5,11 @@ function KEditor(container, baseUrl) {
     this.baseUrl = baseUrl
     this.cwd = ''
 
+    this.title = KED.title ?? 'Sans titre'
+    this.pushState('path', '', this.title)
+
     this.tags = new Map()
     this.LockedNotFound = new Map()
-
     this.quillOpts = {
         theme: 'snow',
         modules: {
@@ -40,9 +42,35 @@ function KEditor(container, baseUrl) {
     //this.container.addEventListener('click', this.interact.bind(this))
     window.addEventListener('popstate', event => {
         if (event.state === null) { this.setPath('') }
-        else { this.setPath(event.state.path) }
-        this.clear()
-        this.ls()
+        else { 
+            this.popingState = true
+            this.setTitle(event.state.title)
+            switch (event.state.type) {
+                case 'path':
+                    for(const tag of this.tags) {
+                        tag[1].unset()
+                    }
+                    this.cwd = event.state.content
+                    this.clear()
+                    this.ls()
+                    break
+                case 'tags':
+                    const tags = event.state.content
+                    for(const tag of this.tags) {
+                        if (tags.indexOf(tag[1].tag) === -1) {
+                            tag[1].unset()
+                        } else {
+                            tag[1].set()
+                        }
+                    }
+                    this.selectedTag()
+                    break
+                case 'search':
+                    this.search(event.state.content)
+                    break
+
+            }
+        }
     })
     if (!window.location?.hash?.startsWith('#menshen-')) {
         this.cwd = window.location.hash.substring(1)
@@ -71,6 +99,15 @@ KEditor.prototype.updateActiveTags = function () {
         if (result.ok) { 
             this.ActiveTags = result.data.tags
         }
+    })
+}
+
+KEditor.prototype.setTitle = function (title) {
+    this.title = title
+    document.title = `[ked] ${this.title}`
+    KEDAnim.push(() => {  
+        const h = this.headerMenu.getElementsByClassName('kmenu-title')[0]
+        if (h) { h.innerHTML = this.title }
     })
 }
 
@@ -285,7 +322,6 @@ KEditor.prototype.authNext = function (username, password) {
         }
         this.setupPage()
         this.sseSetup()
-        this.replaceState()
         this.ls()
     })
 }
@@ -411,11 +447,29 @@ KEditor.prototype.ls = function () {
         this.API.listDocument(this.cwd)
         .then(result =>{
             if (!result.ok) { this.error(result.data); return }
+        
+            if (this.cwd !== '') {
+                const cwd = this.cwd
+                this.getInfo(cwd)
+                .then(info => {
+                    this.setTitle(info.name)
+                    this.pushState('path', cwd)
+                })
+            } else {
+                this.setTitle(KED.title ?? 'Sans titre')
+            }
+
             return this.render(result.data)
         })
         .then(_ => resolve())
         .catch(reason => reject(reason))
     })
+}
+
+KEditor.prototype.resetTag = function () {
+    for (const tag of this.tags) {
+        tag[1].unset()
+    }
 }
 
 KEditor.prototype.selectedTag = function (event) {
@@ -425,10 +479,11 @@ KEditor.prototype.selectedTag = function (event) {
             tags.push(tag[1].tag)
         }
     }
+    this.pushState('tags', tags)
+    this.setTitle(tags.map(t => `#${t}`).join(', '))
     if (tags.length === 0) {
         return this.ls()
     }
-    
     this.API.searchByTags(tags)
     .then(result => {
         if (!result.ok) { this.error(result.data); return}
@@ -436,15 +491,21 @@ KEditor.prototype.selectedTag = function (event) {
     })
 }
 
-
-KEditor.prototype.pushState = function (path) {
-    path = path || this.cwd
-    const url = `${String(window.location).split('#')[0]}${this.cwd === '' ? '' : '#'}${path}`
-    if (history.state.url === url) {
-        history.replaceState({path}, 'KED', url)
-        return;
+KEditor.prototype.pushState = function (type, content, title = undefined) {
+    /* popstate set this flag, so we avoid pushing the same state when coming from popstate */
+    if (this.popingState) { this.popingState = false; return }
+    let url
+    if (type === 'path') {
+        path = content || this.cwd
+        url = `${String(window.location).split('#')[0]}${this.cwd === '' ? '' : '#'}${path}`
+    } else {
+        url = String(window.location)
     }
-    history.pushState({path}, 'KED', url)
+    history.pushState({
+        type,
+        content,
+        title: title || this.title
+    }, 'KED', url)
 }
 
 KEditor.prototype.replaceState = function () {
@@ -457,8 +518,11 @@ KEditor.prototype.setPath = function (path) {
 }
 
 KEditor.prototype.cd = function (abspath) {
+    if (!this.previousPath) {
+        this.previousPath = []
+    }
+    this.previousPath.push(this.cwd)
     this.cwd = abspath
-    this.pushState()
 }
 
 KEditor.prototype.interact = function (event) {
@@ -471,7 +535,7 @@ KEditor.prototype.interact = function (event) {
         case 'click':
             if (node.dataset.childs <= 0) { return }
             this.cd(node.id)           
-            window.history.pushState({path: this.cwd}, '')
+            window.history.pushState({type: 'path', content: this.cwd}, '')
             this.ls()
             break
     }
@@ -837,7 +901,14 @@ KEditor.prototype.dropEntry = function (event) {
 KEditor.prototype.menuFormSubmit = function (event) {
     event.preventDefault()
     const formData = new FormData(event.target)
+    this.search(formData)
+}
+
+KEditor.prototype.search = function (formData) {
+    this.pushState('search', formData)
+    this.previousPath.push(this.cwd)
     const searchTerm = formData.get('search')
+    this.setTitle(`Recherche "${searchTerm}"`)
     const operation = {
         operation: 'search',
         term: searchTerm
@@ -855,7 +926,7 @@ KEditor.prototype.menuEvents = function (event) {
     if (!actionNode) { return }
 
     switch(actionNode.dataset.action) {
-        case 'history-back': history.back(); break
+        case 'history-back': this.cwd = this.previousPath.pop(); this.resetTag(); this.ls(); break
         case 'add-document':  this.addDocumentInteract(this.cwd); break
         case 'show-tags': this.showTags(); break
     }
@@ -1486,21 +1557,11 @@ KEditor.prototype.render = function (root) {
 
     if (this.cwd === '') {
         KEDAnim.push(() => {
-            this.headerMenu.innerHTML = `<span class="kmenu-title">${KED.title ?? ''}</span>${this.headerMenu._tools}`
-            document.title = `[ked] ${KED.title ?? ''}`
+            this.headerMenu.innerHTML = `<span class="kmenu-title">${this.title}</span>${this.headerMenu._tools}`
         })
     } else {
         KEDAnim.push(() => {
-            this.headerMenu.innerHTML = `<span data-action="history-back" class="back"><i class="fas fa-arrow-left"></i></span><span class="kmenu-title"></span>${this.headerMenu._tools}`
-        })
-        .then (_ => {
-            return this.getInfo(this.cwd)
-        })
-        .then(info => {
-            KEDAnim.push(() => {
-                this.headerMenu.getElementsByClassName('kmenu-title')[0].innerHTML = info.name
-                document.title = `[ked] ${info.name}`
-            })
+            this.headerMenu.innerHTML = `<span data-action="history-back" class="back"><i class="fas fa-arrow-left"></i></span><span class="kmenu-title">${this.title}</span>${this.headerMenu._tools}`
         })
     }
 

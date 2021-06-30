@@ -20,6 +20,14 @@ KTag.prototype.html = function (addon) {
         node.innerHTML += `<span class="addon">${addon}</span>`
     }
     node.addEventListener('click', this.toggle.bind(this))
+    this.addEventListener('set-state', function (event) {
+        const tag = event.detail
+        if (tag.state) {
+            if (!this.classList.contains('selected')) { this.classList.add('selected') }
+        } else {
+            this.classList.remove('selected')
+        }
+    }.bind(node))
     return node;
 }
 
@@ -33,4 +41,16 @@ KTag.prototype.toggle = function (event) {
     }
     this.eventTarget.dispatchEvent(new CustomEvent('change', {detail: this}))
     return this.state
+}
+
+KTag.prototype.unset = function () {
+    this.state = false
+    this.eventTarget.dispatchEvent(new CustomEvent('set-state', {detail: this}))
+    return this.state
+}
+
+KTag.prototype.set = function () {
+    this.state = true
+    this.eventTarget.dispatchEvent(new CustomEvent('set-state', {detail: this}))
+    return this.state   
 }
