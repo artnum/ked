@@ -4,6 +4,7 @@ function KEditor(container, baseUrl) {
     this.container = container
     this.baseUrl = baseUrl
     this.cwd = ''
+    this.previousPath = []
 
     this.title = KED.title ?? 'Sans titre'
     this.pushState('path', '', this.title)
@@ -66,7 +67,7 @@ function KEditor(container, baseUrl) {
                     this.selectedTag()
                     break
                 case 'search':
-                    this.search(event.state.content)
+                    this.search(this.json2FormData(event.state.content))
                     break
 
             }
@@ -91,6 +92,23 @@ function KEditor(container, baseUrl) {
             wrapAround: true
         })
     }
+}
+
+KEditor.prototype.formData2Json = function (formData) {
+    const object = {}
+    for (const k of formData.keys()) {
+        object[k] = formData.get(k)
+    }
+    return JSON.stringify(object)
+}
+
+KEditor.prototype.json2FormData = function (jsonForm) {
+    const object = JSON.parse(jsonForm)
+    const formData = new FormData()
+    for (const k in object) {
+        formData.append(k, object[k])
+    }
+    return formData
 }
 
 KEditor.prototype.updateActiveTags = function () {
@@ -905,7 +923,7 @@ KEditor.prototype.menuFormSubmit = function (event) {
 }
 
 KEditor.prototype.search = function (formData) {
-    this.pushState('search', formData)
+    this.pushState('search', this.formData2Json(formData))
     this.previousPath.push(this.cwd)
     const searchTerm = formData.get('search')
     this.setTitle(`Recherche "${searchTerm}"`)
