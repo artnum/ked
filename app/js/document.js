@@ -77,7 +77,6 @@ KEDDocument.prototype.handleDragEvent = function (event) {
     event.preventDefault()
     switch (event.type) {
         case 'dragover':
-        case 'dragenter':
             if (!this.domNode.classList.contains('highlight')) {
                 this.domNode.classList.add('highlight')
             }
@@ -243,6 +242,56 @@ KEDDocument.prototype.highlight = function (timer = 0) {
             this.lowlight()
             this.applyStates()
         }, timer * 1000)
+    }
+}
+
+KEDDocument.prototype.uploadStart = function (uploadCount) {
+    const ksubmenu = this.domNode.querySelector('div.ksubmenu')
+    let newCount = true
+    if (!this.uploadInProgress) {
+        this.uploadInProgress = {
+            ksubmenu: ksubmenu,
+            count: uploadCount,
+            currentCount: 0
+        }
+    } else {
+        this.uploadInProgress.count += uploadCount
+        newCount = false
+    }
+    if (newCount) {
+        const newKSubMenu = document.createElement('DIV')
+        newKSubMenu.innerHTML = `Chargement : ${'<i class="fas fa-upload"></i>&nbsp;'.repeat(uploadCount)}`
+        newKSubMenu.classList.add('ksubmenu', 'upload')
+        KEDAnim.push(() => {
+            ksubmenu.parentNode.insertBefore(newKSubMenu, ksubmenu)
+            ksubmenu.parentNode.removeChild(ksubmenu)
+        })
+    } else {
+        const ksubmenu = this.domNode.querySelector('div.ksubmenu')
+        KEDAnim.push(() => { ksubmenu.innerHTML += `${'<i class="fas fa-upload"></i>&nbsp;'.repeat(uploadCount)}` })
+    }
+}
+
+KEDDocument.prototype.uploadNext = function () {
+    const ksubmenu = this.domNode.querySelector('div.ksubmenu')
+    const symbols = ksubmenu.querySelectorAll('i')
+    const currentCount = this.uploadInProgress.currentCount
+    this.uploadInProgress.currentCount++
+    KEDAnim.push(() => { symbols[currentCount].classList.add('done') })
+}
+
+KEDDocument.prototype.uploadEnd = function () {
+    if (this.uploadInProgress.currentCount >= this.uploadInProgress.count) {
+        const newKSubMenu = this.domNode.querySelector('div.ksubmenu')
+        const ksubmenu = this.uploadInProgress.ksubmenu
+        delete this.uploadInProgress
+        setTimeout(() => {
+            KEDAnim.push(() => {
+                if (!newKSubMenu) { return }
+                newKSubMenu.parentNode.insertBefore(ksubmenu, newKSubMenu)
+                newKSubMenu.parentNode.removeChild(newKSubMenu)
+            })
+        }, 1500)
     }
 }
 

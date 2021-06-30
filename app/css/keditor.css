@@ -312,6 +312,17 @@
     margin: 4px 0 2px 0;
 }
 
+.ksubmenu.upload {
+    font-size: 10px;
+}
+.ksubmenu.upload i{
+    font-size: 18px;
+}
+.ksubmenu.upload i.done{
+    color: var(--button-bg-color);
+    font-size: 18px;
+}
+
 .ktool {
     display: flex;
     flex-wrap: wrap;

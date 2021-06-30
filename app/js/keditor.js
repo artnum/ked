@@ -208,9 +208,7 @@ KEditor.prototype.authForm = function (nextTry = false) {
                 .then(() => {
                     if (document.location.hash.startsWith('#menshen-')) {
                         const pemkey = document.location.hash.substring(9).replaceAll('-', '+').replaceAll('_', '/').replaceAll('.', '=')
-                        console.log(pemkey)
                         const key = MenshenEncoding.base64Decode(document.location.hash.substring(9).replaceAll('-', '+').replaceAll('_', '/').replaceAll('.', '='))
-                        console.log(key)
                         this.API.importAuth(data.get('username'), key)
                         .then(() => {
                             this.authNext(data.get('username'), data.get('password'))
@@ -798,6 +796,12 @@ KEditor.prototype.dropEntry = function (event) {
     while (docNode && !docNode.dataset?.pathid) { docNode = docNode.parentNode }
     if (!docNode) { return }
     const files = event.dataTransfer
+    const getDoc = KEDDocument.get(docNode.id, this.API)
+    const itemQty = files.items.length
+    getDoc
+    .then(doc => {
+        doc.uploadStart(itemQty)
+    })
     let allTransfers = []
     for (let i = 0; i < files.items.length; i++) {
         if (files.items[i].kind === 'file') {
@@ -811,6 +815,10 @@ KEditor.prototype.dropEntry = function (event) {
                 this.fetch('', formData)
                 .then(_ => {
                     resolve()
+                    getDoc
+                    .then(doc => {
+                        doc.uploadNext()
+                    })
                 })
             }))
         }
@@ -819,6 +827,10 @@ KEditor.prototype.dropEntry = function (event) {
     Promise.all(allTransfers)
     .then(_ => {
         this.refreshDocument(docNode.id)
+        getDoc
+        .then(doc => {
+            doc.uploadEnd()
+        })
     })
 }
 
@@ -1092,6 +1104,11 @@ KEditor.prototype.uploadFile = function (node, event) {
     const files = event.target.files
     const op = node.dataset.entryid ? 'update-entry' : 'add-entry'
     const path = op === 'update-entry' ? this.buildPath(docNode.id, node.dataset.entryid) :  docNode.id
+    const getDoc = KEDDocument.get(docNode.id, this.API)
+    getDoc
+    .then(doc => {
+        doc.uploadStart(files.length)
+    })
     let allTransfers = []
     for (let i = 0; i < files.length; i++) {
         allTransfers.push(new Promise ((resolve, reject) => {
@@ -1103,12 +1120,20 @@ KEditor.prototype.uploadFile = function (node, event) {
             this.fetch('', formData)
             .then(_ => {
                 resolve()
+                getDoc
+                .then(doc => {
+                    doc.uploadNext()
+                })
             })
         }))
     }
 
     Promise.all(allTransfers)
     .then(_ => {
+        getDoc
+        .then(doc => {
+            doc.uploadEnd()
+        })
         this.refreshDocument(docNode.id)
     })
 }
