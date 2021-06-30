@@ -55,6 +55,11 @@ function KEDDocument (doc) {
             `</div>` +
             `<div id="tag-${doc.id}" class="ktags"><span class="ktags-tools" data-action="add-tag"><i class="fas fa-plus-circle"></i></span></div>` +
             `</div>`
+
+        kedDocument.domNode.addEventListener('dragenter', kedDocument.handleDragEvent.bind(kedDocument), {capture: true})
+        kedDocument.domNode.addEventListener('dragover', kedDocument.handleDragEvent.bind(kedDocument), {capture: true})
+        kedDocument.domNode.addEventListener('dragleave', kedDocument.handleDragEvent.bind(kedDocument), {capture: true})
+        kedDocument.domNode.addEventListener('drop', kedDocument.handleDropEvent.bind(kedDocument), {capture: true})
     }
 
     if (doc['+lock']) {
@@ -66,6 +71,28 @@ function KEDDocument (doc) {
     kedDocument.applyStates()
 
     return kedDocument
+}
+
+KEDDocument.prototype.handleDragEvent = function (event) {
+    event.preventDefault()
+    switch (event.type) {
+        case 'dragover':
+        case 'dragenter':
+            if (!this.domNode.classList.contains('highlight')) {
+                this.domNode.classList.add('highlight')
+            }
+            break
+        case 'dragleave':
+            this.domNode.classList.remove('highlight')
+            break
+    }
+}
+
+KEDDocument.prototype.handleDropEvent = function (event) {
+    event.preventDefault()
+    event.stopPropagation()
+    this.domNode.classList.remove('highlight')
+    this.dropCallback(event)
 }
 
 KEDDocument.search = function (pathid) {
@@ -119,6 +146,10 @@ KEDDocument.prototype.handleClickEvent = function (event) {
 
 /* events are installed only once */
 KEDDocument.prototype.addEventListener = function (event, callback, options = {}) {
+    if (event === 'drop') {
+        this.dropCallback = callback
+        return
+    }
     if (this.installedEvents.indexOf(event) !== -1) { return }    
     this.EvtTarget.addEventListener(event, callback, options)
     this.installedEvents.push(event)
