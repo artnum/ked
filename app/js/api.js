@@ -97,7 +97,7 @@ KEDApi.prototype.importAuth = function(username, pemkey) {
     return this.KeyStore.importPrivateKey(pemkey, username, '', 'SHA-256')
 }
 
-KEDApi.prototype.fetch = function(url, opts = {}) {
+KEDApi.prototype.fetch = function(url, opts = {}, offlineStore = false) {
     return new Promise((resolve, reject) => {
         if (opts.headers === undefined) {
             opts.headers = new Headers()
@@ -119,10 +119,11 @@ KEDApi.prototype.fetch = function(url, opts = {}) {
             return opts
         })
         .then(opts => {
-            return this.Menshen.fetch(url, opts)
-        })
-        .then(response => {
-            resolve(response)
+            this.Menshen.fetch(url, opts)
+            .then(response => {
+                resolve(response)
+            })
+            .catch(reason => { reject(reason) })
         })
         .catch(reason => { reject(reason) })
     })
@@ -159,12 +160,12 @@ KEDApi.prototype.getUrl = function (url) {
     })
 }
 
-KEDApi.prototype.post = function(body) {
+KEDApi.prototype.post = function(body, offlineStore = false) {
     return new Promise((resolve) => {
         this.fetch(this.uri, {
             method: 'POST',
             body: body instanceof FormData ? body : JSON.stringify(body)
-        })
+        }, offlineStore)
         .then(response => {
             if (!response.ok) {
                 const ret = { 

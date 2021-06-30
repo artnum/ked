@@ -818,7 +818,7 @@ KEditor.prototype.dropEntry = function (event) {
 
     Promise.all(allTransfers)
     .then(_ => {
-        this.ls()
+        this.refreshDocument(docNode.id)
     })
 }
 
@@ -1300,6 +1300,8 @@ KEditor.prototype.renderSingle = function (doc) {
             kedDocument.addEventListener('add-text', (event) => { this.docMustOpen(event.detail.target.getId()); this.addTextInteract(event.detail.target.getDomNode()); })
             kedDocument.addEventListener('upload-file', (event) => { this.docMustOpen(event.detail.target.getId()); this.uploadFileInteract(event.detail.target.getDomNode()); })
             kedDocument.addEventListener('add-tag', (event) => { this.addTagInteract(event.detail.target.getDomNode()); })
+            kedDocument.addEventListener('drop', this.dropEntry.bind(this))
+
 
             htmlnode = kedDocument.getDomNode()
             const tagNode = htmlnode.querySelector(`#tag-${kedDocument.getRelativeId()}`)
@@ -1354,7 +1356,6 @@ KEditor.prototype.renderSingle = function (doc) {
                     })
                     event.preventDefault() 
                 })
-                htmlnode.addEventListener('drop', this.dropEntry.bind(this))
             }
             if ((Array.isArray(doc['+entries']) && doc['+entries'].length >0) || doc['+entries'] > 0) {
                 htmlnode.classList.add('with-entries')
