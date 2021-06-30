@@ -289,7 +289,7 @@ class ked {
     }
 
     function findActiveTags (array $limits = [100, -1]) {
-        $filter = $this->buildFilter('(&(objectclass=kedDocument)(kedRelatedTag=*))');
+        $filter = $this->buildFilter('(&(objectclass=kedDocument)(kedRelatedTag=*)(!(kedDeleted=*)))');
         $res = @ldap_search(
             $this->conn,
             $this->base,
