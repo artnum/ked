@@ -1,4 +1,4 @@
 dn: olcDatabase={1}mdb,cn=config
 changetype: modify
 replace: olcDbIndex
-olcDbIndex: objectClass,kedId eq
+olcDbIndex: objectClass,kedId,kedIdName,kedType,kedObjectDn,kedRelatedTag,kedDeleted,kedName eq
