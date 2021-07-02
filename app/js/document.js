@@ -52,6 +52,7 @@ function KEDDocument (doc, api) {
             `<div class="ksubmenu">` +
             `<button class="kui small" data-action="add-text"><i class="fas fa-file-alt"> </i>&nbsp;Texte</button>` +
             `<button class="kui small" data-action="upload-file"><i class="fas fa-cloud-upload-alt"> </i>&nbsp;Fichier</button>` +
+            `<button class="kui small" data-action="archive-document"><i class="fas fa-archive"> </i>&nbsp;Archiver</button>` +
             `<button class="kui small danger" data-action="delete-document"><i class="fas fa-trash"> </i>&nbsp;Supprimer</button>` +
             `</div>` +
             `<div id="tag-${doc.id}" class="ktags">` +
@@ -147,6 +148,14 @@ KEDDocument.prototype.handleClickEvent = function (event) {
     switch(actionNode.dataset.action) {
         case 'remove-tag':
             this.removeTagInteract(); break
+        case 'archive-document':
+            this.API.archive(this)
+            .then(result => {
+                if (result.ok) {
+                    this.remove();
+                }
+            })
+            break
     }
 
     const newEvent = new CustomEvent(actionNode.dataset.action, {detail: {target: this, eventTarget: actionNode}})

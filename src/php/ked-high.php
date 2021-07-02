@@ -77,7 +77,7 @@ class high extends ked {
         $res = @ldap_list(
             $this->conn,
             $currentDir,
-            '(&(objectClass=kedDocument)(!(kedDeleted=*)))',
+            '(&(objectClass=kedDocument)(!(kedDeleted=*))(!(kedArchived=*)))',
             [ 'dn' ],
             0,
             $limits[0],
@@ -94,7 +94,7 @@ class high extends ked {
         $res = @ldap_list(
             $this->conn,
             $currentDir,
-            '(&(objectClass=kedEntry)(!(kedDeleted=*))(!(kedNext=*)))',
+            '(&(objectClass=kedEntry)(!(kedDeleted=*))(!(kedNext=*))(!(kedArchived=*)))',
             [
                 'objectClass',
                 'kedTimestamp',
@@ -105,7 +105,8 @@ class high extends ked {
                 'kedModified',
                 'kedSignature',
                 'kedApplication',
-                'kedContentReference'
+                'kedContentReference',
+                'kedArchived'
             ],
             0,
             $limits[0],
@@ -144,6 +145,7 @@ class high extends ked {
                 case 'created':
                 case 'taskEnd':
                 case 'taskDone':
+                case 'archived':
                     $entry[$k] = (new DateTime("@$entry[$k]"))->format('c');
                     break;
             }

@@ -629,6 +629,24 @@ class http {
             case 'get-active-tags':
                 $this->ok(json_encode(['tags' => $this->ked->findActiveTags()]));
                 break;
+            case 'archive':
+                if (empty($body['anyid'])) { $this->errorBadRequest(); }
+                $dn = $this->ked->pathToDn($body['anyid']);
+                if (!$dn) { $this->errorNotFound(); }
+                $id = $this->ked->archive($dn);
+                if (!$id) { $this->errorUnableToOperate(); }
+                if ($this->msg) { $this->msg->update($id, $this->clientid); }
+                $this->ok(json_encode(['archive' => $this->ked->idFromPath($body['anyid'])]));
+                break;
+            case 'unarchive':
+                if (empty($body['anyid'])) { $this->errorBadRequest(); }
+                $dn = $this->ked->pathToDn($body['anyid']);
+                if (!$dn) { $this->errorNotFound(); }
+                $id = $this->ked->unarchive($dn);
+                if (!$id) { $this->errorUnableToOperate(); }
+                if ($this->msg) { $this->msg->update($id, $this->clientid); }
+                $this->ok(json_encode(['unarchive' => $this->ked->idFromPath($body['anyid'])]));
+                break;
         }
     }
 }

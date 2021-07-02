@@ -23,6 +23,7 @@ class ked {
         'created'  => ['kedTimestamp', false, false, false],
         'modified' => ['kedModified', false, false, false],
         'deleted' => ['kedDeleted', false, false, false],
+        'archived' => ['kedArchived', false, false, false],
         'signature' => ['kedSignature', false, false, false],
         'application' => ['kedApplication', true, false, false],
         'content' => ['kedContent', false, false, false],
@@ -289,7 +290,7 @@ class ked {
     }
 
     function findActiveTags (array $limits = [100, -1]) {
-        $filter = $this->buildFilter('(&(objectclass=kedDocument)(kedRelatedTag=*)(!(kedDeleted=*)))');
+        $filter = $this->buildFilter('(&(objectclass=kedDocument)(kedRelatedTag=*)(!(kedDeleted=*))(!(kedDeleted=*)))');
         $res = @ldap_search(
             $this->conn,
             $this->base,
@@ -638,7 +639,8 @@ class ked {
             'kedSignature',
             'kedApplication',
             'kedContentReference',
-            'kedRelatedTag'
+            'kedRelatedTag',
+            'kedArchived'
             ]);
         if (!$res) { $this->ldapFail($this->conn); return null; }
         $entry = @ldap_first_entry($this->conn, $res);
@@ -703,7 +705,8 @@ class ked {
                 'objectClass',
                 'kedContentType',
                 'kedSignature',
-                'kedApplication'
+                'kedApplication',
+                'kedArchived'
             ],
             0,
             $limits[0],
@@ -720,7 +723,7 @@ class ked {
         $res = @ldap_list(
             $this->conn,
             $docDn,
-            '(&(objectclass=kedEntry)(!(kedNext=*))(!(kedDeleted=*)))',
+            '(&(objectclass=kedEntry)(!(kedNext=*))(!(kedDeleted=*))(!(kedDeleted=*)))',
             [ '*' ],
             0,
             $limits[0],
@@ -751,7 +754,7 @@ class ked {
 
     /* Return the entry currently active for given entry and document id */
     function getCurrentEntry (string $docDn, string $entryId, array $limits = [-1, -1]):?array {
-        $filter = $this->buildFilter('(&(objectclass=kedEntry)(kedId=%s)(!(kedNext=*))(!(kedDeleted=*)))', $entryId);
+        $filter = $this->buildFilter('(&(objectclass=kedEntry)(kedId=%s)(!(kedNext=*))(!(kedDeleted=*))(!(kedArchived=*)))', $entryId);
         $res = @ldap_list(
             $this->conn,
             $docDn,
@@ -783,7 +786,7 @@ class ked {
 
     function getCurrentEntryByDn(string $entryDn, array $limits = [-1, -1]):?array {
         $entry = $this->getMetadata($entryDn);
-        $filter = $this->buildFilter('(&(objectClass=kedEntry)(kedId=%s)(!(kedNext=*))(!(kedDeleted=*)))', $entry['id']);
+        $filter = $this->buildFilter('(&(objectClass=kedEntry)(kedId=%s)(!(kedNext=*))(!(kedDeleted=*))(!(kedArchived=*)))', $entry['id']);
 
         $res = @ldap_list(
             $this->conn,
@@ -808,7 +811,7 @@ class ked {
     /* Return historic entries for given entry and document id */
     function getEntryHistory (string $docDn, string $entryId, array $limits = [-1, -1]):array {
         $history = [];
-        $filter = $this->buildFilter('(&(objectclass=kedEntry)(kedId=%s)(!(kedDeleted=*))(kedNext=*))', $entryId);
+        $filter = $this->buildFilter('(&(objectclass=kedEntry)(kedId=%s)(!(kedDeleted=*))(!(kedDeleted=*))(!(kedArchived=*))(kedNext=*))', $entryId);
         $res = @ldap_list(
             $this->conn,
             $docDn,
@@ -831,6 +834,21 @@ class ked {
             $history[] = $currentEntry;
         }
         return $history;
+    }
+
+    function archive (string $dn) {
+        $attrs = ['kedArchived' => time()];
+        error_log($dn);
+        $res = @ldap_mod_add($this->rwconn, $dn, $attrs);
+        if (!$res) { $this->ldapFail($this->rwconn); return null; }
+        return $dn;
+    }
+    
+    function unarchive (string $dn) {
+        $attrs = ['kedArchived' => []];
+        $res = @ldap_mod_del($this->rwconn, $dn, $attrs);
+        if (!$res) { $this->ldapFail($this->rwconn); return null; }
+        return $dn;
     }
 
     /* for auto-save features, update the content of the entry without creating history of the update */
@@ -975,9 +993,9 @@ class ked {
             }
         } else {
             if ($options['timestamp']) {
-                $filter = $this->buildFilter('(&(objectclass=kedDocument)(kedId=%s)(!(kedDeleted=*))(kedTimestamp=%s))', $docId, $options['timestamp']);
+                $filter = $this->buildFilter('(&(objectclass=kedDocument)(kedId=%s)(!(kedDeleted=*))(!(kedArchived=*))(kedTimestamp=%s))', $docId, $options['timestamp']);
             } else {
-                $filter = $this->buildFilter('(&(objectclass=kedDocument)(kedId=%s)(!(kedDeleted=*)))', $docId);
+                $filter = $this->buildFilter('(&(objectclass=kedDocument)(kedId=%s)(!(kedDeleted=*))(!(kedArchived=*)))', $docId);
             }
         }
         if (empty($options['parent'])) {
@@ -1038,7 +1056,7 @@ class ked {
             }
         } else {
             if ($options['timestamp']) {
-                $filter = $this->buildFilter('(&(kedId=%s)(kedTimestamp=%s)(!(kedDeleted=*)))', $id, $options['timestamp']);
+                $filter = $this->buildFilter('(&(kedId=%s)(kedTimestamp=%s)(!(kedDeleted=*))(!(kedArchived=*)))', $id, $options['timestamp']);
             } else {
                 $filter = $this->buildFilter('(&(kedId=%s)(!(kedDeleted=*))(!(kedNext=*)))', $id);
             }

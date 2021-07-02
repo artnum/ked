@@ -384,3 +384,27 @@ KEDApi.prototype.removeTag = function (path, tag) {
         })
     })
 }
+
+KEDApi.prototype.archive = function (idOrDoc) {
+    return new Promise(resolve => {
+        this.post({
+            operation: 'archive',
+            anyid: idOrDoc instanceof KEDDocument ? idOrDoc.getId() : idOrDoc
+        })
+        .then(result => {
+            resolve(result)
+        })
+    })
+}
+
+KEDApi.prototype.unarchive = function (idOrDoc) {
+    return new Promise(resolve => {
+        this.post({
+            operation: 'unarchive',
+            anyid: idOrDoc instanceof KEDDocument ? idOrDoc.getId() : idOrDoc
+        })
+        .then(result => {
+            resolve(result)
+        })
+    })
+}
