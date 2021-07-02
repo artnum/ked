@@ -76,6 +76,9 @@ function KEditor(container, baseUrl) {
     if (!window.location?.hash?.startsWith('#menshen-')) {
         this.cwd = window.location.hash.substring(1)
     }
+    window.addEventListener('hashchange', event => {
+        this.authStart()
+    })
 
     /* client id is for each browser */
     this.API.getClientId()
@@ -261,31 +264,19 @@ KEditor.prototype.authForm = function (nextTry = false) {
             if (form.dataset.importAuth === '1') {
                 this.API.setPassword(data.get('password'))
                 .then(() => {
-                    if (document.location.hash.startsWith('#menshen-')) {
-                        const pemkey = document.location.hash.substring(9).replaceAll('-', '+').replaceAll('_', '/').replaceAll('.', '=')
-                        const key = MenshenEncoding.base64Decode(document.location.hash.substring(9).replaceAll('-', '+').replaceAll('_', '/').replaceAll('.', '='))
-                        this.API.importAuth(data.get('username'), key)
-                        .then(() => {
-                            this.authNext(data.get('username'), data.get('password'))
-                        })
-                        .catch(reason => {
-                            this.error(reason)
-                        })
-                    } else {
-                        const file = data.get('keyfile')
-                        if (file) {
-                            reader = new FileReader()
-                            reader.addEventListener('load', event => {
-                                this.API.importAuth(data.get('username'), event.target.result)
-                                .then(() => {
-                                    this.authNext(data.get('username'), data.get('password'))
-                                })
+                    const file = data.get('keyfile')
+                    if (file) {
+                        reader = new FileReader()
+                        reader.addEventListener('load', event => {
+                            this.API.importAuth(data.get('username'), event.target.result)
+                            .then(() => {
+                                this.authNext(data.get('username'), data.get('password'))
                             })
-                            reader.readAsArrayBuffer(file)
-                            return
-                        } else {
-                            this.authForm(true)
-                        }
+                        })
+                        reader.readAsArrayBuffer(file)
+                        return
+                    } else {
+                        this.authForm(true)
                     }
                 })
             } else {
@@ -302,12 +293,25 @@ KEditor.prototype.authStop = function () {
 }
 
 KEditor.prototype.authStart = function () {
-    const username = localStorage.getItem(`KED/username@${this.baseUrl}`)
-    const password = localStorage.getItem(`KED/password@${this.baseUrl}`)
-    if (!username) {
-        this.authForm()
+    if (window.location.hash.startsWith('#menshen-')) {
+        const authData = window.location.hash.substring(9).split('@')
+        const pemkey = authData[1].replaceAll('-', '+').replaceAll('_', '/').replaceAll('.', '=')
+        const key = MenshenEncoding.base64Decode(pemkey)
+        this.API.importAuth(authData[0], key)
+        .then(() => {
+            this.authNext(authData[0], '')
+        })
+        .catch(reason => {
+            this.error(reason)
+        })
     } else {
-        this.authNext(username, JSON.parse(password))
+        const username = localStorage.getItem(`KED/username@${this.baseUrl}`)
+        const password = localStorage.getItem(`KED/password@${this.baseUrl}`)
+        if (!username) {
+            this.authForm()
+        } else {
+            this.authNext(username, JSON.parse(password))
+        }
     }
 }
 
@@ -1072,7 +1076,7 @@ KEditor.prototype.addTagInteract = function (docNode) {
 
 KEditor.prototype.addDocumentTag = function (path, tag) {
     return new Promise((resolve, reject) => {
-        if (name === null) { resolve(null); return; }
+        if (path === null) { resolve(null); return; }
         const operation = {
             operation: 'add-document-tag',
             path,
