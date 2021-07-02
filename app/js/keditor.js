@@ -153,10 +153,14 @@ KEditor.prototype.showTags = function () {
     closeButton.addEventListener('click', () => {
         KEDAnim.push(() => {
             document.body.removeChild(document.getElementById('ktagOverlay'))
+            document.body.classList.remove('noscroll')
         })
     })
     tagOverlay.appendChild(closeButton)
-    KEDAnim.push(() => { document.body.appendChild(tagOverlay)})
+    KEDAnim.push(() => {
+        document.body.appendChild(tagOverlay)
+        document.body.classList.add('noscroll')
+    })
 }
 
 KEditor.prototype.setupPage = function () {
