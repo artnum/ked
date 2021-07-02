@@ -293,8 +293,9 @@ KEditor.prototype.authStop = function () {
 }
 
 KEditor.prototype.authStart = function () {
-    if (window.location.hash.startsWith('#menshen-')) {
-        const authData = window.location.hash.substring(9).split('@')
+    const hash = window.location.hash || LoadHash
+    if (hash.startsWith('#menshen-')) {
+        const authData = hash.substring(9).split('@')
         const pemkey = authData[1].replaceAll('-', '+').replaceAll('_', '/').replaceAll('.', '=')
         const key = MenshenEncoding.base64Decode(pemkey)
         this.API.importAuth(authData[0], key)

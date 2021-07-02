@@ -10,6 +10,7 @@
         <div id="keditorContent"></div>
     </body>
     <script>
+        const LoadHash = window.location.hash
         window.addEventListener('keditor-loaded', () => {
             const k = new KEditor(document.getElementById('keditorContent'), new URL('../../web/index.php', window.location))
         })
