@@ -18,7 +18,7 @@ function KEditor(container, baseUrl) {
                 ['bold', 'italic', 'underline', 'strike'],        // toggled buttons
               
                 [{ 'header': 1 }, { 'header': 2 }],
-                [{ 'list': 'ordered'}, { 'list': 'bullet' }],
+                [{ 'list': 'ordered'}, { 'list': 'bullet' }, {'list': 'check'}],
                 [{ 'script': 'sub'}, { 'script': 'super' }],      // superscript/subscript
               
                 [{ 'size': ['small', false, 'large', 'huge'] }],  // custom dropdown

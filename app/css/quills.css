@@ -1,5 +1,5 @@
 :root {
-    --tab-space: 3ch;
+    --tab-space: 6ch;
 }
 
 .ql-indent-1 {
@@ -32,4 +32,38 @@
 
 .ql-indent-8 {
     margin-left: calc(8 * var(--tab-space));
+}
+
+.quilltext ul[data-checked="true"] > li::before {
+    content: '\2611';
+}
+
+.quilltext ul[data-checked="false"] > li::before {
+    content: '\2610';
+}
+
+.quilltext ul  {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    counter-reset: list-1 list-2 list-3 list-4 list-5 list-6 list-7 list-8 list-9;
+    padding-left: 1.5em;
+}
+
+.quilltext ul[data-checked="true"] > li::before, .quilltext ul[data-checked="false"] > li::before {
+    cursor: pointer;
+    pointer-events: all;
+}
+.quilltext li::before {
+    margin-left: -1.5em;
+    margin-right: 0.3em;
+    text-align: right;
+}
+.quilltext ul > li::before {
+    content: '\2022';
+}
+.quilltext li::before {
+    display: inline-block;
+    white-space: nowrap;
+    width: 1.2em;
 }
