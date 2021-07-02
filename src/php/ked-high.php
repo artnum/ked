@@ -628,6 +628,25 @@ class high extends ked {
         $docDn = $this->pathToDn($path, false);
         return $this->addTag($docDn, $tagObject['dn']);
     }
+
+    function removeDocumentTag (string $path, $tags) {
+        if (!is_array($tags)) {
+            $tagObject = $this->findTag($tags);
+            if (!$tagObject) { return false; }
+            $docDn = $this->pathToDn($path, false);
+            if (!$docDn) { return false; }
+            return $this->removeTag($docDn, $tagObject['dn']);
+        }
+        $tagsDn = [];
+        foreach ($tags as $tag) {
+            $tagObject = $this->findTag($tag);
+            if (!$tagObject) { return false; }
+            $tagsDn[] = $tagObject['dn'];
+        }
+        $docDn = $this->pathToDn($path, false);
+        if (!$docDn) { return false; }
+        return $this->removeTags($docDn, $tagsDn);
+    }
 }
 
 ?>

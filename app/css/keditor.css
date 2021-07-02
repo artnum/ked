@@ -398,35 +398,6 @@ button.danger.kui:active {
     min-height: 36px;
 }
 
-.kmetadata .indicator {
-    float: right;
-    font-size: 36px;
-    display: flex;
-    float: right;
-    padding: 0px 8px;
-    margin: 0px 4px;
-    justify-content: center;
-}
-
-.kmetadata .indicator [data-action] {
-    cursor: pointer;
-}
-
-.kmetadata .indicator span i {
-    align-items: center;
-}
-
-.kmetadata.childs .navigation {
-    background-color: var(--white);
-    color: var(--bg-color);
-    display: inline-block;
-}
-
-.kmetadata.childs .navigation:active {
-    background-color: var(--bg2-color);
-    color: var(--white);
-}
-
 .ktags {
     margin-top: 0.5em;
     display: flex;

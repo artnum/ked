@@ -1,8 +1,9 @@
-function KEDDocument (doc) {
+function KEDDocument (doc, api) {
     if (window.KEDDocumentRegistry === undefined) {
         window.KEDDocumentRegistry = new Map()
     }
     const kedDocument = KEDDocument.registered(doc.abspath) || this
+    kedDocument.API = api
     if (!kedDocument.EvtTarget) {
         kedDocument.EvtTarget = new EventTarget()
         kedDocument.installedEvents = []
@@ -53,7 +54,10 @@ function KEDDocument (doc) {
             `<button class="kui small" data-action="upload-file"><i class="fas fa-cloud-upload-alt"> </i>&nbsp;Fichier</button>` +
             `<button class="kui small danger" data-action="delete-document"><i class="fas fa-trash"> </i>&nbsp;Supprimer</button>` +
             `</div>` +
-            `<div id="tag-${doc.id}" class="ktags"><span class="ktags-tools" data-action="add-tag"><i class="fas fa-plus-circle"></i></span></div>` +
+            `<div id="tag-${doc.id}" class="ktags">` +
+            `</div>` +
+            `<div class="ktags-tools" ><span data-action="add-tag"><i class="fas fa-plus-circle"></i>&nbsp;Ajouter tag</span>` +
+            `<span data-action="remove-tag"><i class="fas fa-minus-circle"></i>&nbsp;Retirer tag</span></div>` +
             `</div>`
 
         kedDocument.domNode.addEventListener('dragenter', kedDocument.handleDragEvent.bind(kedDocument), {capture: true})
@@ -118,7 +122,7 @@ KEDDocument.get = function (id, api) {
                     resolve(null)
                     return
                 }
-                resolve(new KEDDocument(result))
+                resolve(new KEDDocument(result, api))
             })
             .catch (reason => reject(reason))
         }
@@ -137,8 +141,14 @@ KEDDocument.prototype.handleClickEvent = function (event) {
     while (actionNode && !actionNode.dataset?.action) {
         actionNode = actionNode.parentNode
     }
-
+    
     if (!actionNode) { return; }
+
+    switch(actionNode.dataset.action) {
+        case 'remove-tag':
+            this.removeTagInteract(); break
+    }
+
     const newEvent = new CustomEvent(actionNode.dataset.action, {detail: {target: this, eventTarget: actionNode}})
     this.EvtTarget.dispatchEvent(newEvent)
 }
@@ -299,11 +309,11 @@ KEDDocument.prototype.lowlight = function () {
     this.state.highlight = false
 }
 
-KEDDocument.prototype.isLockable = function (api) {
+KEDDocument.prototype.isLockable = function () {
     return new Promise(resolve => {
         // not locked so I can 
         if (!this.state.locked) { resolve(true); return }
-        api.getClientId()
+        this.API.getClientId()
         .then(clientid => {
             if (clientid === this.state.locked) { resolve(true); return}
             resolve(false)
@@ -311,20 +321,20 @@ KEDDocument.prototype.isLockable = function (api) {
     })
 }
 
-KEDDocument.prototype.lock = function (api) {
-    api.getClientId()
+KEDDocument.prototype.lock = function () {
+    this.API.getClientId()
     .then(clientid => {
         this.state.locked = clientid
-        api.lock(this)
+        this.API.lock(this)
         .then(() => {
             this.applyStates()
         })
     })
 }
 
-KEDDocument.prototype.unlock = function (api) {
+KEDDocument.prototype.unlock = function () {
     this.state.locked = false
-    api.unlock(this)
+    this.API.unlock(this)
     .then(() => {
         this.applyStates()
     })
@@ -406,4 +416,93 @@ KEDDocument.prototype.compare = function (doc) {
         }
     }
     return changes
+}
+
+KEDDocument.prototype.closeConfirm = function (eventOrNode) {
+    if (!eventOrNode) { return }
+    if (eventOrNode instanceof HTMLElement) {
+        KEDAnim.push(() => {
+            if (eventOrNode.parentNode) { eventOrNode.parentNode.removeChild(eventOrNode) }
+        })
+        return
+    }
+
+    let node = eventOrNode.target
+    while (node && !node.classList.contains('kconfirm')) { node = node.parentNode }
+    this.closeConfirm(node)
+}
+
+KEDDocument.prototype.confirm = function (formNode) {
+    if (this.currentConfirm) {
+        this.currentConfirm.querySelector('form')?.reset()
+        this.closeConfirm(this.currentConfirm)
+        this.currentConfirm = null
+    }
+
+    formNode.addEventListener('reset', event => { this.closeConfirm(event) })
+    formNode.addEventListener('submit', event => { this.closeConfirm(event) })
+
+    this.currentConfirm = document.createElement('DIV')
+    this.currentConfirm.classList.add('kconfirm')
+    this.currentConfirm.appendChild(formNode)
+    const metaNode = this.domNode.querySelector('.kmetadata')
+    KEDAnim.push(() => { metaNode.appendChild(this.currentConfirm) })
+    .then(() => {
+        formNode.querySelector('input')?.focus()
+    })
+}
+
+KEDDocument.prototype.removeTagInteract = function () {
+    this.domNode.classList.add('remove-tag')
+
+    const replaceTagInteractionFunction = function (event) {
+        let node = event.target
+        if (event.target.classList.contains('fa-hashtag')) {
+            while (node && !node.dataset.tagid) { node = node.parentNode }
+            if (!node) { return }
+        }
+        if (!node.dataset.tagid) { return }
+        event.stopPropagation()
+        if (node.classList.contains('condamned')) {
+            node.classList.remove('condamned')
+        } else {
+            node.classList.add('condamned')
+        }      
+    }.bind(this)
+
+    const handleFormEvent = function (event) {
+        this.domNode.removeEventListener('click', replaceTagInteractionFunction, {capture: true})
+        const condmanedTag = this.domNode.querySelectorAll('.ktag.condamned')
+        const toRemove = []
+        for (const tag of condmanedTag) {
+            toRemove.push(tag.dataset.tagid)
+            KEDAnim.push(() => {
+                tag.classList.remove('condamned')
+            })
+        }
+        if (event.type === 'reset') { return }
+        event.preventDefault()
+        if(toRemove.length <= 0) { return; }
+        this.API.removeTag(this.domNode.id, toRemove)
+        .then(result => {
+            if (result.ok) {
+                for (const tag of condmanedTag) {
+                    KEDAnim.push(() => {
+                        if (tag.parentNode) { tag.parentNode.removeChild(tag) }
+                    })
+                }
+            }
+        })
+    }.bind(this)
+
+    this.domNode.addEventListener('click', replaceTagInteractionFunction, {capture: true})
+    
+    const confirmForm = document.createElement('FORM')
+    confirmForm.innerHTML = '<div class="kform-inline">Sélectionnez les tags à supprimer.<button type="submit">Supprimer les tags</button><button type="reset">Annuler</button></div>'
+
+    confirmForm.addEventListener('reset', (event) => { handleFormEvent(event) })
+    confirmForm.addEventListener('submit', (event) => { handleFormEvent(event) })
+
+
+    this.confirm(confirmForm)
 }

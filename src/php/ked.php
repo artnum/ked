@@ -495,6 +495,58 @@ class ked {
         return $object['kedid'][0];
     }
 
+    function removeTags (string $dn, array $tagsDn) {
+        $object = $this->getRawLdapObjectByDn($dn);
+        if (!$object) { return null; }
+        if (empty($object['kedrelatedtag'])) { return $object['kedid'][0]; }
+        foreach ($tagsDn as $tagDn) {
+            $key = array_search($tagDn, $object['kedrelatedtag']);
+            if (!$key) { return $object['kedid']; }
+            array_splice($object['kedrelatedtag'], $key, 1);
+        }
+        if (empty($object['kedrelatedtag'])) {
+            $res = @ldap_mod_del(
+                $this->rwconn,
+                $dn,
+                ['kedrealtedtag' => []]
+            );
+            if (!$res) { $this->ldapFail($this->rwconn); return false; }
+            return $object['kedid'][0];
+        }
+        $res = @ldap_mod_replace(
+            $this->rwconn,
+            $dn,
+            ['kedRelatedTag' => $object['kedrelatedtag']]
+        );
+        if (!$res) { $this->ldapFail($this->rwconn); return null; }
+        return $object['kedid'][0];
+    }
+
+    function removeTag (string $dn, string $tagDn) {
+        $object = $this->getRawLdapObjectByDn($dn);
+        if (!$object) { return null; }
+        if (empty($object['kedrelatedtag'])) { return $object['kedid'][0]; }
+        $key = array_search($tagDn, $object['kedrelatedtag']);
+        if (!$key) { return $object['kedid']; }
+        array_splice($object['kedrelatedtag'], $key, 1);
+        if (empty($object['kedrelatedtag'])) {
+            $res = @ldap_mod_del(
+                $this->rwconn,
+                $dn,
+                ['kedrealtedtag' => []]
+            );
+            if (!$res) { $this->ldapFail($this->rwconn); return false; }
+            return $object['kedid'][0];
+        }
+        $res = @ldap_mod_replace(
+            $this->rwconn,
+            $dn,
+            ['kedRelatedTag' => $object['kedrelatedtag']]
+        );
+        if (!$res) { $this->ldapFail($this->rwconn); return null; }
+        return $object['kedid'][0];
+    }
+
     /* Find documents metadata for matching name */
     function findDocuments (string $name, array $limits = [-1, -1]):array {
         if (empty($name)) { return []; }

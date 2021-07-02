@@ -423,6 +423,14 @@ class http {
                 if ($this->msg) { $this->msg->update($id, $this->clientid); }
                 $this->ok(json_encode(['id' => $id, 'tag' => $body['tag']]));
                 break;
+            case 'remove-tag':
+                if (empty($body['tag'])) { $this->errorBadRequest(); }
+                if (empty($body['path'])) { $this->errorBadRequest(); }
+                $id = $this->ked->removeDocumentTag($body['path'], $body['tag']);
+                if (!$id) { $this->errorUnableToOperate(); }
+                if ($this->msg) { $this->msg->update($id, $this->clientid); }
+                $this->ok(json_encode(['id' => $id]));
+                break;
             case 'create-document':
                 $parent = null;
                 if (empty($body['name'])) {
