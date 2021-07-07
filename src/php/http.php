@@ -274,8 +274,8 @@ class http {
                     }
                 }
                 $info = $this->ked->getAll($path, false);
-                if (!$this->acl->can($this->user, 'access', $info['dn'])) { $this->errorForbidden(); }
                 if ($info === null) { $this->errorNotFound(); }
+                if (!$this->acl->can($this->user, 'access', $info['dn'])) { $this->errorForbidden(); }
                 if (in_array('document', $info['+class'])) {
                     if ($this->config('disable-apache-browse')) {
                         $this->errorForbidden();
