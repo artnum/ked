@@ -682,7 +682,7 @@ class ked {
         $res = @ldap_list(
             $this->conn,
             $docDn,
-            '(&(objectclass=kedEntry)' . $filterOption . ')', 
+            '(&(objectclass=kedEntry)(!(kedNext=*))' . $filterOption . ')', 
             [ 
                 'kedId',
                 'kedTimestamp',
@@ -746,7 +746,7 @@ class ked {
         $res = @ldap_list(
             $this->conn,
             $docDn,
-            $filterOption !== '' ? '(&(objectclass=kedDocument)' . $filterOption . ')' : '(objectClass=kedDocument)',
+            $filterOption !== '' ? '(&(objectclass=kedDocument)(!(kedNext=*))' . $filterOption . ')' : '(objectClass=kedDocument)',
             [ 'dn' ],
             0,
             $limits[0],
