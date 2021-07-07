@@ -2,6 +2,8 @@
 declare(strict_types=1);
 namespace ked;
 
+use ArrayAccess;
+use Iterator;
 use Normalizer;
 
 /* when returning object, attributes are named with the following convention :
@@ -289,26 +291,23 @@ class ked {
         return $related;
     }
 
-    function findActiveTags (array $limits = [100, -1]) {
-        $filter = $this->buildFilter('(&(objectclass=kedDocument)(kedRelatedTag=*)(!(kedDeleted=*))(!(kedDeleted=*)))');
-        $res = @ldap_search(
-            $this->conn,
-            $this->base,
-            $filter,
-            [ 'kedRelatedTag' ],
-            0,
-            $limits[0],
-            $limits[1]
-        );
-        if (!$res) { $this->ldapFail($this->conn); return []; }
+    function findActiveTags (
+        array $options = ['deleted' => false, 'archived' => false],
+        array $limits = [100, 1]
+    ) {
+
+        $options = array_merge(['deleted' => false, 'archived' => false], $options);
+        $filterOption = '';
+        if (!$options['archived']) { $filterOption .= '(!(kedArchived=*))'; }
+        if (!$options['deleted']) { $filterOption .= '(!(kedDeleted=*))'; }
+
+        $filter = $this->buildFilter('(&(objectclass=kedDocument)(kedRelatedTag=*)(!(kedNext=*))' . $filterOption . ')');
         $tags = [];
-        for ($entry = @ldap_first_entry($this->conn, $res); $entry; $entry = ldap_next_entry($this->conn, $entry)) {
-            $values = @ldap_get_values($this->conn, $entry, 'kedRelatedTag');
-            if (!$values) { continue; }
-            if ($values['count'] <= 0) { continue; }
-            for ($i = 0; $i < $values['count']; $i++) {
-                if ($this->rootTag['dn'] === $values[$i]) { continue; } // skip root tag
-                $name = $this->getTagName($values[$i]);    
+    
+        foreach ($this->ldap_search($this->base, $filter, [ '*' ], $limits) as $entry) {
+            foreach ($entry['kedrelatedtag'] as $tagDn) {
+                if ($this->rootTag['dn'] === $tagDn) { continue; }
+                $name = $this->getTagName($tagDn);
                 if (!isset($tags[$name])) {
                     $tags[$name] = [
                         'count' => 0
@@ -320,21 +319,19 @@ class ked {
         return $tags;
     }
 
-    function findTag (string $tag, array $limits = [-1, -1]):?array {
-        $filter = $this->buildFilter('(&(objectclass=kedTag)(kedIdName=%s))', $this->sanitizeString($tag));
-        $res = @ldap_search(
-            $this->conn,
-            $this->tagBase,
-            $filter,
-            [ '*' ],
-            0,
-            $limits[0],
-            $limits[1]
-        );
-        if (!$res) { $this->ldapFail($this->conn); return null; }
-        $entry = @ldap_first_entry($this->conn, $res);
-        if (!$entry) { return null; }
-        $currentEntry = $this->getRawLdapObject($this->conn, $entry);
+    function findTag (
+        string $tag,
+        array $options = ['deleted' => false, 'archived' => false],
+        array $limits = [-1, -1]
+    ):?array {
+
+        $options = array_merge(['deleted' => false, 'archived' => false], $options);
+        $filterOption = '';
+        if (!$options['archived']) { $filterOption .= '(!(kedArchived=*))'; }
+        if (!$options['deleted']) { $filterOption .= '(!(kedDeleted=*))'; }
+
+        $filter = $this->buildFilter('(&(objectclass=kedTag)(kedIdName=%s)' . $filterOption . ')', $this->sanitizeString($tag));
+        $currentEntry = $this->ldap_search($this->tagBase, $filter, [ '*' ], $limits)->current();
         if (!$currentEntry) { return null; }
         return $currentEntry;
     }
@@ -345,25 +342,23 @@ class ked {
         return $entry['kedidname'][0];
     }
 
-    function findSubTags (string $tagDn, $limits = [ -1, -1 ]):array {
-        $filter = $this->buildFilter('(&(objectclass=kedTag)(kedRelatedTag=%s))', $tagDn);
-        $res = @ldap_search(
-            $this->conn,
-            $this->tagBase,
-            $filter,
-            [ '*' ],
-            0,
-            $limits[0],
-            $limits[1]
-        );
-        if (!$res) { $this->ldapFail($this->conn); return [];}
+    function findSubTags (
+        string $tagDn,
+        array $options = ['deleted' => false, 'archived' => false],
+        array $limits = [ -1, -1 ]
+    ):array {
+
+        $options = array_merge(['deleted' => false, 'archived' => false], $options);
+        $filterOption = '';
+        if (!$options['archived']) { $filterOption .= '(!(kedArchived=*))'; }
+        if (!$options['deleted']) { $filterOption .= '(!(kedDeleted=*))'; }
+
+        $filter = $this->buildFilter('(&(objectclass=kedTag)(kedRelatedTag=%s)' . $filterOption . ')', $tagDn);
         $objects = [];
-        for($entry = @ldap_first_entry($this->conn, $res); $entry; $entry = @ldap_next_entry($this->conn, $entry)) {
-            $object = $this->getRawLdapObject($this->conn, $entry);
-            if (!$object) { continue; }
+        foreach($this->ldap_search($this->tagBase, $filter, ['*'], $limits) as $object) {
             if (isset($objects[$object['dn']])) { continue; }
             $objects[$object['dn']] = $object;
-            $subtags = $this->findSubTags($object['dn'], $limits);
+            $subtags = $this->findSubTags($object['dn'], [], $limits);
             if (!empty($subtags)) {
                 foreach ($subtags as $k => $v) {
                     if (!isset($objects[$k])) {
@@ -399,19 +394,7 @@ class ked {
             /* search entry, documents and tags. We want everything */
             foreach ([$this->base, $this->tagBase] as $base) {
                 $filter = $this->buildFilter('(kedRelatedTag=%s)', $tagDn);
-                $res = @ldap_search(
-                    $this->conn,
-                    $base,
-                    $filter,
-                    [ 'objectclass' ],
-                    0,
-                    $limits[0],
-                    $limits[1]
-                );
-                if (!$res) { $this->ldapFail($this->conn); continue; }
-                for($entry = @ldap_first_entry($this->conn, $res); $entry; $entry = @ldap_next_entry($this->conn, $entry)) {
-                    $object = $this->getRawLdapObject($this->conn, $entry);
-                    if (!$object) { continue; }
+                foreach ($this->ldap_search($base, $filter, [ 'objectclass' ], $limits) as $object) {
                     if (isset($objects[$object['dn']])) { continue; }
                     $objects[$object['dn']] = $object;
                 }
@@ -423,28 +406,23 @@ class ked {
     function listTags(array $limits = [-1, -1]):array {
         $tags = [];
         $filter = $this->buildFilter('(objectclass=kedTag)');
-        $res = @ldap_search(
-            $this->conn,
-            $this->tagBase,
-            $filter,
-            [ 'kedIdName' ],
-            0,
-            $limits[0],
-            $limits[1],
-            LDAP_DEREF_NEVER,
-            [
-                [   
-                    'oid' => LDAP_CONTROL_SORTREQUEST,
-                    'iscritical' => false,
-                    'value' => [ ['attr' => 'kedIdName'] ]
+        foreach (
+            $this->ldap_search(
+                $this->tagBase,
+                $filter,
+                [ 'kedIdName'],
+                $limits,
+                LDAP_DEREF_NEVER,
+                [
+                    [   
+                        'oid' => LDAP_CONTROL_SORTREQUEST,
+                        'iscritical' => false,
+                        'value' => [ ['attr' => 'kedIdName'] ]
+                    ]
                 ]
-            ]
-        );
-        if (!$res) { $this->ldapFail($this->conn); return $tags; }
-        for ($entry = @ldap_first_entry($this->conn, $res); $entry; $entry = @ldap_next_entry($this->conn, $entry)) {
-            $value = @ldap_get_values($this->conn, $entry, 'kedIdName');
-            if (!$value) { continue; }
-            $tags[] = $value[0];
+        ) as $entry) {
+            if (empty($entry['kedidname'])) { continue; }
+            $tags[] = $entry['kedidname'][0];
         }
         return $tags;
     }
@@ -452,15 +430,11 @@ class ked {
     function searchTags(string $expression, array $limits = [-1, -1]):array {
         $tags = [];
         $filter = $this->buildFilter('(&(objectclass=kedTag)(kedIdName=*%s*))', $expression);
-        $res = @ldap_search(
-            $this->conn,
+        foreach ($this->ldap_search(
             $this->tagBase,
             $filter,
             [ 'kedIdName' ],
-            0,
-            $limits[0],
-            $limits[1],
-            LDAP_DEREF_NEVER,
+            $limits,
             [
                 [
                     'oid' => LDAP_CONTROL_SORTREQUEST, 
@@ -468,14 +442,10 @@ class ked {
                     'value' => [ ['attr' => 'kedIdName'] ]
                 ]
             ]
-        );
-        if (!$res) { $this->ldapFail($this->conn); return $tags; }
-        for ($entry = @ldap_first_entry($this->conn, $res); $entry; $entry = @ldap_next_entry($this->conn, $entry)) {
-            if ($this->rootTag['dn'] === ldap_get_dn($this->conn, $entry)) { continue; }
-            $value = @ldap_get_values($this->conn, $entry, 'kedIdName');
-            if (!$value) { continue; }
-            if ($value['count'] <= 0) { continue; }
-            $tags[] = $value[0];
+        ) as $entry) {
+            if ($this->rootTag['dn'] === $entry['dn']) { continue; }
+            if (empty($entry['kedidname'])) { continue; }
+            $tags[] = $entry['kedidname'][0];
         }
         return $tags;
     }
@@ -549,22 +519,28 @@ class ked {
     }
 
     /* Find documents metadata for matching name */
-    function findDocuments (string $name, array $limits = [-1, -1]):array {
+    function findDocuments (
+        string $name,
+        array $options = ['deleted' => false, 'archived' =>false], 
+        array $limits = [-1, -1]
+    ):array {
         if (empty($name)) { return []; }
+        $options = array_merge(['deleted' => false, 'archived' =>false], $options);
+
+        $filterOption = '';
+        if (!$options['archived']) { $filterOption .= '(!(kedArchived=*))'; }
+        if (!$options['deleted']) { $filterOption .= '(!(kedDeleted=*))'; }
+
         $documents = [];
-        $filter = $this->buildFilter('(&(objectclass=kedDocument)(kedName=*%s*))', $name);
-        $res = @ldap_search(
-            $this->conn,
+        $filter = $this->buildFilter('(&(objectclass=kedDocument)(kedName=*%s*)' . $filterOption . ')', $name);
+        foreach($this->ldap_search(
             $this->base,
             $filter,
             [ '*' ],
-            0,
-            $limits[0],
-            $limits[0]
-        );
-        if (!$res) { $this->ldapFail($this->conn); return null; }
-        for ($entry = @ldap_first_entry($this->conn, $res); $entry; $entry = @ldap_next_entry($this->conn, $entry)) {
-            $currentEntry = $this->getLdapObject($this->conn, $entry);
+            $limits,
+            [],
+            [$this, 'getLdapObject']
+        ) as $currentEntry) {
             if ($currentEntry === null) { $document[] = ['+failed' => true]; continue; }
             $documents[] = $currentEntry;
         }
@@ -593,8 +569,8 @@ class ked {
     }
 
     function getLdapObject ($conn, $entry):array {
-        $currentEntry =[ '__dn' => ldap_get_dn($conn, $entry) ];
-        if (!$currentEntry['__dn']) { $this->ldapFail($conn); return []; }
+        $currentEntry =[ 'dn' => ldap_get_dn($conn, $entry) ];
+        if (!$currentEntry['dn']) { $this->ldapFail($conn); return []; }
         foreach (self::attrMap as $attr => $_) {
             $value = $this->getLdapValue($conn, $entry, $attr);
             if ($value !== null) { $currentEntry[$attr] = $value; }
@@ -691,12 +667,22 @@ class ked {
         return $document;
     }
 
-    function listDocumentEntries (string $docDn, array $limits = [-1, -1]):array {
+    function listDocumentEntries (
+        string $docDn,
+        array $options = ['archived' => false, 'deleted' => false],
+        array $limits = [-1, -1]
+    ):array {
         $entries = [];
+        
+        $options = array_merge(['deleted' => false, 'archived' => false], $options);
+        $filterOption = '';
+        if (!$options['archived']) { $filterOption .= '(!(kedArchived=*))'; }
+        if (!$options['deleted']) { $filterOption .= '(!(kedDeleted=*))'; }
+
         $res = @ldap_list(
             $this->conn,
             $docDn,
-            '(&(objectclass=kedEntry)(!(kedNext=*))(!(kedDeleted=*)))', 
+            '(&(objectclass=kedEntry)' . $filterOption . ')', 
             [ 
                 'kedId',
                 'kedTimestamp',
@@ -719,11 +705,21 @@ class ked {
         return $entries;
     }
 
-    function countDocumentEntries (string $docDn, array $limits = [-1, -1]):int {
+    function countDocumentEntries (
+        string $docDn,
+        array $options = ['archived' => false, 'deleted' => false],
+        array $limits = [-1, -1]
+    ):int {
+
+        $options = array_merge(['deleted' => false, 'archived' => false], $options);
+        $filterOption = '';
+        if (!$options['archived']) { $filterOption .= '(!(kedArchived=*))'; }
+        if (!$options['deleted']) { $filterOption .= '(!(kedDeleted=*))'; }
+
         $res = @ldap_list(
             $this->conn,
             $docDn,
-            '(&(objectclass=kedEntry)(!(kedNext=*))(!(kedDeleted=*))(!(kedDeleted=*)))',
+            '(&(objectclass=kedEntry)(!(kedNext=*))' . $filterOption . ')',
             [ '*' ],
             0,
             $limits[0],
@@ -735,12 +731,22 @@ class ked {
         return $countEntries;
     }
 
-    function countDocumentChilds (string $docDn, array $limits = [-1, -1]):int {
+    function countDocumentChilds (
+        string $docDn,
+        array $options = ['archived' => false, 'deleted' => false],
+        array $limits = [-1, -1]
+    ):int {
+
+        $options = array_merge(['deleted' => false, 'archived' => false], $options);
+        $filterOption = '';
+        if (!$options['archived']) { $filterOption .= '(!(kedArchived=*))'; }
+        if (!$options['deleted']) { $filterOption .= '(!(kedDeleted=*))'; }
+
         /* count child documents */
         $res = @ldap_list(
             $this->conn,
             $docDn,
-            '(&(objectclass=kedDocument)(!(kedDeleted=*)))',
+            $filterOption !== '' ? '(&(objectclass=kedDocument)' . $filterOption . ')' : '(objectClass=kedDocument)',
             [ 'dn' ],
             0,
             $limits[0],
@@ -753,8 +759,19 @@ class ked {
     }
 
     /* Return the entry currently active for given entry and document id */
-    function getCurrentEntry (string $docDn, string $entryId, array $limits = [-1, -1]):?array {
-        $filter = $this->buildFilter('(&(objectclass=kedEntry)(kedId=%s)(!(kedNext=*))(!(kedDeleted=*))(!(kedArchived=*)))', $entryId);
+    function getCurrentEntry (
+        string $docDn,
+        string $entryId,
+        $options = ['archived' => false, 'deleted' => false],
+        array $limits = [-1, -1]
+    ):?array {
+
+        $options = array_merge(['deleted' => false, 'archived' => false], $options);
+        $filterOption = '';
+        if (!$options['archived']) { $filterOption .= '(!(kedArchived=*))'; }
+        if (!$options['deleted']) { $filterOption .= '(!(kedDeleted=*))'; }
+
+        $filter = $this->buildFilter('(&(objectclass=kedEntry)(kedId=%s)(!(kedNext=*))' . $filterOption . ')', $entryId);
         $res = @ldap_list(
             $this->conn,
             $docDn,
@@ -784,13 +801,23 @@ class ked {
         return implode(',', $parts);
     }
 
-    function getCurrentEntryByDn(string $entryDn, array $limits = [-1, -1]):?array {
+    function getCurrentEntryByDn(
+        string $entryDn,
+        array $limits = [-1, -1],
+        array $options = ['archived' => false, 'deleted' => false]
+    ):?array {
+
+        $options = array_merge(['deleted' => false, 'archived' => false], $options);
+        $filterOption = '';
+        if (!$options['archived']) { $filterOption .= '(!(kedArchived=*))'; }
+        if (!$options['deleted']) { $filterOption .= '(!(kedDeleted=*))'; }
+
         $entry = $this->getMetadata($entryDn);
-        $filter = $this->buildFilter('(&(objectClass=kedEntry)(kedId=%s)(!(kedNext=*))(!(kedDeleted=*))(!(kedArchived=*)))', $entry['id']);
+        $filter = $this->buildFilter('(&(objectClass=kedEntry)(kedId=%s)(!(kedNext=*))' . $filterOption . ')', $entry['id']);
 
         $res = @ldap_list(
             $this->conn,
-            $this->getParentDn($entry['__dn']),
+            $this->getParentDn($entry['dn']),
             $filter,
             [ '*' ],
             0,
@@ -809,9 +836,20 @@ class ked {
     }
 
     /* Return historic entries for given entry and document id */
-    function getEntryHistory (string $docDn, string $entryId, array $limits = [-1, -1]):array {
+    function getEntryHistory (
+        string $docDn,
+        string $entryId,
+        array $options = ['archived' => false, 'deleted' => false],
+        array $limits = [-1, -1]
+    ):array {
+        
+        $options = array_merge(['deleted' => false, 'archived' => false], $options);
+        $filterOption = '';
+        if (!$options['archived']) { $filterOption .= '(!(kedArchived=*))'; }
+        if (!$options['deleted']) { $filterOption .= '(!(kedDeleted=*))'; }
+
         $history = [];
-        $filter = $this->buildFilter('(&(objectclass=kedEntry)(kedId=%s)(!(kedDeleted=*))(!(kedDeleted=*))(!(kedArchived=*))(kedNext=*))', $entryId);
+        $filter = $this->buildFilter('(&(objectclass=kedEntry)(kedId=%s)(kedNext=*)' . $filterOption . ')', $entryId);
         $res = @ldap_list(
             $this->conn,
             $docDn,
@@ -823,9 +861,9 @@ class ked {
         );
         if (!$res) { $this->ldapFail($this->conn); return $history; }
         for ($entry = ldap_first_entry($this->conn, $res); $entry; $entry = ldap_next_entry($this->conn, $entry)) {
-            $currentEntry = [ '__dn' => @ldap_get_dn($this->conn, $entry) ];
+            $currentEntry = [ 'dn' => @ldap_get_dn($this->conn, $entry) ];
             /* a failed dn insert a failed entry */
-            if (!$currentEntry['__dn']) { $this->ldapFail($this->conn); $currentEntry['+failed'] = true; continue; }
+            if (!$currentEntry['dn']) { $this->ldapFail($this->conn); $currentEntry['+failed'] = true; continue; }
             foreach(self::attrMap as $attr => $_) {
                 $value = $this->getLdapValue($this->conn, $entry, $attr);
                 if ($value !== null) { $currentEntry[$attr] = $value; }
@@ -838,7 +876,6 @@ class ked {
 
     function archive (string $dn) {
         $attrs = ['kedArchived' => time()];
-        error_log($dn);
         $res = @ldap_mod_add($this->rwconn, $dn, $attrs);
         if (!$res) { $this->ldapFail($this->rwconn); return null; }
         return $dn;
@@ -864,7 +901,7 @@ class ked {
         if (!empty($options['contentRef'])) {
             $updateCurrentEntry['kedContentReference'] = $options['contentRef'];
         }       
-        $res = ldap_mod_replace($this->rwconn, $currentEntry['__dn'], $updateCurrenEntry);
+        $res = ldap_mod_replace($this->rwconn, $currentEntry['dn'], $updateCurrenEntry);
         if (!$res) { $this->ldapFail($this->rwconn); return null; }
         return $currentEntry['id'];
     }
@@ -880,7 +917,7 @@ class ked {
         $newEntryDn = $this->createEntry($docDn, $content, $options);
         if ($newEntryDn === null) { return null; } 
         $updateCurrent = ['kedModified' => time(), 'kedNext' => $newEntryDn];
-        $res = ldap_mod_replace($this->rwconn, $currentEntry['__dn'], $updateCurrent);
+        $res = ldap_mod_replace($this->rwconn, $currentEntry['dn'], $updateCurrent);
         if (!$res) { $this->ldapFail($this->rwconn); return null; }
         return $currentEntry['id']; // update do not change the id
     }
@@ -893,10 +930,10 @@ class ked {
             $options['type'] = $currentEntry['type'];
         }
         $options['__update'] = true;
-        $newEntryDn = $this->createEntry($this->getParentDn($currentEntry['__dn']), $content, $options);
+        $newEntryDn = $this->createEntry($this->getParentDn($currentEntry['dn']), $content, $options);
         if ($newEntryDn === null) { return null; }
         $updateCurrent = [ 'kedModified' => time(), 'kedNext' => $newEntryDn ];
-        $res = @ldap_mod_replace($this->rwconn, $currentEntry['__dn'], $updateCurrent);
+        $res = @ldap_mod_replace($this->rwconn, $currentEntry['dn'], $updateCurrent);
         if (!$res) {
             /* rollback operation */
             $this->ldapFail($this->rwconn);
@@ -981,56 +1018,6 @@ class ked {
         return [sprintf('kedId=%s+kedTimestamp=%d', $id, $ts), $id, $ts];
     }
 
-    /* Return document DN for given id */
-    function getDocumentDn (string $docId, bool $includeDeleted = false, array $options = [], array $limits = [-1, -1]):?string {
-        $filter = '';
-        if (!isset($options['timestamp'])) { $options['timestamp'] = null; }
-        if ($includeDeleted) {
-            if ($options['timestamp']) {
-                $filter = $this->buildFilter('(&(objectclass=kedDocument)(kedId=%s)(kedTimestamp=%s))', $docId, $options['timestamp']);
-            } else {
-                $filter = $this->buildFilter('(&(objectclass=kedDocument)(kedId=%s))', $docId);
-            }
-        } else {
-            if ($options['timestamp']) {
-                $filter = $this->buildFilter('(&(objectclass=kedDocument)(kedId=%s)(!(kedDeleted=*))(!(kedArchived=*))(kedTimestamp=%s))', $docId, $options['timestamp']);
-            } else {
-                $filter = $this->buildFilter('(&(objectclass=kedDocument)(kedId=%s)(!(kedDeleted=*))(!(kedArchived=*)))', $docId);
-            }
-        }
-        if (empty($options['parent'])) {
-            $res = @ldap_search(
-                $this->conn,
-                $this->base,
-                $filter,
-                [ 'dn' ],
-                0,
-                $limits[0],
-                $limits[1]
-            );
-        } else {
-            $res = @ldap_list(
-                $this->conn,
-                $options['parent'],
-                $filter,
-                [ 'dn' ],
-                $limits[0],
-                $limits[1]
-            );
-        }
-        if (!$res) { $this->ldapFail($this->conn); return null; }
-        $entriesCount = @ldap_count_entries($this->conn, $res);
-        if ($entriesCount === false) { $this->ldapFail($this->conn); return null; }
-        if ($entriesCount > 1) { $this->logicFail('Too many entries'); return null; }
-        if ($entriesCount < 1) { return null; }
-        $entry = @ldap_first_entry($this->conn, $res);
-        if (!$entry) { $this->ldapFail($this->conn); return null; }
-        $dn = @ldap_get_dn($this->conn, $entry);
-        if (!$dn) { $this->ldapFail($this->conn); return null; }
-
-        return $dn;
-    }
-
     function getDnByName (string $name, string $parentDn):?string {
         $filter = $this->buildFilter('(&(|(kedName=%s)(kedApplication=%s))(!(kedNext=*)))', $name, 'ked:name=' . $name);
         $res = @ldap_list($this->conn, $parentDn, $filter, [ 'dn' ]);
@@ -1045,44 +1032,31 @@ class ked {
         return $dn;
     }
 
-    function getDn (string $id, bool $includeDeleted = false, array $options = [], array $limits = [-1, -1]):?string {
-        $filter = '';
-        if (!isset($options['timestamp'])) { $options['timestamp'] = null; }
-        if ($includeDeleted) {
-            if ($options['timestamp']) {
-                $filter = $this->buildFilter('(&(kedId=%s)(kedTimestamp=%s))', $id, $options['timestamp']);
-            } else {
-                $filter = $this->buildFilter('(&(kedId=%s)(!(kedNext=*)))', $id);
-            }
-        } else {
-            if ($options['timestamp']) {
-                $filter = $this->buildFilter('(&(kedId=%s)(kedTimestamp=%s)(!(kedDeleted=*))(!(kedArchived=*)))', $id, $options['timestamp']);
-            } else {
-                $filter = $this->buildFilter('(&(kedId=%s)(!(kedDeleted=*))(!(kedNext=*)))', $id);
-            }
-        }
-        
-        if (empty($options['parent'])) {
-            $res = @ldap_search(
-                $this->conn,
-                $this->base,
-                $filter,
-                [ 'dn' ],
-                0,
-                $limits[0],
-                $limits[1]
-            );
-        } else {
-            $res = @ldap_list(
-                $this->conn,
-                $options['parent'],
-                $filter,
-                [ 'dn' ],
-                0,
-                $limits[0],
-                $limits[1]
-            );
-        }
+    function getDn (
+        string $id,
+        array $options = ['parent' => '', 'timestamp' => null, 'archived' => false, 'deleted' => false, 'document' => false],
+        array $limits = [-1, -1]
+    ):?string {
+
+        $options = array_merge(['parent' => $this->base, 'timestamp' => null, 'archived' => false, 'deleted' => false, 'document' => false], $options);
+    
+        $filterOption = '';
+        if ($options['timestamp']) { $filterOption = $this->buildFilter('(kedTimestamp=%s)', $options['timestamp']); }
+        if (!$options['archived']) { $filterOption .= '(!(kedArchived=*))'; }
+        if (!$options['deleted']) { $filterOption .= '(!(kedDeleted=*))'; }
+        if ($options['document']) { $filterOption .= '(objectClass=kedDocument)'; }
+
+        $filter = $filterOption !== '' ? $this->buildFilter('(&(kedId=%s)' . $filterOption . ')', $id) : $this->buildFilter('(kedId=%s)', $id);
+
+        $res = @ldap_list(
+            $this->conn,
+            $options['parent'],
+            $filter,
+            [ 'dn' ],
+            0,
+            $limits[0],
+            $limits[1]
+        );
         if (!$res) { $this->ldapFail($this->conn); return null; }
         $entriesCount = @ldap_count_entries($this->conn, $res);
         if ($entriesCount === false) { $this->ldapFail( $this->conn); return null; }
@@ -1100,10 +1074,122 @@ class ked {
         $meta = $this->getMetadata($dn);
         if (empty($meta['deleted'])) {
             $mod = ['kedDeleted' => time() ];
-            $res = @ldap_mod_add($this->rwconn, $meta['__dn'], $mod);
+            $res = @ldap_mod_add($this->rwconn, $meta['dn'], $mod);
             if (!$res) { $this->ldapFail($this->rwconn); return false; }
             return true;
         }
+    }
+ 
+    /* Search while enforcing parent filter to child */
+    function ldap_search (string $base, $filter, $attributes = ['*'], $limits = [-1, -1], $ctrls = [], $loadentry = null) {
+        $result = new KEDLdapResult();
+        $result->search($this->conn, $base, $filter, $attributes, $limits, $ctrls, $loadentry);
+        return $result;
+    }
+}
+
+/* Iterator for ldap_search, non-recursive breadth-first */
+class KEDLdapResult implements Iterator {
+    public function __construct() {
+        $this->results = [];
+        $this->position = 0;
+        $this->count = 0;
+
+        $this->duration = 0;
+        $this->bases = [];
+        $this->limits = [ -1, -1 ];
+        $this->ldap = null;
+        $this->res = null;
+        $this->filter = null;
+        $this->ctrls = null;
+        $this->attributes = [ '*' ];
+        $this->loadentry = null;
+    }
+
+    public function search ($ldap, string $base, $filter, $attributes = ['*'], $limits = [-1, -1], $ctrls = [], $loadentry = null) {
+
+        array_push($this->bases, $base);
+        $this->ldap = $ldap;
+        $this->limits = $limits;
+        $this->ctrls = $ctrls;
+        $this->attributes = $attributes;
+        $this->filter = $filter;
+        $this->res = null;
+        $this->entry = null;
+        $this->count = 0;
+        $this->loadentry = $loadentry;
+
+        $this->load_next_result();
+    }
+
+    public function load_entry($entry) {
+        $currentEntry = [ 'dn' => ldap_get_dn($this->ldap, $entry) ];
+        if (!$currentEntry['dn']) { return null; }
+        for ($attr = @ldap_first_attribute($this->ldap, $entry); $attr; $attr = @ldap_next_attribute($this->ldap, $entry)) {
+            $values =  @ldap_get_values($this->ldap, $entry, $attr);
+            if (!$values) {  return null; }
+            unset($values['count']);
+            if (empty($values)) { continue; }
+            $currentEntry[strtolower($attr)] = $values;
+        }
+        return $currentEntry;
+    }
+
+    public function load_next_result () {
+        if ( 
+            ($this->limits[1] <= 0 || $this->duration < $this->limits[1]) &&
+            ($this->limits[0] <= 0 || $this->count < $this->limits[0])
+        ) {
+            if ($this->res && $this->entry) {
+                $entry = @ldap_next_entry($this->ldap, $this->entry);
+                if (!$entry) { $this->entry = null; $this->res = null; }
+                else {
+                    $entryVal = $this->loadentry ? call_user_func($this->loadentry, $this->ldap, $entry) : $this->load_entry($entry);
+                    if (!$entryVal) { $this->entry = null; $this->res = null; }
+                    else { array_push($this->bases, $entryVal['dn']); array_push($this->results, $entryVal); $this->entry = $entry; $this->count++; }
+                }
+            }
+            if ($this->res && !$this->entry) {
+                $entry = @ldap_first_entry($this->ldap, $this->res);
+                if (!$entry) { $this->entry = null; $this->res = null; }
+                else {
+                    $entryVal = $this->loadentry ? call_user_func($this->loadentry, $this->ldap, $entry) : $this->load_entry($entry);
+                    if (!$entryVal) { $this->entry = null; $this->res = null; }
+                    else { array_push($this->bases, $entryVal['dn']); array_push($this->results, $entryVal); $this->entry = $entry; $this->count++; }
+                }
+            }
+            if (!$this->res && !$this->entry) {
+                if (!empty($this->bases)) {
+                    $start = time();
+                    $res = @ldap_list($this->ldap, array_shift($this->bases), $this->filter, $this->attributes, 0, -1, $this->limits[1] - $this->duration, 0, $this->ctrls);
+                    $this->duration += time() - $start;
+                    if (!$res) { return $this->load_next_result(); }
+                    $this->res = $res;
+                    $this->entry = null;
+                    return $this->load_next_result();
+                }
+            }
+        }
+    }
+
+    public function next() {
+        $this->load_next_result();
+        return ++$this->position;
+    }
+
+    public function current() {
+        return $this->results[$this->position];
+    }
+
+    public function rewind() {
+        $this->position = 0;
+    }
+
+    public function key() {
+        return $this->position;
+    }
+    public function valid() {
+        return isset($this->results[$this->position]);
     }
 }
 

@@ -69,15 +69,26 @@ class high extends ked {
         return sprintf('%s/%s/%s/%s', $this->store, substr($hash, 0, 2), substr($hash, 2, 2), $hash);
     }
 
-    function listDirectory (?string $path, bool $extended = false, array $limits = [-1, -1]):?array {
+    function listDirectory (
+        ?string $path,
+        bool $extended = false,
+        array $options = ['deleted' => false, 'archived' => false],
+        array $limits = [-1, -1]
+    ):?array {
         $currentDir = $this->base;
         if ($path !== null) {
             $currentDir = $path;
         }
+    
+        $options = array_merge(['deleted' => false, 'archived' => false], $options);
+        $filterOption = '';
+        if (!$options['archived']) { $filterOption .= '(!(kedArchived=*))'; }
+        if (!$options['deleted']) { $filterOption .= '(!(kedDeleted=*))'; }
+
         $res = @ldap_list(
             $this->conn,
             $currentDir,
-            '(&(objectClass=kedDocument)(!(kedDeleted=*))(!(kedArchived=*)))',
+            $filterOption !== '' ? '(&(objectClass=kedDocument)' . $filterOption . ')' : '(objectClass=kedDocument)',
             [ 'dn' ],
             0,
             $limits[0],
@@ -94,7 +105,7 @@ class high extends ked {
         $res = @ldap_list(
             $this->conn,
             $currentDir,
-            '(&(objectClass=kedEntry)(!(kedDeleted=*))(!(kedNext=*))(!(kedArchived=*)))',
+            '(&(objectClass=kedEntry)(!(kedNext=*))' . $filterOption . ')',
             [
                 'objectClass',
                 'kedTimestamp',
@@ -116,7 +127,7 @@ class high extends ked {
         for ($entry = @ldap_first_entry($this->conn, $res); $entry; $entry = @ldap_next_entry($this->conn, $entry)) {
             $object = $this->getLdapObject($this->conn, $entry);
             if ($this->locker) {
-                $object['+lock'] = $this->locker->islocked($object['__dn']);
+                $object['+lock'] = $this->locker->islocked($object['dn']);
             }
             $h = $this->getEntryHistory($currentDir, $object['id']);
             $object['+history'] = [];
@@ -134,12 +145,13 @@ class high extends ked {
         $keys = array_keys($entry);
         foreach ($keys as $k) {
             if (substr($k, 0, 2) === '__') { 
-                if ($k === '__dn') {
-                    $entry['abspath'] = $this->dnToPath($entry[$k]);
-                }
                 unset($entry[$k]); 
             }
             switch ($k) {
+                case 'dn':
+                    $entry['abspath'] = $this->dnToPath($entry['dn']);
+                    unset($entry['dn']);
+                    break;
                 case 'deleted':
                 case 'modified':
                 case 'created':
@@ -162,11 +174,7 @@ class high extends ked {
         $currentDir = $this->base;
         foreach ($elements as $dir) {
             $hpart = explode('-', $dir, 2);
-            if ($docOnly) {
-                $currentDir = $this->getDocumentDn($hpart[0], false, ['parent' => $currentDir, 'timestamp' => $hpart[1] ?? null]);
-            } else {
-                $currentDir = $this->getDn($hpart[0], false, ['parent' => $currentDir, 'timestamp' => $hpart[1] ?? null]);
-            }
+            $currentDir = $this->getDn($hpart[0], ['parent' => $currentDir, 'timestamp' => $hpart[1] ?? null, 'document' => $docOnly]);
             if ($currentDir === null)  { return null; }
         }
         return $currentDir;
@@ -181,7 +189,7 @@ class high extends ked {
             $newCurrentDir = $this->getDnByName($fname, $currentDir);
             if ($newCurrentDir === null) {
                 $hpart = explode('-', $fname, 2);
-                $newCurrentDir = $this->getDn($hpart[0], false, ['parent' => $currentDir, 'timestamp' => $hpart[1] ?? null]);
+                $newCurrentDir = $this->getDn($hpart[0], ['parent' => $currentDir, 'timestamp' => $hpart[1] ?? null]);
             } 
             if ($newCurrentDir === null) { return null;}
             $currentDir = $newCurrentDir;
@@ -283,18 +291,18 @@ class high extends ked {
         $document = parent::getDocument($docDn);
 
         if ($this->locker) {
-            $document['+lock'] = $this->locker->islocked($document['__dn']);
+            $document['+lock'] = $this->locker->islocked($document['dn']);
         }
 
-        $document['+childs'] = $this->countDocumentChilds($document['__dn']);
+        $document['+childs'] = $this->countDocumentChilds($document['dn']);
         if ($extended) {
-            $document['+entries'] = $this->listDocumentEntries($document['__dn']);
+            $document['+entries'] = $this->listDocumentEntries($document['dn']);
             foreach ($document['+entries'] as $k => $child) {
-                $child['abspath'] = $this->pathToDn($child['__dn']);
+                $child['abspath'] = $this->pathToDn($child['dn']);
                 $document['+entries'][$k] = $this->filterConvertResult($child);
             }
         } else {
-            $document['+entries'] = $this->countDocumentEntries($document['__dn']);
+            $document['+entries'] = $this->countDocumentEntries($document['dn']);
         }
        
         $document['+history'] = [];
@@ -406,7 +414,7 @@ class high extends ked {
                     break;
             }
         }
-        return $this->updateInPlaceAny($docInfo['__dn'], $updateValues);
+        return $this->updateInPlaceAny($docInfo['dn'], $updateValues);
     }
 
     /**** UPDATE and ADD functions should be kind of fuse together ****/
