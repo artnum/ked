@@ -174,7 +174,7 @@ class high extends ked {
         $currentDir = $this->base;
         foreach ($elements as $dir) {
             $hpart = explode('-', $dir, 2);
-            $currentDir = $this->getDn($hpart[0], ['parent' => $currentDir, 'timestamp' => $hpart[1] ?? null, 'document' => $docOnly]);
+            $currentDir = $this->getActiveDn($hpart[0], ['parent' => $currentDir, 'timestamp' => $hpart[1] ?? null, 'document' => $docOnly]);
             if ($currentDir === null)  { return null; }
         }
         return $currentDir;
@@ -189,7 +189,7 @@ class high extends ked {
             $newCurrentDir = $this->getDnByName($fname, $currentDir);
             if ($newCurrentDir === null) {
                 $hpart = explode('-', $fname, 2);
-                $newCurrentDir = $this->getDn($hpart[0], ['parent' => $currentDir, 'timestamp' => $hpart[1] ?? null]);
+                $newCurrentDir = $this->getActiveDn($hpart[0], ['parent' => $currentDir, 'timestamp' => $hpart[1] ?? null]);
             } 
             if ($newCurrentDir === null) { return null;}
             $currentDir = $newCurrentDir;

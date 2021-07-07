@@ -1032,7 +1032,7 @@ class ked {
         return $dn;
     }
 
-    function getDn (
+    function getActiveDn (
         string $id,
         array $options = ['parent' => '', 'timestamp' => null, 'archived' => false, 'deleted' => false, 'document' => false],
         array $limits = [-1, -1]
@@ -1046,7 +1046,7 @@ class ked {
         if (!$options['deleted']) { $filterOption .= '(!(kedDeleted=*))'; }
         if ($options['document']) { $filterOption .= '(objectClass=kedDocument)'; }
 
-        $filter = $filterOption !== '' ? $this->buildFilter('(&(kedId=%s)' . $filterOption . ')', $id) : $this->buildFilter('(kedId=%s)', $id);
+        $filter =  $this->buildFilter('(&(kedId=%s)(!(kedNext=*))' . $filterOption . ')', $id);
 
         $res = @ldap_list(
             $this->conn,
