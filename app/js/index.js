@@ -18,6 +18,7 @@ window.addEventListener('load', (event) => {
     const csss = [
         '../css/keditor.css',
         '../css/ktags.css',
+        '../css/kdocument.css',
         '../node_modules/@fortawesome/fontawesome-free/css/all.min.css',
         '../node_modules/quill/dist/quill.snow.css',
         '../node_modules/lightbox2/dist/css/lightbox.min.css'

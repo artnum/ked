@@ -222,7 +222,8 @@ KEDApi.prototype.getDocument = function (path) {
     return new Promise((resolve) => {
         this.post(operation)
         .then(result => {
-            resolve(result)
+            if (!result.ok) { resolve(null); return }
+            resolve(result.data)
         })
     })
 }
@@ -364,6 +365,44 @@ KEDApi.prototype.unlock = function (idOrDoc) {
 KEDApi.prototype.activeTags = function () {
     return new Promise(resolve => {
         this.post({operation: 'get-active-tags'})
+        .then(result => {
+            resolve(result)
+        })
+    })
+}
+
+KEDApi.prototype.removeTag = function (path, tag) {
+    const operation = {
+        operation: 'remove-tag',
+        path,
+        tag
+    }
+    return new Promise(resolve => {
+        this.post(operation)
+        .then(result => {
+            resolve(result)
+        })
+    })
+}
+
+KEDApi.prototype.archive = function (idOrDoc) {
+    return new Promise(resolve => {
+        this.post({
+            operation: 'archive',
+            anyid: idOrDoc instanceof KEDDocument ? idOrDoc.getId() : idOrDoc
+        })
+        .then(result => {
+            resolve(result)
+        })
+    })
+}
+
+KEDApi.prototype.unarchive = function (idOrDoc) {
+    return new Promise(resolve => {
+        this.post({
+            operation: 'unarchive',
+            anyid: idOrDoc instanceof KEDDocument ? idOrDoc.getId() : idOrDoc
+        })
         .then(result => {
             resolve(result)
         })

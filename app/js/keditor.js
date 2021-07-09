@@ -153,10 +153,14 @@ KEditor.prototype.showTags = function () {
     closeButton.addEventListener('click', () => {
         KEDAnim.push(() => {
             document.body.removeChild(document.getElementById('ktagOverlay'))
+            document.body.classList.remove('noscroll')
         })
     })
     tagOverlay.appendChild(closeButton)
-    KEDAnim.push(() => { document.body.appendChild(tagOverlay)})
+    KEDAnim.push(() => {
+        document.body.appendChild(tagOverlay)
+        document.body.classList.add('noscroll')
+    })
 }
 
 KEditor.prototype.setupPage = function () {
@@ -443,19 +447,9 @@ KEditor.prototype.error = function (data) {
     }, {capture: true})
 }
 
-KEditor.prototype.getDocument = function (docPath) {
-    return new Promise((resolve, reject) => {
-        this.API.getDocument(docPath)
-        .then(result => {
-            if (!result.ok) { resolve(null); return }
-            resolve(result.data)
-        })
-    })
-}
-
 KEditor.prototype.refreshDocument = function (docPath) {
     return new Promise((resolve, reject) => {
-        this.getDocument(docPath)
+        this.API.getDocument(docPath)
         .then(doc => {
             if (!doc) { return }
             return this.renderSingle(doc)
@@ -867,7 +861,7 @@ KEditor.prototype.addDocument = function (title = null, path = null) {
     this.fetch('', operation)
     .then(result => {
         if (!result.ok) { return }
-        return KEDDocument.get(result.data.id, this)
+        return KEDDocument.get(result.data.id, this.API)
     })
     .then(kedDoc => {
         if (kedDoc) {
@@ -1017,7 +1011,6 @@ KEditor.prototype.addTagInteract = function (docNode) {
                     const div = existing || document.createElement('DIV')
                     if (!existing) {
                         div.addEventListener('click', event => {
-                            KEDAnim.push(() => { form.parentNode.removeChild(form) })
                             resolve([event.target.dataset.tag, false])
                             return;
                         })
@@ -1031,9 +1024,9 @@ KEditor.prototype.addTagInteract = function (docNode) {
                 }            
             })
         })
-        KEDAnim.push(() => { docNode.insertBefore(form, docNode.getElementsByClassName('kmetadata')[0].nextElementSibling) })
-        .then(() => {
-            form.querySelector('input[type="text"]').focus()
+        KEDDocument.get(docNode.id, this.API)
+        .then(doc => {
+            doc.confirm(form)
         })
     })
     .then (([tag, create]) => {
@@ -1377,7 +1370,7 @@ KEditor.prototype.toggleEntriesDisplay = function (kedDocument) {
         })
     } else {
         kedDocument.open()
-        this.getDocument(kedDocument.getId())
+        this.API.getDocument(kedDocument.getId())
         .then(doc => {
             this.renderSingle(doc)
         })
@@ -1407,7 +1400,7 @@ KEditor.prototype.renderSingle = function (doc) {
                 date = new Date()
             }
             let refresh = true
-            const kedDocument = new KEDDocument(doc)
+            const kedDocument = new KEDDocument(doc, this.API)
             if (this.LockedNotFound.has(kedDocument.getRelativeId())) {
                 kedDocument.receiveLock(this.LockedNotFound.get(kedDocument.getRelativeId()))
                 this.LockedNotFound.delete(kedDocument.getRelativeId())
@@ -1594,7 +1587,7 @@ KEditor.prototype.render = function (root) {
     for (let i = 0; i < root.documents.length; i++) {
         elementOnPage.push(root.documents[i].abspath)
         if (root.documents[i]['+class'].indexOf('entry') !== -1) { continue; }
-        KEDDocument.get(root.documents[i].abspath, this)
+        KEDDocument.get(root.documents[i].abspath, this.API)
         .then(kedDoc => {
             let r
             if (!kedDoc) {
@@ -1604,7 +1597,7 @@ KEditor.prototype.render = function (root) {
             }
             if (kedDoc.isOpen()) {
                 r = new Promise((resolve, reject) => {
-                    this.getDocument(root.documents[i].abspath)
+                    this.API.getDocument(root.documents[i].abspath)
                     .then(doc => { this.renderSingle(doc).then(node => resolve(node)) })
                 })
             } else {

@@ -1,0 +1,51 @@
+
+.document.remove-tag .ktag.condamned {
+    text-decoration: line-through !important;
+    background-color: indianred !important;
+    color: white;
+}
+
+.document .ktags-tools {
+    margin: 1ex 0;   
+}
+
+.document .ktags-tools span[data-action] {
+    margin: 0 2ch 0 0;
+    font-family: 'PT Sans', sans-serif;
+    font-size: 18px;
+    padding: 4px;
+}
+
+.document .ktags-tools span[data-action]:active {
+    color: var(--bg2-color);
+    background-color: var(--light-bg-color);
+}
+
+.kmetadata .indicator {
+    float: right;
+    font-size: 36px;
+    display: flex;
+    float: right;
+    padding: 0px 8px;
+    margin: 0px 4px;
+    justify-content: center;
+}
+
+.kmetadata .indicator [data-action] {
+    cursor: pointer;
+}
+
+.kmetadata .indicator span i {
+    align-items: center;
+}
+
+.kmetadata.childs .navigation {
+    background-color: var(--white);
+    color: var(--bg-color);
+    display: inline-block;
+}
+
+.kmetadata.childs .navigation:active {
+    background-color: var(--bg2-color);
+    color: var(--white);
+}

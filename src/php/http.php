@@ -38,7 +38,7 @@ class http {
     function config(string $name, $value = null) {
         if ($value === null) {
             if (!isset($this->configuration[$name])) { return null; }
-            return $this->configuration['name'];
+            return $this->configuration[$name];
         }
         $this->configuration[$name] = $value;
         return $this->configuration[$name];
@@ -179,7 +179,7 @@ class http {
         $this->ok('<span class="created">Created</span><span class="modified">Modified</span></span></div>');
         $this->ok('<hr>');
         if (!$root) {
-            $parent = $this->ked->dnToPath($dir['__dn'], true);
+            $parent = $this->ked->dnToPath($dir['dn'], true);
             $this->ok('<div class="entry"><span class="type"><i class="parent"> </i></span>');
             $this->ok('<span class="name"><a href="' . (empty($parent) ? str_replace($_SERVER['PATH_INFO'], '', $_SERVER['REQUEST_URI']) : $parent) . '">[parent]</a></span>');
             $this->ok('<span class="childs"></span>');
@@ -223,9 +223,9 @@ class http {
             }
             $this->ok('<div class="entry"><span class="type"><i class="' . $class . '"> </i></span>');
             if (!$file) {
-                $this->ok('<span class="name"><a href="' . ($root ? $this->getBaseName() . '/' : $this->ked->dnToPath($dir['__dn']) . ',') . $child['id'] . '">' . ($child['name'] ?? $child['id']) . '</a></span>');
+                $this->ok('<span class="name"><a href="' . ($root ? $this->getBaseName() . '/' : $this->ked->dnToPath($dir['dn']) . ',') . $child['id'] . '">' . ($child['name'] ?? $child['id']) . '</a></span>');
             } else {
-                $this->ok('<span class="name"><a href="' . ($root ? $this->getBaseName() . '/' : $this->ked->dnToPath($dir['__dn']) . ',') . $child['id'] . '?format=browser">' . ($child['name'] ?? $child['id']) . '</a></span>');
+                $this->ok('<span class="name"><a href="' . ($root ? $this->getBaseName() . '/' : $this->ked->dnToPath($dir['dn']) . ',') . $child['id'] . '?format=browser">' . ($child['name'] ?? $child['id']) . '</a></span>');
             }
             $this->ok('<span class="tasks">' . ($task ? '+' : '') . '</span>');
             $this->ok('<span class="events">' . ($event ? '+' : '') . '</span>');
@@ -236,7 +236,7 @@ class http {
             for ($i = 0; $i < count($child['+history']); $i++) {
                 $c = $child['+history'][$i];
                 $this->ok('<div class="entry history"><span class="type"><i class="' . $class . '"> </i></span>');
-                $this->ok('<span class="name"><a href="' . ($root ? $this->getBaseName() . '/' : $this->ked->dnToPath($dir['__dn']) . ',') . $c['id'] . '?format=browser">' . ($child['name'] ?? $child['id']) . '</a></span>');
+                $this->ok('<span class="name"><a href="' . ($root ? $this->getBaseName() . '/' : $this->ked->dnToPath($dir['dn']) . ',') . $c['id'] . '?format=browser">' . ($child['name'] ?? $child['id']) . '</a></span>');
                 $this->ok('<span class="tasks"></span>');
                 $this->ok('<span class="events"></span>');
                 $this->ok('<span class="childs"></span>');
@@ -274,13 +274,13 @@ class http {
                     }
                 }
                 $info = $this->ked->getAll($path, false);
-                if (!$this->acl->can($this->user, 'access', $info['__dn'])) { $this->errorForbidden(); }
                 if ($info === null) { $this->errorNotFound(); }
+                if (!$this->acl->can($this->user, 'access', $info['dn'])) { $this->errorForbidden(); }
                 if (in_array('document', $info['+class'])) {
                     if ($this->config('disable-apache-browse')) {
                         $this->errorForbidden();
                     }
-                    $childs = $this->ked->listDirectory($info['__dn']);
+                    $childs = $this->ked->listDirectory($info['dn']);
                     $this->printDir($info, $childs);
                 } else {
                     if (!empty($info['contentRef'])) {
@@ -422,6 +422,14 @@ class http {
                 if ($id === null) { $this->errorNotFound(); }
                 if ($this->msg) { $this->msg->update($id, $this->clientid); }
                 $this->ok(json_encode(['id' => $id, 'tag' => $body['tag']]));
+                break;
+            case 'remove-tag':
+                if (empty($body['tag'])) { $this->errorBadRequest(); }
+                if (empty($body['path'])) { $this->errorBadRequest(); }
+                $id = $this->ked->removeDocumentTag($body['path'], $body['tag']);
+                if (!$id) { $this->errorUnableToOperate(); }
+                if ($this->msg) { $this->msg->update($id, $this->clientid); }
+                $this->ok(json_encode(['id' => $id]));
                 break;
             case 'create-document':
                 $parent = null;
@@ -620,6 +628,24 @@ class http {
                 break;
             case 'get-active-tags':
                 $this->ok(json_encode(['tags' => $this->ked->findActiveTags()]));
+                break;
+            case 'archive':
+                if (empty($body['anyid'])) { $this->errorBadRequest(); }
+                $dn = $this->ked->pathToDn($body['anyid']);
+                if (!$dn) { $this->errorNotFound(); }
+                $id = $this->ked->archive($dn);
+                if (!$id) { $this->errorUnableToOperate(); }
+                if ($this->msg) { $this->msg->update($id, $this->clientid); }
+                $this->ok(json_encode(['archive' => $this->ked->idFromPath($body['anyid'])]));
+                break;
+            case 'unarchive':
+                if (empty($body['anyid'])) { $this->errorBadRequest(); }
+                $dn = $this->ked->pathToDn($body['anyid']);
+                if (!$dn) { $this->errorNotFound(); }
+                $id = $this->ked->unarchive($dn);
+                if (!$id) { $this->errorUnableToOperate(); }
+                if ($this->msg) { $this->msg->update($id, $this->clientid); }
+                $this->ok(json_encode(['unarchive' => $this->ked->idFromPath($body['anyid'])]));
                 break;
         }
     }

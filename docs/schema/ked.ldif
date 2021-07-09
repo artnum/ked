@@ -171,20 +171,34 @@ olcAttributeTypes: (kedAttr:25 NAME 'kedType'
   ORDERING caseExactOrderingMatch
   SINGLE-VALUE
  )
+olcAttributeTypes: (kedAttr:26 NAME 'kedArchived'
+  DESC 'Unix timestamp of modification'
+  EQUALITY integerMatch
+  ORDERING integerOrderingMatch
+  SYNTAX 1.3.6.1.4.1.1466.115.121.1.27 
+  SINGLE-VALUE
+ )
+olcAttributeTypes: (kedAttr:27 NAME 'kedDescription'
+  DESC 'Short description that can be associated to an object'
+  SYNTAX 1.3.6.1.4.1.1466.115.121.1.15{480}
+  EQUALITY caseExactMatch
+  SUBSTR caseExactSubstringsMatch
+  ORDERING caseExactOrderingMatch
+  SINGLE-VALUE )
 olcObjectClasses: (kedClass:1 NAME 'kedEntry'
   SUP top
   STRUCTURAL
   DESC 'An entry, the rdn most likely in form kedUid=...+kedTimestamp=...
   Empty entry have no content'
   MUST ( kedTimestamp $ kedId )
-  MAY ( kedContent $ kedContentType $ kedNext $kedDeleted $ kedModified $ kedSignature $ kedApplication $kedContentReference $ kedRelatedTag )
+  MAY ( kedContent $ kedContentType $ kedNext $ kedDeleted $ kedModified $ kedSignature $ kedApplication $kedContentReference $ kedRelatedTag $ kedArchived $ kedDescription )
  )
 olcObjectClasses: (kedClass:2 NAME 'kedDocument'
   SUP top
   STRUCTURAL
   DESC 'A document. Basically it contains kedEntry. As many as needed.'
   MUST ( kedTimestamp $ kedId )
-  MAY ( kedName $ kedContentType $ kedDeleted $ kedModified $ kedApplication $ kedRelatedTag )
+  MAY ( kedName $ kedContentType $ kedDeleted $ kedModified $ kedApplication $ kedRelatedTag $ kedArchived $ kedDescription )
  )
 olcObjectClasses: (kedClass:3 NAME 'kedTask'
   SUP top
