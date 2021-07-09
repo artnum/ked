@@ -52,8 +52,9 @@ function KEDDocument (doc, api) {
             `<div class="ksubmenu">` +
             `<button class="kui small" data-action="add-text"><i class="fas fa-file-alt"> </i>&nbsp;Texte</button>` +
             `<button class="kui small" data-action="upload-file"><i class="fas fa-cloud-upload-alt"> </i>&nbsp;Fichier</button>` +
-            `<button class="kui small" data-action="archive-document"><i class="fas fa-archive"> </i>&nbsp;Archiver</button>` +
-            `<button class="kui small danger" data-action="delete-document"><i class="fas fa-trash"> </i>&nbsp;Supprimer</button>` +
+            `<button class="kui small" data-display="next" data-action="archive-document"><i class="fas fa-archive"> </i>&nbsp;Archiver</button>` +
+            `<button class="kui small danger" data-display="next" data-action="delete-document"><i class="fas fa-trash"> </i>&nbsp;Supprimer</button>` +
+            `<button class="kui verysmall" data-action="display-next"><i class="fas fa-forward"></i></button>` +
             `</div>` +
             `<div id="tag-${doc.id}" class="ktags">` +
             `</div>` +
@@ -61,6 +62,7 @@ function KEDDocument (doc, api) {
             `<span data-action="remove-tag"><i class="fas fa-minus-circle"></i>&nbsp;Retirer tag</span></div>` +
             `</div>`
 
+        kedDocument.domNode.querySelector('button[data-action="display-next"]').addEventListener('click', kedDocument.handleNextEvent.bind(kedDocument))
         kedDocument.domNode.addEventListener('dragenter', kedDocument.handleDragEvent.bind(kedDocument), {capture: true})
         kedDocument.domNode.addEventListener('dragover', kedDocument.handleDragEvent.bind(kedDocument), {capture: true})
         kedDocument.domNode.addEventListener('dragleave', kedDocument.handleDragEvent.bind(kedDocument), {capture: true})
@@ -76,6 +78,21 @@ function KEDDocument (doc, api) {
     kedDocument.applyStates()
 
     return kedDocument
+}
+
+KEDDocument.prototype.handleNextEvent = function (event) {
+    if (!event.target.dataset.action && !event.target.parentNode?.dataset?.action) { return }
+    const node = event.target.dataset.action ? event.target : event.target.parentNode
+
+    const buttons = node.parentNode.querySelectorAll('button')
+    for (const button of buttons) {
+        if (button === node) { continue }
+        if (!button.dataset.display) {
+            button.dataset.display = 'next'
+        } else {
+            delete button.dataset.display
+        }
+    }
 }
 
 KEDDocument.prototype.handleDragEvent = function (event) {

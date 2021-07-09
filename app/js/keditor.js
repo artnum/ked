@@ -170,6 +170,7 @@ KEditor.prototype.setupPage = function () {
     setInterval(this.updateActiveTags.bind(this), 60000)
     this.pathDisplay = document.createElement('DIV')
     this.pathDisplay.classList.add('kpath')
+    this.pathDisplay.innerHTML = '&nbsp;'
     this.container.appendChild(this.pathDisplay)
     this.headerMenu = document.createElement('DIV')
     this.headerMenu.classList.add('kmenu')

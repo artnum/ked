@@ -339,6 +339,10 @@
     font-size: 18px;
 }
 
+.ksubmenu button[data-display="next"] {
+    display: none;
+}
+
 .ktool {
     display: flex;
     flex-wrap: wrap;
@@ -363,7 +367,13 @@
     border-radius: 4px;
 }
 
-button.kui.small {
+button.kui.verysmall {
+    max-width: 30px;
+    min-width: 30px;
+    width: 30px;
+}
+
+button.kui.small, button.kui.verysmall {
     height: 26px;
     font-size: 12px;
 }
