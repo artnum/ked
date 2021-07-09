@@ -674,6 +674,9 @@ KEditor.prototype.renderEntry = function (path, entry) {
         const subresolve = function (htmlnode) {
             htmlnode.dataset.entryid = entry.id
             htmlnode.id = entry.abspath
+            if (entry.user) {
+                htmlnode.dataset.users = JSON.stringify(entry.user)
+            }
             if (entry['+class'].indexOf('task') !== -1) {
                 htmlnode.dataset.task = '1'
             }
@@ -1444,7 +1447,6 @@ KEditor.prototype.renderSingle = function (doc) {
             kedDocument.addEventListener('add-tag', (event) => { this.addTagInteract(event.detail.target.getDomNode()); })
             kedDocument.addEventListener('drop', this.dropEntry.bind(this))
 
-
             htmlnode = kedDocument.getDomNode()
             const tagNode = htmlnode.querySelector(`#tag-${kedDocument.getRelativeId()}`)
             for (const tag of doc.tags) {
@@ -1551,11 +1553,20 @@ KEditor.prototype.renderSingle = function (doc) {
                             entryContainer.classList.add('flowed')
                             break
                     }
+                    const entryDetails = document.createElement('DIV')
+                    entryDetails.classList.add('kentry-details')
+                    entryDetails.innerHTML = `<span class="name">${nodes[i].dataset.name}</span>`
+                    if (nodes[i].dataset.users) {
+                        const users = JSON.parse(nodes[i].dataset.users)
+                        for (const userid in users) {
+                            entryDetails.innerHTML += `<span class="kuser" data-id="${userid}">@${users[userid]}</span>`
+                        }
+                    }
+                    entryContainer.appendChild(entryDetails)
                     const entryTools = document.createElement('DIV')
                     entryTools.classList.add('kentry-tools')
                     entryTools.innerHTML = `<button class="kui small" data-action="edit-entry"><i class="fas fa-edit"> </i>&nbsp;Éditer</button>`
                         +`<button class="kui danger small" data-action="delete-entry"><i class="fas fa-trash"></i>&nbsp;Supprimer</button>`
-                        + `<span class="name">${nodes[i].dataset.name}</span>`
                     entryTools.addEventListener('click', this.handleToolsEvents.bind(this))
                     entryContainer.appendChild(entryTools)
                 }

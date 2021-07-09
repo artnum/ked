@@ -147,11 +147,27 @@
     margin: 10px 0;
 }
 
-.kentry-tools {
+.kentry-tools, .kentry-details {
+    font-size: 12px;
     background-color: var(--light-bg-color);
     padding: 4px;
     margin: 0;
     font-size: 16px;
+}
+
+.kentry-details {
+    font-size: 12px;
+}
+.kentry-details span {
+    display: inline-block;
+    margin-left: 1ch;
+    max-width: 16ch;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.kentry-details span.kuser {
+    color: sienna;
 }
 
 .kentry-tools span {
@@ -159,14 +175,10 @@
     cursor: pointer;
 }
 
-.kentry-tools .name {
-    display: flex;
-    align-items: center;
-    height: 26px;
-    float: right;
+.kentry-details .name {
+    display: block;
+    max-width: 40ch;
     font-family: 'B612 Mono', monospace;
-    font-size: 12px;
-    text-overflow: ellipsis;
 }
 
 .kentry-container.squared {

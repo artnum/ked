@@ -720,7 +720,8 @@ class ked {
                 'kedContentType',
                 'kedSignature',
                 'kedApplication',
-                'kedArchived'
+                'kedArchived',
+                'kedUser'
             ],
             0,
             $limits[0],
