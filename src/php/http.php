@@ -62,10 +62,12 @@ class http {
 
     function setUserStore($userstore) {
         $this->userStore = $userstore;
+        $this->ked->setUserStore($userstore);
     }
 
     function setUser($user) {
         $this->user = $user;
+        $this->ked->setCurrentUser($user->getDbId());
     }
 
     function responseHeaders() {

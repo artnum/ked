@@ -2,7 +2,6 @@
 declare(strict_types=1);
 namespace ked;
 
-use ArrayAccess;
 use Iterator;
 use Normalizer;
 
@@ -39,7 +38,8 @@ class ked {
         'taskEnd' => ['kedTaskEnd', false, false, false],
         'taskDone' => ['kedTaskDone', false, false, false],
         'taskPrevious' => ['kedTaskPrevious', false, false, true],
-        'tags' => [ 'kedRelatedTag', false, false, true]
+        'tags' => ['kedRelatedTag', false, false, true],
+        'user' => ['kedUser', false, false, false]
     ];
 
     const classAttrMap = [
@@ -55,6 +55,7 @@ class ked {
         $this->base = null;
         $this->tagBase = null;
         $this->aclBase = null;
+        $this->currentUser = null;
     }
 
     function init():bool {
@@ -91,6 +92,14 @@ class ked {
 
         $this->rootTag = $rootTag;
         return true;
+    }
+
+    function setCurrentUser ($dn) {
+        $this->currentUser = $dn;
+    }
+
+    function setUserStore ($store) {
+        $this->userStore = $store;
     }
 
     /* for master/slave structure, add a write connection */
@@ -208,6 +217,10 @@ class ked {
                 $document['kedRelatedTag'][] = $tag;
             }
         }
+        if ($this->currentUser) {
+            $document['kedUser'] = $this->currentUser;
+        }
+
         /* base is from configuration, rdn is generated, no need to escape */
         $dn = sprintf('%s,%s', $rdn[0], $parent);
         $res = @ldap_add($this->rwconn, $dn, $document);
@@ -226,6 +239,9 @@ class ked {
         $entry['kedModified'] = $rdn[2];
         if (!empty($content) && $content !== null) {
             $entry['kedContent'] = $content;
+        }
+        if ($this->currentUser) {
+            $entry['kedUser'] = $this->currentUser;
         }
         $entry['objectClass'] = 'kedEntry';
         
@@ -600,6 +616,18 @@ class ked {
             }
         }
 
+        $users = [];
+        if ($this->userStore && !empty($currentEntry['user'])) {
+            if (!is_array($currentEntry['user'])) { $currentEntry['user'] = [$currentEntry['user']]; }
+            foreach ($currentEntry['user'] as $userid) {
+                $user = $this->userStore->getUserByDbId($userid);
+                if ($user) {
+                    $users[$user->getUid()] = $user->getDisplayName();
+                }
+            }
+        }
+        $currentEntry['user'] = $users;
+
         return $currentEntry;
     }
 
@@ -900,7 +928,14 @@ class ked {
         }
         if (!empty($options['contentRef'])) {
             $updateCurrentEntry['kedContentReference'] = $options['contentRef'];
-        }       
+        }
+        if (!empty($currentEntry['kedUser'])) {
+            if (!is_array($currentEntry['kedUser'])) { $currentEntry['kedUser'] = [$currentEntry['kedUser']]; }
+            if (!in_array($this->currentUser, $currentEntry['kedUser'])) {
+                $updateCurrentEntry['kedUser'] = $currentEntry['kedUser'];
+                $updateCurrentEntry['kedUser'][] = $this->currentUser;
+            }
+        }
         $res = ldap_mod_replace($this->rwconn, $currentEntry['dn'], $updateCurrenEntry);
         if (!$res) { $this->ldapFail($this->rwconn); return null; }
         return $currentEntry['id'];
@@ -917,6 +952,13 @@ class ked {
         $newEntryDn = $this->createEntry($docDn, $content, $options);
         if ($newEntryDn === null) { return null; } 
         $updateCurrent = ['kedModified' => time(), 'kedNext' => $newEntryDn];
+        if (!empty($currentEntry['kedUser'])) {
+            if (!is_array($currentEntry['kedUser'])) { $currentEntry['kedUser'] = [$currentEntry['kedUser']]; }
+            if (!in_array($this->currentUser, $currentEntry['kedUser'])) {
+                $updateCurrentEntry['kedUser'] = $currentEntry['kedUser'];
+                $updateCurrentEntry['kedUser'][] = $this->currentUser;
+            }
+        }
         $res = ldap_mod_replace($this->rwconn, $currentEntry['dn'], $updateCurrent);
         if (!$res) { $this->ldapFail($this->rwconn); return null; }
         return $currentEntry['id']; // update do not change the id
@@ -933,6 +975,13 @@ class ked {
         $newEntryDn = $this->createEntry($this->getParentDn($currentEntry['dn']), $content, $options);
         if ($newEntryDn === null) { return null; }
         $updateCurrent = [ 'kedModified' => time(), 'kedNext' => $newEntryDn ];
+        if (!empty($currentEntry['kedUser'])) {
+            if (!is_array($currentEntry['kedUser'])) { $currentEntry['kedUser'] = [$currentEntry['kedUser']]; }
+            if (!in_array($this->currentUser, $currentEntry['kedUser'])) {
+                $updateCurrentEntry['kedUser'] = $currentEntry['kedUser'];
+                $updateCurrentEntry['kedUser'][] = $this->currentUser;
+            }
+        }
         $res = @ldap_mod_replace($this->rwconn, $currentEntry['dn'], $updateCurrent);
         if (!$res) {
             /* rollback operation */
@@ -1082,6 +1131,13 @@ class ked {
  
     /* Search while enforcing parent filter to child */
     function ldap_search (string $base, $filter, $attributes = ['*'], $limits = [-1, -1], $ctrls = [], $loadentry = null) {
+
+        switch ($base) {
+            case ':acl': $base = $this->aclBase; break;
+            case ':tag': $base = $this->tagBase; break;
+            case ':document': $base = $this->base; break;
+        }
+
         $result = new KEDLdapResult();
         $result->search($this->conn, $base, $filter, $attributes, $limits, $ctrls, $loadentry);
         return $result;

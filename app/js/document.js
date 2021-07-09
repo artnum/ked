@@ -56,6 +56,7 @@ function KEDDocument (doc, api) {
             `<button class="kui small danger" data-display="next" data-action="delete-document"><i class="fas fa-trash"> </i>&nbsp;Supprimer</button>` +
             `<button class="kui verysmall" data-action="display-next"><i class="fas fa-forward"></i></button>` +
             `</div>` +
+            `<div class="kusers">${kedDocument.htmlUserList()}</div>` +
             `<div id="tag-${doc.id}" class="ktags">` +
             `</div>` +
             `<div class="ktags-tools" ><span data-action="add-tag"><i class="fas fa-plus-circle"></i>&nbsp;Ajouter tag</span>` +
@@ -78,6 +79,15 @@ function KEDDocument (doc, api) {
     kedDocument.applyStates()
 
     return kedDocument
+}
+
+KEDDocument.prototype.htmlUserList = function () {
+    if (!this.doc.user) { return '' }
+    let userhtml = ''
+    for (let userid in this.doc.user) {
+        userhtml += `<span class="kuser" data-id="${userid}">@${this.doc.user[userid]}</span>`
+    }
+    return userhtml
 }
 
 KEDDocument.prototype.handleNextEvent = function (event) {
