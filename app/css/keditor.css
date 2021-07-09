@@ -360,14 +360,15 @@
     flex-wrap: wrap;
     justify-content: space-between;
 }
-.kmenu .tools span[data-action], button.kui {
+
+.kmenu .tools span[data-action], button.kui, input.kui {
     background-color: var(--button-bg-color);
     color: var(--button-color);
-    border: 1px solid var(--button-border-color);
+    border: 2px solid var(--button-border-color);
     font-size: 14px;
     cursor: pointer;
     display: inline-flex;
-    height: 36px;
+    min-height: 36px;
     max-height: 36px;
     align-items: center;
     justify-content: center;
@@ -377,6 +378,13 @@
     margin: 0 5px 0 5px;
     padding: 0 5px 0 5px; 
     border-radius: 4px;
+}
+
+input.kui {
+    background-color: white !important;
+    color: black !important;
+    max-height: 32px;
+    min-height: 32px;
 }
 
 button.kui.verysmall {
@@ -396,16 +404,26 @@ button.danger {
     border: 1px solid var(--button-danger-border-color);
 }
 
-.kmenu .tools span[data-action]:hover, button.kui:hover {
+.kmenu .tools span[data-action]:hover, button.kui:hover, input.kui:hover {
     background-color: var(--button-bg-hover-color);
     color: var(--button-hover-color);
     border: 2px solid var(--button-border-hover-color);
 }
 
-.kmenu .tools span[data-action]:active, button.kui:active {
+.kmenu .tools span[data-action]:active, button.kui:active, input.kui:active {
     background-color: var(--button-bg-active-color);
     color: var(--button-active-color);
     border: 2px solid var(--button-border-active-color);
+}
+
+input.kui:hover {
+    background-color: white !important;
+    color: black !important;
+}
+
+input.kui:active {
+    background-color: white !important;
+    color: black !important;
 }
 
 button.danger.kui:hover {

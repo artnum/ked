@@ -176,7 +176,7 @@ KEditor.prototype.setupPage = function () {
     this.headerMenu.classList.add('kmenu')
     this.headerMenu._tools = '<div class="ktool"><div class="tools"><button class="kui" data-action="add-document"><i class="fas fa-folder-plus"></i> Nouveau document</button></div>' +
         '<div class="tools"><button class="kui" data-action="show-tags"><i class="fas fa-tags"> </i>&nbsp;Liste des tags</button></div>' +
-        '<div class="search"><form name="search"><input type="text" name="search" value=""/> <button class="kui" type="submit">Rechercher</button></form></div></div>'
+        '<div class="search"><form name="search"><input class="kui" type="text" name="search" value=""/> <button class="kui" type="submit">Rechercher</button></form></div></div>'
     this.headerMenu.addEventListener('click', this.menuEvents.bind(this))
     this.headerMenu.addEventListener('submit', this.menuFormSubmit.bind(this))
     this.container.appendChild(this.headerMenu)
