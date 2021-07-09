@@ -4,10 +4,12 @@ function KEditor(container, baseUrl) {
     this.container = container
     this.baseUrl = baseUrl
     this.cwd = ''
-    this.previousPath = []
-
+    
     this.title = KED.title ?? 'Sans titre'
     this.pushState('path', '', this.title)
+    
+    this.previousTitles = []
+    this.previousPath = []
 
     this.tags = new Map()
     this.LockedNotFound = new Map()
@@ -166,6 +168,9 @@ KEditor.prototype.showTags = function () {
 KEditor.prototype.setupPage = function () {
     this.updateActiveTags()
     setInterval(this.updateActiveTags.bind(this), 60000)
+    this.pathDisplay = document.createElement('DIV')
+    this.pathDisplay.classList.add('kpath')
+    this.container.appendChild(this.pathDisplay)
     this.headerMenu = document.createElement('DIV')
     this.headerMenu.classList.add('kmenu')
     this.headerMenu._tools = '<div class="ktool"><div class="tools"><button class="kui" data-action="add-document"><i class="fas fa-folder-plus"></i> Nouveau document</button></div>' +
@@ -534,11 +539,34 @@ KEditor.prototype.setPath = function (path) {
     this.cwd = path
 }
 
-KEditor.prototype.cd = function (abspath) {
-    if (!this.previousPath) {
-        this.previousPath = []
+KEditor.prototype.renderPath = function () {
+    if (this.previousTitles.length > 0) {
+        this.pathDisplay.innerHTML = this.previousTitles.join(' » ')
+    } else {
+        this.pathDisplay.innerHTML = '&nbsp;'
     }
+}
+
+KEditor.prototype.reset = function () {
+    this.previousPath = []
+    this.previousTitles = []
+    this.renderPath()
+}
+
+KEditor.prototype.backward = function () {
+    this.previousTitles.pop()
+    this.renderPath()
+    return this.previousPath.pop()
+}
+
+KEditor.prototype.forward = function () {
     this.previousPath.push(this.cwd)
+    this.previousTitles.push(this.title)
+    this.renderPath()
+}
+
+KEditor.prototype.cd = function (abspath) {
+    this.forward()
     this.cwd = abspath
 }
 
@@ -923,7 +951,7 @@ KEditor.prototype.menuFormSubmit = function (event) {
 
 KEditor.prototype.search = function (formData) {
     this.pushState('search', this.formData2Json(formData))
-    this.previousPath.push(this.cwd)
+    this.forward()
     const searchTerm = formData.get('search')
     this.setTitle(`Recherche "${searchTerm}"`)
     const operation = {
@@ -943,7 +971,8 @@ KEditor.prototype.menuEvents = function (event) {
     if (!actionNode) { return }
 
     switch(actionNode.dataset.action) {
-        case 'history-back': this.cwd = this.previousPath.pop(); this.resetTag(); this.ls(); break
+        case 'history-back': this.cwd = this.backward(); this.resetTag(); this.ls(); break
+        case 'history-home': this.cwd = ''; this.reset(); this.resetTag(); this.ls(); break
         case 'add-document':  this.addDocumentInteract(this.cwd); break
         case 'show-tags': this.showTags(); break
     }
@@ -1573,11 +1602,11 @@ KEditor.prototype.render = function (root) {
 
     if (this.cwd === '') {
         KEDAnim.push(() => {
-            this.headerMenu.innerHTML = `<span class="kmenu-title">${this.title}</span>${this.headerMenu._tools}`
+            this.headerMenu.innerHTML = `<span data-action="history-home" class="back"><i class="fas fa-home"></i></span><span class="kmenu-title">${this.title}</span>${this.headerMenu._tools}`
         })
     } else {
         KEDAnim.push(() => {
-            this.headerMenu.innerHTML = `<span data-action="history-back" class="back"><i class="fas fa-arrow-left"></i></span><span class="kmenu-title">${this.title}</span>${this.headerMenu._tools}`
+            this.headerMenu.innerHTML = `<span data-action="history-home" class="back"><i class="fas fa-home"></i></span><span data-action="history-back" class="back"><i class="fas fa-arrow-left"></i></span><span class="kmenu-title">${this.title}</span>${this.headerMenu._tools}`
         })
     }
 

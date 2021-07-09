@@ -289,6 +289,11 @@
     align-self: flex-end;
 }
 
+.kpath {
+    font-family: 'B612 Mono';
+    font-size: 12px;
+}
+
 .kmenu {
     font-size: 36px;
     margin: 0.5em 0;
@@ -298,10 +303,12 @@
     padding: 0 3px;
     width: 48px;
     height: 42px;
-    display: inline-block;
+    display: inline-flex;
+    justify-content: center;
     color: var(--light-bg-color);
     background-color: var(--bg-color);
     margin: 0 0.3ch 0 0;
+    cursor: pointer;
 }
 
 .kmenu .back:active {
