@@ -402,6 +402,7 @@ KEditor.prototype.fetch = function (path, content) {
                 switch (response.status) {
                     default: break;
                     case 404: ret.data = 'Objet pas trouvé'; break
+                    case 403: ret.data = 'Accès non-autorisé'; break
                     case 400: ret.data = 'Mauvaise requête'; break
                     case 406: ret.data = 'Mauvais contenu'; break;
                     case 405: ret.data = 'Méthode non-supportée'; break

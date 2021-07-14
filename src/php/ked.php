@@ -631,6 +631,37 @@ class ked {
         return $currentEntry;
     }
 
+    function getUserByUid (string $uid) {
+        return $this->userStore->getUser($uid);
+    }
+
+    function getUserByDbId (string $dbId) {
+        return $this->userStore->getUserByDbId($dbId);
+    }
+
+    function getObjectUsersObjects (string $dn):array {
+        $users = [];
+        $res = @ldap_read(
+            $this->conn,
+            $dn,
+            '(objectclass=*)',
+            [
+                'kedUser'
+            ]
+        );
+        if (!$res) { $this->ldapFail($this->conn); return $users; }
+        $entry = @ldap_first_entry($this->conn, $res);
+        if (!$entry) { $this->ldapFail($this->conn); return $users; }
+        $values =  @ldap_get_values($this->conn, $entry, 'kedUser');
+        if (!$values) { return $users; }
+        if ($values['count'] <= 0) { return $users; }
+        for ($i = 0; $i < $values['count']; $i++) {
+            $user = $this->userStore->getUserByDbId($values[$i]);
+            if ($user) { $users[] = $user; }
+        }
+        return $users;
+    }
+
     function getMetadata (string $dn):?array {
         $res = @ldap_read($this->conn, $dn, '(objectclass=*)', [ 
             'kedId',
@@ -645,7 +676,7 @@ class ked {
             'kedContentReference',
             'kedRelatedTag',
             'kedArchived'
-            ]);
+        ]);
         if (!$res) { $this->ldapFail($this->conn); return null; }
         $entry = @ldap_first_entry($this->conn, $res);
         if (!$entry) { $this->ldapFail($this->conn); return null; }

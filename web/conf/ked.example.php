@@ -26,5 +26,24 @@ $KEDConfiguration = [
             'port' => 8531,
             'key' => 'ked-demo-key'
         ]
+    ],
+    'acl' => [
+        /* when nothing set in anyway */
+        'default' => [
+            'everything',
+            '-delete'
+        ],
+        'ownobject' => [
+            'access',
+            'create',
+            'create:sub',
+            'create:entry',
+            'delete',
+            'undelete',
+            'tag',
+            'untag',
+            'archive',
+            'unarchive'
+        ]
     ]
 ];

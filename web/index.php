@@ -51,6 +51,7 @@ if (($user = $menshen->check()) !== false) {
         $KEDConfiguration['message'][0]['key']
     );
     $http = new http($high, $msg);
+    $http->setAclConfiguration($KEDConfiguration['acl']);
     $http->setUser($user);
     $http->setUserStore($credStore);
     $http->run();

@@ -14,8 +14,11 @@ class http {
     protected $user;
     protected $clientid;
     protected $requestid;
+    protected $aclConfiguration = null;
+
     function __construct(high $ked, msg $msg = null)
     {
+        $this->startRequest = microtime(true);
         $this->ked = $ked;
         $this->msg = $msg;
         $this->requestid = null;
@@ -58,6 +61,10 @@ class http {
             $this->configuration[$k] = $v;
         }
         return;
+    }
+
+    function setAclConfiguration ($acl) {
+        $this->acl->setConfiguration($acl);
     }
 
     function setUserStore($userstore) {
@@ -260,6 +267,9 @@ class http {
         echo Normalizer::normalize($txt, Normalizer::FORM_C);
     }
 
+    function end () {
+    }
+
     function run () {
         $method = strtolower($_SERVER['REQUEST_METHOD']);
         switch ($method) {
@@ -307,6 +317,7 @@ class http {
                         $formatted->output();
                     }
                 }
+                $this->end();
                 break;
             /* post is the api access */
             case 'post':
@@ -344,11 +355,14 @@ class http {
                 }
                 $this->setJsonOut();
                 $this->postOperation($body);
+                $this->end();
                 break;
             case 'head':
+                $this->end();
                 break;
             default:
                 $this->errorUnsupportedMethod();
+                $this->end();
                 break;
         }
     }
@@ -420,7 +434,13 @@ class http {
                 if (empty($body['path'])) {
                     $this->errorBadRequest();
                 }
+
+                $entryDn = $this->ked->pathToDn($body['path']);
+                if (!$entryDn) { $this->errorNotFound(); }
+                if (!$this->acl->can($this->user, 'tag', $entryDn)) { $this->errorForbidden(); }
+
                 $id = $this->ked->addDocumentTag($body['path'], $body['tag']);
+
                 if ($id === null) { $this->errorNotFound(); }
                 if ($this->msg) { $this->msg->update($id, $this->clientid); }
                 $this->ok(json_encode(['id' => $id, 'tag' => $body['tag']]));
@@ -428,6 +448,11 @@ class http {
             case 'remove-tag':
                 if (empty($body['tag'])) { $this->errorBadRequest(); }
                 if (empty($body['path'])) { $this->errorBadRequest(); }
+
+                $entryDn = $this->ked->pathToDn($body['path']);
+                if (!$entryDn) { $this->errorNotFound(); }
+                if (!$this->acl->can($this->user, 'untag', $entryDn)) { $this->errorForbidden(); }
+
                 $id = $this->ked->removeDocumentTag($body['path'], $body['tag']);
                 if (!$id) { $this->errorUnableToOperate(); }
                 if ($this->msg) { $this->msg->update($id, $this->clientid); }
@@ -470,12 +495,16 @@ class http {
                 if (!empty($body['format']) && strtolower($body['format']) === 'extended') {
                     $extended = true;
                 }
+                if (!$this->acl->can($this->user, 'list', $parent ?? $this->ked->getDocumentBase())) { $this->errorForbidden(); }
                 $documents = $this->ked->listDirectory($parent, $extended);
                 if ($documents === null) { $this->errorUnableToOperate(); }
                 $this->ok(json_encode(['documents' => $documents]));
                 break;
             case 'get-info':
                 if (empty($body['path'])) { $this->errorBadRequest(); }
+                $entryDn = $this->ked->pathToDn($body['path'], false);
+                if (!$entryDn) { $this->errorNotFound(); }
+                if (!$this->acl->can($this->user, 'access', $entryDn)) { $this->errorForbidden(); }
                 $document = $this->ked->getInfo($body['path']);
                 if ($document === null) { $this->errorNotFound(); }
                 $this->ok(json_encode($document));
@@ -503,6 +532,10 @@ class http {
 
                 if (empty($body['path'])) { $this->errorBadRequest(); }
                 if (empty($body['_file']) || !is_array($body['_file'])) { $this->errorBadRequest(); }
+
+                $entryDn = $this->ked->pathToDn($body['path'], false);
+                if ($entryDn === null) { $this->errorNotFound(); }
+                if (!$this->acl->can($this->user, 'create:entry', $entryDn)) { $this->errorForbidden(); }
 
                 $mimeparts = explode('/', $body['_file']['type']);
                 $id = null;
@@ -592,6 +625,7 @@ class http {
                 if (empty($body['path'])) { $this->errorBadRequest(); }
                 $anyDn = $this->ked->pathToDn($body['path'], false);
                 if ($anyDn === NULL) { $this->errorNotFound(); }
+                if (!$this->acl->can($this->user, 'delete', $anyDn)) { $this->errorForbidden(); }
                 $deleted = $this->ked->deleteByDn($anyDn);
                 if ($this->msg) { $this->msg->delete($this->ked->idFromPath($body['path']), $this->clientid); }
                 $this->ok(json_encode(['path' => $body['path'], 'deleted' => $deleted]));
@@ -635,6 +669,9 @@ class http {
                 if (empty($body['anyid'])) { $this->errorBadRequest(); }
                 $dn = $this->ked->pathToDn($body['anyid']);
                 if (!$dn) { $this->errorNotFound(); }
+
+                if (!$this->acl->can($this->user, 'archive', $dn)) { $this->errorForbidden(); }
+
                 $id = $this->ked->archive($dn);
                 if (!$id) { $this->errorUnableToOperate(); }
                 if ($this->msg) { $this->msg->update($id, $this->clientid); }
@@ -644,6 +681,9 @@ class http {
                 if (empty($body['anyid'])) { $this->errorBadRequest(); }
                 $dn = $this->ked->pathToDn($body['anyid']);
                 if (!$dn) { $this->errorNotFound(); }
+
+                if (!$this->acl->can($this->user, 'unarchive', $dn)) { $this->errorForbidden(); }
+
                 $id = $this->ked->unarchive($dn);
                 if (!$id) { $this->errorUnableToOperate(); }
                 if ($this->msg) { $this->msg->update($id, $this->clientid); }

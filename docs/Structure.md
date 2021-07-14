@@ -69,3 +69,41 @@ Tag is a well known system. You tag something and search by tags. Here we just a
 ## ACL
 
 ACL are enforced through tag, people have access to item based on their tag.
+
+ACL set an access to an object, be it "access", "create", "delete" and others actions that have yet to be defined. When defining an ACL, it checks ownership and apply default ownership ACL. Then it goes through tag of the object, it searches for the user or group of user associated, via acl object related to the tag, to build a list of actions.
+
+The list of action contains either positive or negative action "access" set the right to access, "-access" remove the right to access. The list of action is solved by adding all action matching the user, through different tags, and then adding all the positive action (once for each action). Once all positive action are set, it starts to remove negative action. Action left are what is allowed. So you can have ACL made to remove action only.
+You have short names (like everything) that expand into a set of several actions.
+
+Remember, owner of an object (an object with kedUser set to the user), don't go through the tag related check.
+
+There is a third decision part for object with no tags and no user : default. Its a set of action, set by configuration, that are applied when no ACL can be applied to the object.
+
+As tags are tagged, and all get the default "root" tag, you can build ACL in hiearchical way. A positive approach could be to add everything to root tag and then restrict on subsequent tags or do the reverse, nothing on root tag (so no ACL, -everything will disallow everything for everyone except creator), and add up down the road.
+
+The document root has is dn considered as a tag and has no owner. So ACL for document root need to be set before hand.
+
+
+### Example
+
+  tag1 : access delete archive
+  tag2 : -delete
+  tag3 : -archive
+  tag4 : archive
+    =>   access, delete, archive, -delete, -archive, archive
+    ==>  access, delete, archive, -delete, -archive
+    ===> access
+
+  tag1: everything
+  tag2: -delete
+    =>   everything, -delete
+    ==>  access, create, create:sub, create:entry, ..., delete, -delete
+    ===> access, create, create:sub, create:entry, ...
+
+## Resolving ACL membership
+
+When an ACL is created, relative to a tag, members are added. The system will try to match the member to a user by its id or user id. If not, it will look for typical LDAP groups and try to match with thoses groups.
+
+
+
+Some role based might be added.
