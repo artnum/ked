@@ -1476,32 +1476,6 @@ KEditor.prototype.renderSingle = function (doc) {
                     this.toHighlight = null
                 }, 5000)
             }
-            if (!refresh) {
-                htmlnode.addEventListener('dragover', (event) => { event.preventDefault() }) 
-                htmlnode.addEventListener('dragenter', (event) => { 
-                    let node = event.target
-                    while (node && ! node.dataset?.pathid) { node = node.parentNode }
-                    if (node.dataset.kedDrageCounter === undefined) {
-                        node.dataset.kedDrageCounter = 0
-                    }
-                    node.dataset.kedDrageCounter++
-                    KEDAnim.push(() => {
-                        node.classList.add('highlight')
-                    })
-                    event.preventDefault() 
-                })
-                htmlnode.addEventListener('dragleave', (event) => { 
-                    let node = event.target
-                    while (node && ! node.dataset?.pathid) { node = node.parentNode }
-                    node.dataset.kedDrageCounter--
-                    KEDAnim.push(() => {
-                        if (node.dataset.kedDrageCounter <= 0) {
-                            node.classList.remove('highlight')
-                        }
-                    })
-                    event.preventDefault() 
-                })
-            }
             if ((Array.isArray(doc['+entries']) && doc['+entries'].length >0) || doc['+entries'] > 0) {
                 htmlnode.classList.add('with-entries')
             }

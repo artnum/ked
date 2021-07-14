@@ -64,10 +64,10 @@ function KEDDocument (doc, api) {
             `</div>`
 
         kedDocument.domNode.querySelector('button[data-action="display-next"]').addEventListener('click', kedDocument.handleNextEvent.bind(kedDocument))
-        kedDocument.domNode.addEventListener('dragenter', kedDocument.handleDragEvent.bind(kedDocument), {capture: true})
-        kedDocument.domNode.addEventListener('dragover', kedDocument.handleDragEvent.bind(kedDocument), {capture: true})
-        kedDocument.domNode.addEventListener('dragleave', kedDocument.handleDragEvent.bind(kedDocument), {capture: true})
-        kedDocument.domNode.addEventListener('drop', kedDocument.handleDropEvent.bind(kedDocument), {capture: true})
+        kedDocument.domNode.firstElementChild.addEventListener('dragenter', kedDocument.handleDragEvent.bind(kedDocument), {capture: true})
+        kedDocument.domNode.firstElementChild.addEventListener('dragover', kedDocument.handleDragEvent.bind(kedDocument), {capture: true})
+        kedDocument.domNode.firstElementChild.addEventListener('dragleave', kedDocument.handleDragEvent.bind(kedDocument), {capture: true})
+        kedDocument.domNode.firstElementChild.addEventListener('drop', kedDocument.handleDropEvent.bind(kedDocument), {capture: true})
     }
 
     if (doc['+lock']) {
