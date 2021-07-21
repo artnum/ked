@@ -16,6 +16,9 @@ class User {
     static function fromDN (ked $ked, string $dn):?User {
         $conn = $ked->getLdapConn();
 
+        /* if we can't explode a dn, it's not a dn */
+        if (ldap_explode_dn($dn, 1) === false) { return null; }
+
         $res = @ldap_read($conn, $dn, '(objectclass=*)', [ '*' ]);
         if (!$res) { return null; }
         $entry = @ldap_first_entry($conn, $res);

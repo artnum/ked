@@ -180,9 +180,9 @@ class ACL {
                                     }        
                                     break;
                                 default:
-                                    $user = $this->ked->getUserByDbId($value[$i]);
+                                    $user = User::fromDN($this->ked, $value[$i]);
                                     if ($user) {
-                                        $users[] = new User($this->ked, $user);
+                                        $users[] = $user;
                                     }
                             }
                         }
