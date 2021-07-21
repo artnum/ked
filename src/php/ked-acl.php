@@ -16,6 +16,24 @@ class ACL {
         ];
     }
 
+    function mapOp ($operation) {
+        switch($operation) {
+            default: return '';
+            case 'unarchive':
+            case 'archive':
+            case 'delete': return $operation;
+            case 'list-document': return 'list';
+            case 'get-info': return 'access';
+            case 'add-document-tag': return 'tag';
+            case 'remove-tag': return 'untag';
+            case 'create-document': return 'create:sub';
+            case 'get-document': return 'access';
+            case 'get-entry': return 'access';
+            case 'add-entry': return 'create:entry';
+            case 'update-entry': return 'create:entry';
+        }
+    }
+
     function setConfiguration(array $conf)
     {
         foreach ($conf as $k => $v) {

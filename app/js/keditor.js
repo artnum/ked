@@ -474,7 +474,7 @@ KEditor.prototype.ls = function () {
         
             if (this.cwd !== '') {
                 const cwd = this.cwd
-                this.getInfo(cwd)
+                this.API.getInfo(cwd)
                 .then(info => {
                     this.setTitle(info.name)
                     this.pushState('path', cwd)
@@ -568,8 +568,20 @@ KEditor.prototype.forward = function () {
 }
 
 KEditor.prototype.cd = function (abspath) {
-    this.forward()
-    this.cwd = abspath
+    return new Promise((resolve, reject) => {
+        this.API.check(abspath, 'list-document')
+        .then (can => {
+            if (can) {
+                this.forward()
+                this.cwd = abspath
+                resolve()
+            } else {
+                reject(new Error('Accès non-autorisé'))
+            }
+        })
+        .catch(reason => { reject(reason) })
+    })
+    
 }
 
 KEditor.prototype.interact = function (event) {
@@ -581,9 +593,12 @@ KEditor.prototype.interact = function (event) {
     switch (event.type) {
         case 'click':
             if (node.dataset.childs <= 0) { return }
-            this.cd(node.id)           
-            window.history.pushState({type: 'path', content: this.cwd}, '')
-            this.ls()
+            this.cd(node.id)
+            .then(() => {         
+                window.history.pushState({type: 'path', content: this.cwd}, '')
+                this.ls()
+            })
+            .catch(reason => this.error(reason))
             break
     }
 }
@@ -873,18 +888,6 @@ KEditor.prototype.deleteDocument = function (docNode) {
     })
 }
 
-KEditor.prototype.createTag = function (name = null, related = []) {
-    return new Promise((resolve, reject) => {
-        if (name === null) { resolve(null); return; }
-        const operation = {
-            operation: 'create-tag',
-            name,
-            related
-        }
-        this.fetch('', operation).then(result => resolve(result))
-    })
-}
-
 KEditor.prototype.addDocument = function (title = null, path = null) {
     const operation = {
         operation: 'create-document',
@@ -1002,7 +1005,13 @@ KEditor.prototype.submenuEvents = function (event) {
 
     switch (actionNode.dataset.action) {
         case 'delete-document': this.deleteDocumentInteract(docNode); break;
-        case 'open-document': this.cd(docNode.id); this.ls(); break
+        case 'open-document': 
+            this.cd(docNode.id)
+            .then(() => {
+                this.ls(); 
+            })
+            .catch(reason => this.error(reason))
+            break
         case 'toggle-entries': this.toggleEntriesDisplay(event); break;
         case 'add-text': this.docMustOpen(docNode.id); this.addTextInteract(docNode); break
         case 'upload-file': this.docMustOpen(docNode.id); this.uploadFileInteract(docNode); break
@@ -1067,7 +1076,7 @@ KEditor.prototype.addTagInteract = function (docNode) {
         return new Promise(resolve => {
             if (!tag) { resolve(null); return }
             if (create) {
-                this.createTag(tag)
+                this.API.createTag(tag)
                 .then(result => {
                     this.addTagInteract(docNode)
                     this.addDocumentTag(docNode.id, result.data.id)
@@ -1200,20 +1209,6 @@ KEditor.prototype.updateTask = function (docNode, values = []) {
     this.fetch('', formData)
     .then(_ => {
         this.refreshDocument(docNode.id)
-    })
-}
-
-KEditor.prototype.getInfo = function (path) {
-    return new Promise((resolve, reject) => {
-        const formData = new FormData()
-        formData.append('operation', 'get-info');
-        formData.append('path', path)
-        this.fetch('', formData)
-        .then(response => {
-            if (!response.ok) { resolve(null) }
-            resolve(response.data)
-        })
-        .catch(reason => reject(reason))
     })
 }
 
@@ -1397,7 +1392,7 @@ KEditor.prototype.handleToolsEvents = function (event) {
 
 KEditor.prototype.toggleEntriesDisplay = function (kedDocument) {
     if (kedDocument.isOpen()) {
-        this.getInfo(kedDocument.getId())
+        this.API.getInfo(kedDocument.getId())
         .then(doc => {
             kedDocument.close()
             this.renderSingle(doc)
@@ -1441,7 +1436,13 @@ KEditor.prototype.renderSingle = function (doc) {
             }
 
             kedDocument.addEventListener('delete-document', (event) => { this.deleteDocumentInteract(event.detail.target.getDomNode()); })
-            kedDocument.addEventListener('open-document', (event) => { this.cd(event.detail.target.getId()); this.ls(); })
+            kedDocument.addEventListener('open-document', (event) => { 
+                this.cd(event.detail.target.getId())
+                .then(() => {
+                    this.ls()
+                })
+                .catch(reason => this.error(reason))
+            })
             kedDocument.addEventListener('toggle-entries', (event) => { this.toggleEntriesDisplay(event.detail.target) })
             kedDocument.addEventListener('add-text', (event) => { this.docMustOpen(event.detail.target.getId()); this.addTextInteract(event.detail.target.getDomNode()); })
             kedDocument.addEventListener('upload-file', (event) => { this.docMustOpen(event.detail.target.getId()); this.uploadFileInteract(event.detail.target.getDomNode()); })

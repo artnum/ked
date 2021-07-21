@@ -689,6 +689,23 @@ class http {
                 if ($this->msg) { $this->msg->update($id, $this->clientid); }
                 $this->ok(json_encode(['unarchive' => $this->ked->idFromPath($body['anyid'])]));
                 break;
+            case 'check':
+                $can = false;
+                if (empty($body['path'])) { $this->errorBadRequest(); }
+                if (empty($body['access'])) { $this->errorBadRequest(); }
+
+                $dn = $this->ked->pathToDn($body['path']);
+                if (!$dn) { $this->errorNotFound(); }
+
+                $access = $this->acl->mapOp($body['access']);
+                if ($access !== '') {
+                    $can = $this->acl->can($this->user, $access, $dn);
+                } else {
+                    $can = $this->acl->can($this->user, $body['access'], $dn);
+                }
+                
+                $this->ok(json_encode(['can' => $can]));
+                break;
         }
     }
 }

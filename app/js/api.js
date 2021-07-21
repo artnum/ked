@@ -409,3 +409,45 @@ KEDApi.prototype.unarchive = function (idOrDoc) {
         })
     })
 }
+
+KEDApi.prototype.createTag = function (name, related = []) {
+    return new Promise((resolve, reject) => {
+        if (name === null) { resolve(null); return; }
+        const operation = {
+            operation: 'create-tag',
+            name,
+            related
+        }
+        this.post(operation)
+        .then(result => {
+            resolve(result)
+        })
+    })
+}
+
+KEDApi.prototype.getInfo = function (path) {
+    return new Promise((resolve, reject) => {
+        const operation = {
+            operation: 'get-info',
+            path
+        }
+        this.post(operation)
+        .then(result => {
+            resolve(result)
+        })
+    })
+}
+
+KEDApi.prototype.check = function (path, access) {
+    return new Promise((resolve, reject) => {
+        this.post({
+            operation: 'check',
+            path,
+            access
+        })
+        .then(result => {
+            if (!result.ok) { resolve(false); return; }
+            resolve(result.data.can)
+        })
+    })
+}
