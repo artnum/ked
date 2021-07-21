@@ -20,7 +20,15 @@ class User {
         if (ldap_explode_dn($dn, 1) === false) { return null; }
 
         /* exclude groups */
-        $res = @ldap_read($conn, $dn, '(&(!(kedUser=*))(!(memberUid=*))(!(uniqueMember=*))(!(kedAclMember=*)))', [ '*' ]);
+        $res = @ldap_read(
+            $conn,
+            $dn,
+            '(&(!(kedUser=*))(!(memberUid=*))(!(uniqueMember=*))(!(kedAclMember=*)))', 
+            [
+                'uid',
+                'mail'
+            ]
+        );
         if (!$res) { return null; }
         $entry = @ldap_first_entry($conn, $res);
         if (!$entry) { return null; }
@@ -30,8 +38,6 @@ class User {
             if ($values['count'] <= 0) { continue; }
             /* any value that find a user is the right one */
             for ($i = 0; $i < $values['count']; $i++) {
-                $user = $ked->getUserByDbId($values[$i]);
-                if ($user) { return new User($ked, $user, $dn); }
                 $user = $ked->getUserByUid($values[$i]);
                 if ($user) { return new User($ked, $user, $dn); }
             }
