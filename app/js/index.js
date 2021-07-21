@@ -15,6 +15,10 @@ window.addEventListener('load', (event) => {
         '../node_modules/lightbox2/dist/js/lightbox-plus-jquery.min.js'
     ]
 
+    const moduleScripts = [
+        '../js/quill.js',
+    ]
+
     const csss = [
         '../css/keditor.css',
         '../css/ktags.css',
@@ -41,19 +45,41 @@ window.addEventListener('load', (event) => {
         head.appendChild(css)
     }
 
+    const scriptsLoad = []
     for (let i = 0; i < scripts.length; i++) {
         const script = document.createElement('SCRIPT')
         script.src = scripts[i]
-        allLoaded.push(new Promise((resolve, reject) => {
+        const sload = new Promise((resolve, reject) => {
             script.onerror = () => {
                 resolve()
             }
             script.onload = () => {
                 resolve()
             }
-        }))
+        })
+        allLoaded.push(sload)
+        scriptsLoad.push(sload)
         head.appendChild(script)
     }
-    Promise.all(allLoaded)
-    .then(() => { window.dispatchEvent(new CustomEvent('keditor-loaded')) })
+
+    Promise.all(scriptsLoad)
+    .then (() => {
+        for (let i = 0; i < moduleScripts.length; i++) {
+            const script = document.createElement('SCRIPT')
+            script.src = moduleScripts[i]
+            script.type = 'module'
+            allLoaded.push(new Promise((resolve, reject) => {
+                script.onerror = () => {
+                    resolve()
+                }
+                script.onload = () => {
+                    resolve()
+                }
+            }))
+            head.appendChild(script)
+        }
+
+        Promise.all(allLoaded)
+        .then(() => { window.dispatchEvent(new CustomEvent('keditor-loaded')) })
+    })
 })
