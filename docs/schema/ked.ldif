@@ -232,7 +232,7 @@ olcObjectClasses: (kedClass:6 NAME 'kedAcl'
   SUP top
   STRUCTURAL
   DESC 'ACL definition'
-  MUST ( kedId $ kedRelatedTag )
+  MUST ( kedId $ kedObjectDn )
   MAY ( kedAclRight $ kedAclMember)
  )
 olcObjectClasses: (kedClass:7 NAME 'kedRoot'
@@ -240,6 +240,7 @@ olcObjectClasses: (kedClass:7 NAME 'kedRoot'
   STRUCTURAL
   DESC 'Root of ked tree'
   MUST ( kedId $ kedRootType )
+  MAY ( kedUser )
  )
 olcObjectClasses: (kedClass:8 NAME 'kedState'
   SUP top

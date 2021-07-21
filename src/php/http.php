@@ -73,8 +73,8 @@ class http {
     }
 
     function setUser($user) {
-        $this->user = $user;
-        $this->ked->setCurrentUser($user->getDbId());
+        $this->user = new KEDUser($this->ked, $user);
+        $this->ked->setCurrentUser($this->user->getDn());
     }
 
     function responseHeaders() {

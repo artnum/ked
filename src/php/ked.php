@@ -2,6 +2,8 @@
 declare(strict_types=1);
 namespace ked;
 
+require_once('ked-user.php');
+
 use Iterator;
 use Normalizer;
 
@@ -620,7 +622,7 @@ class ked {
         if ($this->userStore && !empty($currentEntry['user'])) {
             if (!is_array($currentEntry['user'])) { $currentEntry['user'] = [$currentEntry['user']]; }
             foreach ($currentEntry['user'] as $userid) {
-                $user = $this->userStore->getUserByDbId($userid);
+                $user = KEDUser::fromDN($this, $userid);
                 if ($user) {
                     $users[$user->getUid()] = $user->getDisplayName();
                 }
@@ -656,7 +658,7 @@ class ked {
         if (!$values) { return $users; }
         if ($values['count'] <= 0) { return $users; }
         for ($i = 0; $i < $values['count']; $i++) {
-            $user = $this->userStore->getUserByDbId($values[$i]);
+            $user = KEDUser::fromDN($this, $values[$i]);
             if ($user) { $users[] = $user; }
         }
         return $users;

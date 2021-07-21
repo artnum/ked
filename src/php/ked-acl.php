@@ -1,6 +1,10 @@
 <?PHP
 declare(strict_types=1);
+
 namespace ked;
+
+require_once('ked-user.php');
+
 
 class ACL {
     function __construct (high $ked)
@@ -94,6 +98,8 @@ class ACL {
                 return [
                     'access'
                 ];
+            case 'nothing':
+                return  [ 'none' ]; // don't return empty array
         }
         return [$shortcut];
     }
@@ -142,7 +148,7 @@ class ACL {
     function lookupUser (string $user) {
         /* is an uid ? */
         $userObject = $this->ked->getUserByUid($user);
-        if ($userObject) { return $userObject; }
+        if ($userObject) { return new KEDUser($this->ked, $userObject); }
     
         /* is a group ? */
         $conn = $this->ked->getLdapConn();
@@ -169,13 +175,13 @@ class ACL {
                                 case 'member':
                                     $user = $this->ked->getUserByUid($value[$i]);
                                     if ($user) {
-                                        $users[] = $user;
+                                        $users[] = new KEDUser($this->ked, $user);
                                     }        
                                     break;
                                 default:
                                     $user = $this->ked->getUserByDbId($value[$i]);
                                     if ($user) {
-                                        $users[] = $user;
+                                        $users[] = new KEDUser($this->ked, $user);
                                     }
                             }
                         }
@@ -191,12 +197,12 @@ class ACL {
        return false;
     }
 
-    function getACLObjectsForTag (string $tagDn):array {
+    function getACLObjectsForDn (string $tagDn):array {
         $conn = $this->ked->getLdapConn();
         $res = @ldap_list(
             $conn,
             $this->ked->getAclBase(),
-            '(kedRelatedTag=' . ldap_escape($tagDn, '', LDAP_ESCAPE_FILTER) . ')',
+            '(kedObjectDn=' . ldap_escape($tagDn, '', LDAP_ESCAPE_FILTER) . ')',
             [ '*' ]
         );
         if (!$res) { return []; }
@@ -207,7 +213,7 @@ class ACL {
                 if (isset($object['kedaclmember'])) {
                     $aclMembers = [];
                     foreach ($object['kedaclmember'] as $v) {
-                        $user = $this->ked->getUserByDbId($v);
+                        $user = KEDUser::fromDN($this->ked, $v);
                         if (!$user) {
                             $user = $this->lookupUser($v);
                         }
@@ -220,15 +226,18 @@ class ACL {
                         }
                     }
                     $object['kedaclmember'] = $aclMembers;
-                    $aclObjects[] = $object;
+                } else {
+                    $object['kedaclmember'] = [];
                 }
+
+                $aclObjects[] = $object;
             }
         }
         return $aclObjects;
     }
 
     function canRoot ($user, string $access) {
-        $aclObjects = $this->getACLObjectsForTag($this->ked->getDocumentBase());
+        $aclObjects = $this->getACLObjectsForDn($this->ked->getDocumentBase());
         if (empty($aclObjects)) { return false; }
 
         $acls = [];
@@ -250,6 +259,31 @@ class ACL {
         return false;
     }
 
+    function canAcl($user, $access) {
+        $conn = $this->ked->getLdapConn();
+        $res = ldap_read(
+            $conn,
+            $this->ked->setAclBase(),
+            '(objectClass=*)',
+            [
+                'kedUser',
+                'uniqueMember'
+            ]
+        );
+
+        if (!$res) { return false; }
+        $entry = ldap_first_entry($conn, $res);
+        if (!$entry) { return false; }
+        for ($attr = ldap_first_attribute($conn, $entry); $attr; $attr = ldap_next_attribute($conn, $entry)) {
+            $values = ldap_get_values($conn, $entry, $attr);
+            if (!$values) { continue; }
+            if ($values['count'] === 0) { continue; }
+            for ($i = 0; $i < $values['count']; $i++) {
+                //if ($value)
+            }
+        }
+    }
+
     /*
      * $ACL->can('user', 'access', 'document')
      * $ACL->can('user', 'update', 'document')
@@ -259,6 +293,14 @@ class ACL {
         $ownObject = false;
         $nothingSet = true;
 
+        /* no access yet */
+        if ($user->getDn() === '') { return false; }
+
+        /* ACL access, modification, deletion, ... handled differently */
+        $parts = explode(':', $access);
+        if (count($parts) > 1 && $parts[0] === 'acl') {
+            return $this->canAcl($user, $parts[1]);
+        }
 
         /* root is checked differently */
         if ($objectDn === $this->ked->getDocumentBase()) {
@@ -276,14 +318,28 @@ class ACL {
         }
 
         /* check ownobject rules. user set in object attributes obey to this first */
-        if ($ownObject && in_array($access, $this->configuration['ownobject'])) {
-            return true;
+        if ($ownObject) {
+            /* dbid might be a DN, so try to look for that */
+            $aclObjects = $this->getACLObjectsForDn($user->getDn());
+            $acls = [];
+            foreach ($aclObjects as $aclObject) {
+                foreach ($aclObject['kedaclright'] as $acl) {
+                    $acls = array_merge($acls, $this->parseACLString($acl));
+                }
+            }
+            if (!empty($acls)) {
+                $acls = $this->solveACLs($acls);
+                return in_array($access, $acls);
+            }
+            if(in_array($access, $this->configuration['ownobject'])) {
+                return true;
+            }
         }
 
         $tags = $this->ked->getRelatedTags($objectDn);
         $acls = [];
         foreach ($tags as $k => $v) {
-            $aclObjects = $this->getACLObjectsForTag($k);
+            $aclObjects = $this->getACLObjectsForDn($k);
             if (empty($aclObjects)) { continue; }
             foreach ($aclObjects as $aclObject) {
                 if (!isset($aclObject['kedaclmember'])) { continue; }
