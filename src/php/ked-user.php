@@ -19,7 +19,8 @@ class User {
         /* if we can't explode a dn, it's not a dn */
         if (ldap_explode_dn($dn, 1) === false) { return null; }
 
-        $res = @ldap_read($conn, $dn, '(objectclass=*)', [ '*' ]);
+        /* exclude groups */
+        $res = @ldap_read($conn, $dn, '(&(!(kedUser=*))(!(memberUid=*))(!(uniqueMember=*))(!(kedAclMember=*)))', [ '*' ]);
         if (!$res) { return null; }
         $entry = @ldap_first_entry($conn, $res);
         if (!$entry) { return null; }
