@@ -2,7 +2,7 @@
 declare(strict_types=1);
 namespace ked;
 
-class KEDUser {
+class User {
     function __construct(ked $ked, \Menshen\User $user, string $dn = '') {
         $this->ked = $ked;
         $this->user = $user;
@@ -13,7 +13,7 @@ class KEDUser {
         }
     }
 
-    static function fromDN (ked $ked, string $dn):?KEDUser {
+    static function fromDN (ked $ked, string $dn):?User {
         $conn = $ked->getLdapConn();
 
         $res = @ldap_read($conn, $dn, '(objectclass=*)', [ '*' ]);
@@ -27,9 +27,9 @@ class KEDUser {
             /* any value that find a user is the right one */
             for ($i = 0; $i < $values['count']; $i++) {
                 $user = $ked->getUserByDbId($values[$i]);
-                if ($user) { return new KEDUser($ked, $user, $dn); }
+                if ($user) { return new User($ked, $user, $dn); }
                 $user = $ked->getUserByUid($values[$i]);
-                if ($user) { return new KEDUser($ked, $user, $dn); }
+                if ($user) { return new User($ked, $user, $dn); }
             }
         }
 

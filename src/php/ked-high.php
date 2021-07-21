@@ -99,6 +99,9 @@ class high extends ked {
         for ($entry = @ldap_first_entry($this->conn, $res); $entry; $entry = @ldap_next_entry($this->conn, $entry)) {
             $docDn = @ldap_get_dn($this->conn, $entry);
             if (!$docDn) { $this->ldapFail($this->conn); continue; }
+            if ($this->acl) {
+                if (!$this->acl->can($this->currentUser, 'access', $docDn)) { continue; }
+            }
             $documents[] = $this->getDocument($docDn);
         }
         /* specify attribute to avoir reading content while listing */

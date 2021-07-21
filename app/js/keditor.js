@@ -1653,11 +1653,18 @@ KEditor.prototype.render = function (root) {
                 userDom.innerHTML = `<span class="username">${user.name}</span></span>`
                 KEDAnim.push(() => { footer.appendChild(userDom) })
             }
+            const configButton = document.createElement('BUTTON')
+            configButton.classList.add('kui')
+            configButton.id = 'KEDConfiguration'
+            configButton.innerHTML = 'Paramètres'
             const exitButton = document.createElement('BUTTON')
             exitButton.classList.add('kui')
             exitButton.id = 'KEDLogout'
             exitButton.innerHTML = 'Se déconnecter'
-            KEDAnim.push(() => { footer.appendChild(exitButton) })
+            KEDAnim.push(() => {
+                footer.appendChild(exitButton)
+                footer.appendChild(configButton) 
+            })
             exitButton.addEventListener('click', () => {
                 this.authStop()
                 window.location.reload()

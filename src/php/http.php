@@ -26,6 +26,9 @@ class http {
         $this->acl = new ACL($this->ked);
         $this->states = new state($this->ked->getBase(), $this->ked->getLdapConn(true));
         $this->ked->setLocker($this->states);
+        if ($this->acl) {
+            $this->ked->setAcl($this->acl);
+        }
         $this->responseStarted = false;
         $this->user = null;
         $this->userStore = null;
@@ -73,8 +76,8 @@ class http {
     }
 
     function setUser($user) {
-        $this->user = new KEDUser($this->ked, $user);
-        $this->ked->setCurrentUser($this->user->getDn());
+        $this->user = new User($this->ked, $user);
+        $this->ked->setCurrentUser($this->user);
     }
 
     function responseHeaders() {

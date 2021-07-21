@@ -433,7 +433,8 @@ KEDApi.prototype.getInfo = function (path) {
         }
         this.post(operation)
         .then(result => {
-            resolve(result)
+            if (!result.ok) { resolve(null); return; }
+            resolve(result.data)
         })
     })
 }

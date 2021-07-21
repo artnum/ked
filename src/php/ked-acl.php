@@ -129,6 +129,7 @@ class ACL {
     function solveACLs ($acls) {
         $solved = [];
         foreach ($acls as $acl) {
+            if ($acl === 'none') { return [ 'none' ]; } // none remove all right
             if ($acl[0] === '-') { continue; }
             if (!in_array($acl, $solved)) {
                 $solved[] = $acl;
@@ -148,7 +149,7 @@ class ACL {
     function lookupUser (string $user) {
         /* is an uid ? */
         $userObject = $this->ked->getUserByUid($user);
-        if ($userObject) { return new KEDUser($this->ked, $userObject); }
+        if ($userObject) { return new User($this->ked, $userObject); }
     
         /* is a group ? */
         $conn = $this->ked->getLdapConn();
@@ -175,13 +176,13 @@ class ACL {
                                 case 'member':
                                     $user = $this->ked->getUserByUid($value[$i]);
                                     if ($user) {
-                                        $users[] = new KEDUser($this->ked, $user);
+                                        $users[] = new User($this->ked, $user);
                                     }        
                                     break;
                                 default:
                                     $user = $this->ked->getUserByDbId($value[$i]);
                                     if ($user) {
-                                        $users[] = new KEDUser($this->ked, $user);
+                                        $users[] = new User($this->ked, $user);
                                     }
                             }
                         }
@@ -213,7 +214,7 @@ class ACL {
                 if (isset($object['kedaclmember'])) {
                     $aclMembers = [];
                     foreach ($object['kedaclmember'] as $v) {
-                        $user = KEDUser::fromDN($this->ked, $v);
+                        $user = User::fromDN($this->ked, $v);
                         if (!$user) {
                             $user = $this->lookupUser($v);
                         }
@@ -279,9 +280,12 @@ class ACL {
             if (!$values) { continue; }
             if ($values['count'] === 0) { continue; }
             for ($i = 0; $i < $values['count']; $i++) {
-                //if ($value)
+                if ($values[$i] === $user->getDb()) {
+                    return true;
+                }
             }
         }
+        return false;
     }
 
     /*
