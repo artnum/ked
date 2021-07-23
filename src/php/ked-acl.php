@@ -18,6 +18,10 @@ class ACL {
                 'access'
             ]
         ];
+        /* cache is per-instance, iterating over a set of object
+         * is costly so per-instance cache should be enough
+         */
+        $this->aclCache = [];
     }
 
     function mapOp ($operation) {
@@ -199,6 +203,9 @@ class ACL {
     }
 
     function getACLObjectsForDn (string $tagDn):array {
+        if (isset($this->aclCache[$tagDn])) {
+            return $this->aclCache[$tagDn];
+        }
         $conn = $this->ked->getLdapConn();
         $res = @ldap_list(
             $conn,
@@ -234,6 +241,7 @@ class ACL {
                 $aclObjects[] = $object;
             }
         }
+        $this->aclCache[$tagDn] = $aclObjects;
         return $aclObjects;
     }
 
