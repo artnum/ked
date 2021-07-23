@@ -49,3 +49,11 @@
     background-color: var(--bg2-color);
     color: var(--white);
 }
+
+.kmetadata .kdates {
+    font-size: 12px;   
+}
+
+.kmetadata .kdates span {
+    margin : 0 1ch;
+}

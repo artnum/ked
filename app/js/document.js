@@ -57,6 +57,7 @@ function KEDDocument (doc, api) {
             `<button class="kui verysmall" data-action="display-next"><i class="fas fa-forward"></i></button>` +
             `</div>` +
             `<div class="kusers">${kedDocument.htmlUserList()}</div>` +
+            `<div class="kdates">${kedDocument.dates()}</div>` +
             `<div id="tag-${doc.id}" class="ktags">` +
             `</div>` +
             `<div class="ktags-tools" ><span data-action="add-tag"><i class="fas fa-plus-circle"></i>&nbsp;Ajouter tag</span>` +
@@ -79,6 +80,14 @@ function KEDDocument (doc, api) {
     kedDocument.applyStates()
 
     return kedDocument
+}
+
+KEDDocument.prototype.dates = function () {
+    const created = new Date(this.doc.created)
+    const modified = new Date(this.doc.modified)
+
+    return `<span class="created">Créer ${created.toLocaleDateString(undefined, {year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit'})}</span>` +
+        `<span class="modified">Modifier ${modified.toLocaleDateString(undefined, {year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit'})}</span>`
 }
 
 KEDDocument.prototype.getTags = function () {
