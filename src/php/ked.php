@@ -261,6 +261,7 @@ class ked {
         $dn = sprintf('%s,%s', $rdn[0], $docDn);
         $res = @ldap_add($this->rwconn, $dn, $entry);
         if (!$res) { $this->ldapFail($this->rwconn); return null; }
+        $this->updateInPlaceAny($docDn, ['modified' => time()]);
         if (isset($options['__update'])) { // when we call from updateEntry, we want to have previous entry full dn
             return $dn;
         }
@@ -506,6 +507,7 @@ class ked {
             ['kedRelatedTag' => $relatedTag]
         );
         if (!$res) { $this->ldapFail($res); return null; }
+        $this->updateInPlaceAny($dn, ['modified' => time()]);
         return $object['kedid'][0];
     }
 
@@ -533,6 +535,7 @@ class ked {
             ['kedRelatedTag' => $object['kedrelatedtag']]
         );
         if (!$res) { $this->ldapFail($this->rwconn); return null; }
+        $this->updateInPlaceAny($dn, ['modified' => time()]);
         return $object['kedid'][0];
     }
 
