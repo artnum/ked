@@ -86,8 +86,8 @@ KEDDocument.prototype.dates = function () {
     const created = new Date(this.doc.created)
     const modified = new Date(this.doc.modified)
 
-    return `<span class="created">Créer ${created.toLocaleDateString(undefined, {year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit'})}</span>` +
-        `<span class="modified">Modifier ${modified.toLocaleDateString(undefined, {year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit'})}</span>`
+    return `<span class="created">Créé ${created.toLocaleDateString(undefined, {year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit'})}</span>` +
+        `<span class="modified">Modifié ${modified.toLocaleDateString(undefined, {year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit'})}</span>`
 }
 
 KEDDocument.prototype.getTags = function () {
