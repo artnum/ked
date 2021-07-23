@@ -45,34 +45,18 @@ class ACL {
     function setConfiguration(array $conf)
     {
         foreach ($conf as $k => $v) {
-            $value = [];
-            $negated = [];
+            $acls = [];
             if (is_array($v)) {
-                foreach ($v as $aclOrShortcut) {
-                    if ($aclOrShortcut[0] === '-') {
-                        $negated = array_merge($negated, $this->aclFromShortcut(substr($aclOrShortcut, 1)));
-                        continue;
-                    }
-                    $value = array_merge($value, $this->aclFromShortcut($aclOrShortcut));
+                foreach ($v as $_v) {
+                    $acls = array_merge($acls, $this->parseACLString($_v));
                 }
             } else if (is_string($v)) {
-                if ($v[0] === '-') {
-                    $negated = array_merge($negated, $this->aclFromShortcut(substr($v, 1)));
-                    continue;
-                }
-                $value = $this->aclFromShortcut($v);
+                $acls = array_merge($acls, $this->parseACLString($v));
             } else {
                 continue;
             }
-            foreach ($negated as $n) {
-                do {
-                    $k = array_search($n, $value);
-                    if ($k !== false) {
-                        unset($value[$k]);
-                    }
-                } while ($k !== false); // some value might be added several time, suppress them all
-            }
-            $this->configuration[$k] = $value;
+
+            $this->configuration[$k] = $this->solveACLs($acls);
         }
     }
 
@@ -331,7 +315,6 @@ class ACL {
 
         /* check ownobject rules. user set in object attributes obey to this first */
         if ($ownObject) {
-            /* dbid might be a DN, so try to look for that */
             $aclObjects = $this->getACLObjectsForDn($user->getDn());
             $acls = [];
             foreach ($aclObjects as $aclObject) {
@@ -347,7 +330,7 @@ class ACL {
                 return true;
             }
         }
-
+      
         $tags = $this->ked->getRelatedTags($objectDn);
         $acls = [];
         foreach ($tags as $k => $v) {
@@ -365,7 +348,7 @@ class ACL {
                 }
             }
         }
-
+ 
         if (!empty($acls)) {
             $acls = $this->solveACLs($acls);
             return in_array($access, $acls);

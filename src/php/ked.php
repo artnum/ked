@@ -295,23 +295,40 @@ class ked {
         return $this->getRawLdapObjectByDn($dn);
     }
 
-    function getRelatedTags (string $dn):array {
-        $object = $this->getRawLdapObjectByDn($dn);
+    function getRelatedTags (string $dn, $recurseParent = true):array {
         $related = [];
-        if (!isset($object['kedrelatedtag'])) { return $related; }
-        foreach ($object['kedrelatedtag'] as $rTag) {
-            $tag = $this->getRawLdapObjectByDn($rTag);
-            if (!$tag) { continue; }
-            $related[$tag['dn']] = $tag;
-            $r = $this->getRelatedTags($rTag);
-            if (!$r) { continue; }
-            foreach ($r as $k => $v) {
-                if (!isset($related[$k])) {
-                    $related[$k] = $v;
+        do {
+            $object = $this->getRawLdapObjectByDn($dn);
+            if (isset($object['kedrelatedtag'])) {
+                foreach ($object['kedrelatedtag'] as $rTag) {
+                    $tag = $this->getRawLdapObjectByDn($rTag);
+                    if (!$tag) { continue; }
+                    if (isset($related[$tag['dn']])) { continue; }
+                    $related[$tag['dn']] = $tag;
+                    $r = $this->getRelatedTags($rTag, false);
+                    if (!$r) { continue; }
+                    foreach ($r as $k => $v) {
+                        if (!isset($related[$k])) {
+                            $related[$k] = $v;
+                        }
+                    }
                 }
             }
-        }
+            $dn = $this->getParentDn($dn);
+        } while ($recurseParent && !$this->hasNotReachParent($dn, $this->base));
         return $related;
+    }
+
+    function hasNotReachParent ($dn1, $dn2) {
+        if (empty($dn1)) { return true; }
+        if (empty($dn2)) { return true; }
+        $d1 = ldap_explode_dn($dn1, 0);
+        $d2 = ldap_explode_dn($dn2, 0);
+        if ($d1['count'] !== $d2['count']) { return false; }
+        for($i = 0; $i < $d1['count']; $i++) {
+            if ($d1[$i] !== $d2[$i]) { return false; }
+        }
+        return true;
     }
 
     function findActiveTags (
