@@ -912,7 +912,13 @@ KEditor.prototype.dropEntry = function (event) {
     if (!docNode) { return }
     const files = event.dataTransfer
     const getDoc = KEDDocument.get(docNode.id, this.API)
-    const itemQty = files.items.length
+    let itemQty = 0
+    for (let i = 0; i < files.items.length; i++) {
+        if (files.items[i].kind === 'file') {
+            itemQty++
+        }
+    }
+    if (itemQty === 0) { return }
     getDoc
     .then(doc => {
         doc.uploadStart(itemQty)
