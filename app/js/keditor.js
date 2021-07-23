@@ -888,13 +888,11 @@ KEditor.prototype.deleteDocument = function (docNode) {
     })
 }
 
-KEditor.prototype.addDocument = function (title = null, path = null) {
-    const operation = {
-        operation: 'create-document',
-        name: title ? title : 'Sans titre',
-        path: path ? path : this.cwd
-    }
-    this.fetch('', operation)
+KEditor.prototype.addDocument = function (title = null, path = null, parent = null) {
+    title = title || 'Sans titre'
+    path = path || this.cwd
+    tags = parent !== null ? parent.getTags() : []
+    this.API.createDocument(title, path, tags)
     .then(result => {
         if (!result.ok) { return }
         return KEDDocument.get(result.data.id, this.API)
@@ -1149,7 +1147,14 @@ KEditor.prototype.addDocumentInteract = function (path) {
         docNode.appendChild(formNode)
     })
     .then (title => {
-        this.addDocument(title, path); 
+        if (path !== '') {
+            KEDDocument.get(path, this.API, true)
+            .then(parent => {
+                this.addDocument(title, path, parent)
+            })
+        } else {
+            this.addDocument(title, path) 
+        }
     })
 }
 

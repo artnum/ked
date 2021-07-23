@@ -81,6 +81,10 @@ function KEDDocument (doc, api) {
     return kedDocument
 }
 
+KEDDocument.prototype.getTags = function () {
+    return this.doc.tags
+}
+
 KEDDocument.prototype.htmlUserList = function () {
     if (!this.doc.user) { return '' }
     let userhtml = ''
@@ -138,10 +142,10 @@ KEDDocument.search = function (pathid) {
     return undefined
 }
 
-KEDDocument.get = function (id, api) {
+KEDDocument.get = function (id, api, forceRefresh = false) {
     return new Promise((resolve, reject) => {
         let kedDoc = KEDDocument.registered(id)
-        if (kedDoc) {
+        if (!forceRefresh && kedDoc) {
             resolve(kedDoc)
         } else {
             api.getDocument(id)

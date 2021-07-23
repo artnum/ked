@@ -452,3 +452,17 @@ KEDApi.prototype.check = function (path, access) {
         })
     })
 }
+
+KEDApi.prototype.createDocument = function (name, path, tags = []) {
+    return new Promise((resolve, reject) => {
+        this.post({
+            operation: 'create-document',
+            path,
+            name,
+            tags
+        })
+        .then(result => {
+            resolve(result)
+        })
+    })
+}
