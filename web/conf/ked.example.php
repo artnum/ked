@@ -1,5 +1,6 @@
 <?php
 
+// most of it should be stored in the directory
 $KEDConfiguration = [
     'ldap' => [
         [
