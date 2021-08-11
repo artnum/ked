@@ -1418,7 +1418,7 @@ KEditor.prototype.toggleEntriesDisplay = function (kedDocument) {
     }
 }
 
-KEditor.prototype.renderSingle = function (doc) {
+KEditor.prototype.renderSingle = function (doc, level) {
     return new Promise((resolve, reject) => {
         (new Promise((resolve, reject) => {
             let htmlnode
@@ -1469,6 +1469,7 @@ KEditor.prototype.renderSingle = function (doc) {
             kedDocument.addEventListener('drop', this.dropEntry.bind(this))
 
             htmlnode = kedDocument.getDomNode()
+            htmlnode.classList.add(level)
             const tagNode = htmlnode.querySelector(`#tag-${kedDocument.getRelativeId()}`)
             for (const tag of doc.tags) {
                 let ktag = this.tags.get(tag)
@@ -1618,33 +1619,49 @@ KEditor.prototype.render = function (root) {
     }
 
     const elementOnPage = []
-    let chain = Promise.resolve()
-    const p = []
-    for (let i = 0; i < root.documents.length; i++) {
-        elementOnPage.push(root.documents[i].abspath)
-        if (root.documents[i]['+class'].indexOf('entry') !== -1) { continue; }
-        KEDDocument.get(root.documents[i].abspath, this.API)
-        .then(kedDoc => {
-            let r
-            if (!kedDoc) {
-                r = Promise.resolve()
-                chain = chain.then(r)
-                return
-            }
-            if (kedDoc.isOpen()) {
-                r = new Promise((resolve, reject) => {
-                    this.API.getDocument(root.documents[i].abspath)
-                    .then(doc => { this.renderSingle(doc).then(node => resolve(node)) })
+    const levels = []
+    new Promise ((resolve) => {
+        const promises = []
+        for (let i = 0; i < root.documents.length; i++) {
+            const level = `level-${root.documents[i].abspath.split(',').length}`
+            if (levels.indexOf(level) === -1) { levels.push(level) }
+
+            elementOnPage.push(root.documents[i].abspath)
+            if (root.documents[i]['+class'].indexOf('entry') !== -1) { continue; }
+
+            promises.push(new Promise((resolve, reject) => {
+                KEDDocument.get(root.documents[i].abspath, this.API)
+                .then(kedDoc => {
+                    let r
+                    if (!kedDoc) {
+                        return
+                    }
+                    if (kedDoc.isOpen()) {
+                        this.API.getDocument(root.documents[i].abspath)
+                        .then(doc => { 
+                            return this.renderSingle(doc, level)
+                        }).then(node => { 
+                            resolve(node)
+                        })
+                    } else {
+                        this.renderSingle(root.documents[i], level)
+                        .then(node => {
+                            resolve(node)
+                        })
+                    }
                 })
-            } else {
-                r = this.renderSingle(root.documents[i])
-            }
-            p.push(r)
-            chain = chain.then(r)
-        })
-    }
-    Promise.all(p)
+            }))
+        }
+        Promise.all(promises).then(_ => resolve())
+    })
     .then(_ => {
+        let multilevel = false
+        if (levels.length > 1) {
+            this.container.classList.add('multilevel')
+            multilevel = true
+        } else {
+            this.container.classList.remove('multilevel')
+        }
         for (const node of document.getElementsByClassName('document')) {
             if (elementOnPage.indexOf(node.id) === -1) {
                 KEDAnim.push(() => {
@@ -1652,6 +1669,33 @@ KEditor.prototype.render = function (root) {
                 })
             }
         }
+
+        if (multilevel) {
+            for (let i = 1; i < 7; i++) {
+                if (i === 1) {
+                    continue
+                }
+                const nodes = document.getElementsByClassName(`level-${i}`)
+                for (const node of nodes) {
+                    const parts = node.id.split(',')
+                    let parentNode
+                    do {
+                        parts.pop()
+                        if (parts.length === 0) { break }
+                        parentNode = document.getElementById(parts.join(','))
+                    } while (!parentNode)
+                    if (parentNode !== null) {
+                        node.parentNode.removeChild(node)
+                        parentNode.parentNode.insertBefore(node, parentNode.nextElementSibling)
+                    } else {
+                        const p = node.parentNode
+                        node.parentNode.removeChild(node)
+                        p.appendChild(node)
+                    }
+                }
+            }
+        }
+
         this.API.getUsers()
         .then(result => {
             if (!result.ok) { return }
