@@ -1458,7 +1458,8 @@ KEditor.prototype.renderSingle = function (doc) {
             kedDocument.addEventListener('print-document', event => {
                 KEDDocument.get(event.detail.target.getId(), this.API)
                 .then(kdoc => {
-                    this.Print.kdoc(kdoc)
+                    const output = window.open('', `print_${kdoc.getId()}`)
+                    this.Print.kdoc(kdoc, output)
                 })
             })
             kedDocument.addEventListener('toggle-entries', (event) => { this.toggleEntriesDisplay(event.detail.target) })

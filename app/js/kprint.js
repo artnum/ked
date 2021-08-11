@@ -3,10 +3,9 @@ function KEDPrint(keditor, location) {
     this.location = location
 }
 
-KEDPrint.prototype.kdoc = function (kdoc) {
+KEDPrint.prototype.kdoc = function (kdoc, output) {
     this.ked.API.getDocument(kdoc.getId())
     .then(fulldoc => {
-        const output = window.open('', `print_${kdoc.getId()}`)
         output.focus()
         const doc = output.document
         doc.head.appendChild(doc.createElement('TITLE'))
