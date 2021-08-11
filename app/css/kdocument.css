@@ -50,6 +50,11 @@
     color: var(--white);
 }
 
+.kmetadata .indicator:active {
+    background-color: var(--bg2-color);
+    color: var(--white);
+}
+
 .kmetadata .kdates {
     font-size: 12px;   
 }

@@ -1,4 +1,5 @@
 function KEditor(container, baseUrl) {
+    this.Print = new KEDPrint(this, window.document.location)
     this.API = new KEDApi(baseUrl)
     this.localLocked = new Map()
     this.container = container
@@ -1453,6 +1454,12 @@ KEditor.prototype.renderSingle = function (doc) {
                     this.ls()
                 })
                 .catch(reason => this.error(reason))
+            })
+            kedDocument.addEventListener('print-document', event => {
+                KEDDocument.get(event.detail.target.getId(), this.API)
+                .then(kdoc => {
+                    this.Print.kdoc(kdoc)
+                })
             })
             kedDocument.addEventListener('toggle-entries', (event) => { this.toggleEntriesDisplay(event.detail.target) })
             kedDocument.addEventListener('add-text', (event) => { this.docMustOpen(event.detail.target.getId()); this.addTextInteract(event.detail.target.getDomNode()); })

@@ -48,6 +48,7 @@ function KEDDocument (doc, api) {
             `${task.is ? (task.done ? '<i data-action="set-task-undone" class="fas fa-clipboard-check"></i>' : '<i data-action="set-task-done" class="fas fa-clipboard"></i>'): ''}` +
             `<span id="name-${doc.id}">${doc.name}</span>` +
             `<div class="navigation indicator"><span data-action="open-document" class="forward"><i class="fas fa-arrow-right"></i></span></div>` +
+            `<div class="indicator"><span data-action="print-document"><i class="fas fa-print"></i></span></div>` +
             `<div class="has-childs indicator"><span data-action="toggle-entries"><i name="open" class="fas fa-folder"></i></span></div>` +
             `<div class="ksubmenu">` +
             `<button class="kui small" data-action="add-text"><i class="fas fa-file-alt"> </i>&nbsp;Texte</button>` +

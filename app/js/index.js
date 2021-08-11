@@ -10,6 +10,7 @@ window.addEventListener('load', (event) => {
         '../js/anim.js',
         '../js/document.js',
         '../js/utils.js',
+        '../js/kprint.js',
         '../node_modules/quill/dist/quill.min.js',
         '../node_modules/jsqr/dist/jsQR.js',
         '../node_modules/lightbox2/dist/js/lightbox-plus-jquery.min.js'
