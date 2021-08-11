@@ -1643,16 +1643,25 @@ KEditor.prototype.render = function (root) {
                         }).then(node => { 
                             resolve(node)
                         })
+                        .catch(reason => {
+                            reject(reason)
+                        })
                     } else {
                         this.renderSingle(root.documents[i], level)
                         .then(node => {
                             resolve(node)
                         })
+                        .catch(reason => {
+                            reject(reason)
+                        })
                     }
+                })
+                .catch(reason => {
+                    reject(reason)
                 })
             }))
         }
-        Promise.all(promises).then(_ => resolve())
+        Promise.allSettled(promises).then(_ => resolve())
     })
     .then(_ => {
         let multilevel = false
