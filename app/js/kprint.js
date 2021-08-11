@@ -12,6 +12,7 @@ KEDPrint.prototype.kdoc = function (kdoc, output) {
         doc.head.firstChild.innerHTML = fulldoc.name
 
         const style = `
+            @page { margin-bottom: 2cm; }
             .kimage img { max-width:  100%;}
             .kentry.ktext { border-bottom: 1px solid lightgray; font-family: sans-serif; }
             footer { position: fixed; bottom: 0; font-family: monospace; font-size: 8pt; background-color: white; }
