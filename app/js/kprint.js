@@ -12,10 +12,13 @@ KEDPrint.prototype.kdoc = function (kdoc, output) {
         doc.head.firstChild.innerHTML = fulldoc.name
 
         const style = `
-            @page { margin-bottom: 2cm; }
-            .kimage img { max-width:  100%;}
+            @page { size: A4; margin: 2cm; }
+            body { font-size: 12pt; }
+            h1.title { font-family: sans-serif; font-size: 28pt;}
+            .kimage { break-inside: avoid-page; break-before: auto; break-after: auto;}
+            .kimage img { max-width:  100%; }
             .kentry.ktext { border-bottom: 1px solid lightgray; font-family: sans-serif; }
-            footer { position: fixed; bottom: 0; font-family: monospace; font-size: 8pt; background-color: white; }
+            .description { font-family: monospace; font-size: 8pt; background-color: lightgray; }
             .kdates span { margin-right: 1ch; }
         `
         doc.head.appendChild(document.createElement('STYLE'))
@@ -31,14 +34,14 @@ KEDPrint.prototype.kdoc = function (kdoc, output) {
             doc.head.appendChild(quillStyle)
         })
         doc.body.innerHTML = `
-            <h1>${kdoc.doc.name}</h1>
-            <footer>
+            <h1 class="title">${kdoc.doc.name}</h1>
+            <div class="description">
             <div class="kusers">${kdoc.doc.name} - ${kdoc.htmlUserList()}</div>
             <div class="kdates">${kdoc.dates()}<span class="printed">Imprimé le ${new Date().toLocaleDateString(undefined, {year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit'})}</span></div>
-            </footer>
+            </div>
         `
         const grid = doc.createElement('DIV')
-        grid.classList.add('entries')
+        grid.classList.add('kentries')
         grid.style.setProperty('display', 'grid')
         grid.style.setProperty('grid-template-columns', '1fr')
         grid.style.setProperty('grid-template-rows', 'auto')
