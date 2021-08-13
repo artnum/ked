@@ -699,6 +699,7 @@ KEditor.prototype.renderEntry = function (path, entry) {
             }
             htmlnode.classList.add('content')
             htmlnode.dataset.name = EntryName
+            if (entry.description) { htmlnode.dataset.description = entry.description }
             resolve(htmlnode)
         }
 
@@ -1313,6 +1314,25 @@ KEditor.prototype.clear = function () {
     this.clearOnRender = true
 }
 
+KEditor.prototype.descriptionInteract = function (entryId, docId) {
+    return new Promise ((resolve, reject) => {
+        KEDDocument.get(docId)
+        .then(doc => {
+            const form = document.createElement('FORM')
+            form.innerHTML = '<div class="kform-inline"><div class="full"><input type="text" name="description"></div><div class="full"></input><button type="submit">Valider</button><button type="reset">Annuler</button></div></div>'
+            doc.confirm(form, entryId)
+            form.addEventListener('submit', event => {
+                event.preventDefault()
+                const form = new FormData(event.target)
+                resolve(form.get('description'))
+            })
+            form.addEventListener('reset', () => {
+                reject()
+            })
+        })
+    })
+}
+
 KEditor.prototype.handleToolsEvents = function (event) {
     event.stopPropagation()
     let kcontainerNode = event.target
@@ -1321,7 +1341,6 @@ KEditor.prototype.handleToolsEvents = function (event) {
     while (docNode && !docNode.classList.contains('document')) {
         docNode = docNode.parentNode
     }
-
     KEDDocument.get(docNode.id, this.API)
     .then(doc => {
         doc.isLockable(this.API)
@@ -1338,6 +1357,19 @@ KEditor.prototype.handleToolsEvents = function (event) {
             switch(ktoolsNode.dataset.action) {
                 case 'delete-entry':
                     this.deleteEntryInteract(docNode, kcontainerNode.firstElementChild)
+                    break
+                case 'edit-entry-description':
+                    const entryId = kcontainerNode.id.split('-', 2)[1]
+                    this.descriptionInteract(entryId, docNode.id)
+                    .then(msg => {
+                        return this.API.setEntryDescription(entryId, msg)
+                    })
+                    .then(_ => {
+                        this.refreshDocument(docNode.id)
+                    })
+                    .catch(reason => {
+                        // nope
+                    })
                     break;
                 case 'edit-entry':
                     KEDDocument.get(docNode.id, this.API)
@@ -1497,7 +1529,7 @@ KEditor.prototype.renderSingle = function (doc, level) {
                     this.toHighlight = null
                 }, 5000)
             }
-            if ((Array.isArray(doc['+entries']) && doc['+entries'].length >0) || doc['+entries'] > 0) {
+            if ((Array.isArray(doc['+entries']) && doc['+entries'].length > 0) || doc['+entries'] > 0) {
                 htmlnode.classList.add('with-entries')
             }
             const p = []
@@ -1527,10 +1559,12 @@ KEditor.prototype.renderSingle = function (doc, level) {
                     entryContainer.id = `container-${nodes[i].id}`
                     entryContainer.appendChild(nodes[i])
                     entryContainer.classList.add('kentry-container')
+                    let withDescription = false
                     switch(nodes[i].nodeName) {
                         case 'IMG':
                         case 'VIDEO':
                         case 'A':
+                            withDescription = true
                             if (document.getElementById(entryContainer.id)) {
                                 const p = document.getElementById(entryContainer.id).parentNode
                                 p.removeChild(document.getElementById(entryContainer.id))
@@ -1551,7 +1585,7 @@ KEditor.prototype.renderSingle = function (doc, level) {
                     }
                     const entryDetails = document.createElement('DIV')
                     entryDetails.classList.add('kentry-details')
-                    entryDetails.innerHTML = `<span class="name">${nodes[i].dataset.name}</span>`
+                    entryDetails.innerHTML = `<span class="name">${(nodes[i].dataset.description || nodes[i].dataset.name) ?? ''}</span>`
                     if (nodes[i].dataset.users) {
                         const users = JSON.parse(nodes[i].dataset.users)
                         for (const userid in users) {
@@ -1562,7 +1596,8 @@ KEditor.prototype.renderSingle = function (doc, level) {
                     const entryTools = document.createElement('DIV')
                     entryTools.classList.add('kentry-tools')
                     entryTools.innerHTML = `<button class="kui small" data-action="edit-entry"><i class="fas fa-edit"> </i>&nbsp;Éditer</button>`
-                        +`<button class="kui danger small" data-action="delete-entry"><i class="fas fa-trash"></i>&nbsp;Supprimer</button>`
+                        + (withDescription ? '<button class="kui small" data-action="edit-entry-description"><i class="fas fa-sticky-note"> </i>&nbsp;Description</button>' : '')
+                        + `<button class="kui danger small" data-action="delete-entry"><i class="fas fa-trash"></i>&nbsp;Supprimer</button>`
                     entryTools.addEventListener('click', this.handleToolsEvents.bind(this))
                     entryContainer.appendChild(entryTools)
                 }

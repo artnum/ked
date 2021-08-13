@@ -482,7 +482,7 @@ KEDDocument.prototype.closeConfirm = function (eventOrNode) {
     this.closeConfirm(node)
 }
 
-KEDDocument.prototype.confirm = function (formNode) {
+KEDDocument.prototype.confirm = function (formNode, entryId = null) {
     if (this.currentConfirm) {
         this.currentConfirm.querySelector('form')?.reset()
         this.closeConfirm(this.currentConfirm)
@@ -495,11 +495,19 @@ KEDDocument.prototype.confirm = function (formNode) {
     this.currentConfirm = document.createElement('DIV')
     this.currentConfirm.classList.add('kconfirm')
     this.currentConfirm.appendChild(formNode)
-    const metaNode = this.domNode.querySelector('.kmetadata')
-    KEDAnim.push(() => { metaNode.appendChild(this.currentConfirm) })
-    .then(() => {
-        formNode.querySelector('input')?.focus()
-    })
+    if (entryId === null) {
+        const metaNode = this.domNode.querySelector('.kmetadata')
+        KEDAnim.push(() => { metaNode.appendChild(this.currentConfirm) })
+        .then(() => {
+            formNode.querySelector('input')?.focus()
+        })
+    } else {
+        const entryNode = document.getElementById(entryId)
+        KEDAnim.push(() => { entryNode.parentNode.insertBefore(formNode, entryNode.nextElementSibling) })
+        .then(() => {
+            formNode.querySelector('input')?.focus()
+        })
+    }
 }
 
 KEDDocument.prototype.removeTagInteract = function () {

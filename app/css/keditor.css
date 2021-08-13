@@ -254,6 +254,14 @@
     flex-wrap: wrap;
 }
 
+.kform-inline .full {
+    width: calc(100% - 16px);
+}
+
+.kform-inline .full  input {
+    width: calc(100% - 16px);
+}
+
 .kform-autocomplete .ktags {
     width: 100%;
     font-family: 'B612 Mono', monospace;

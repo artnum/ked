@@ -478,3 +478,16 @@ KEDApi.prototype.createDocument = function (name, path, tags = []) {
         })
     })
 }
+
+KEDApi.prototype.setEntryDescription = function (path, description) {
+    return new Promise((resolve, reject) => {
+        this.post({
+            operation: 'set-entry-description',
+            path,
+            description
+        })
+        .then(result => {
+            resolve(result)
+        })
+    })
+}

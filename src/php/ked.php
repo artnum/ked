@@ -23,6 +23,7 @@ class ked {
         'type' => ['kedContentType', true, false, false],
         'name' => ['kedName', true, false, false],
         'id' => ['kedId', false, false, false],
+        'description' => ['kedDescription', true, false, false],
         'created'  => ['kedTimestamp', false, false, false],
         'modified' => ['kedModified', false, false, false],
         'deleted' => ['kedDeleted', false, false, false],
@@ -139,7 +140,7 @@ class ked {
         return $this->aclBase;
     }
 
-    /* normalized utf-8 and an ascii version, useful for search */
+    /* normalized utf-8 */
     function sanitizeString (string $name):string {
         return Normalizer::normalize($name, Normalizer::FORM_C);
     }
@@ -782,7 +783,8 @@ class ked {
                 'kedSignature',
                 'kedApplication',
                 'kedArchived',
-                'kedUser'
+                'kedUser',
+                'kedDescription'
             ],
             0,
             $limits[0],
@@ -810,7 +812,7 @@ class ked {
             $this->conn,
             $docDn,
             '(&(objectclass=kedEntry)(!(kedNext=*))' . $filterOption . ')',
-            [ '*' ],
+            [ 'dn' ],
             0,
             $limits[0],
             $limits[1]
@@ -1241,7 +1243,7 @@ class KEDLdapResult implements Iterator {
     }
 
     public function load_entry($entry) {
-        $currentEntry = [ 'dn' => ldap_get_dn($this->ldap, $entry) ];
+        $currentEntry = [ 'dn' => @ldap_get_dn($this->ldap, $entry) ];
         if (!$currentEntry['dn']) { return null; }
         for ($attr = @ldap_first_attribute($this->ldap, $entry); $attr; $attr = @ldap_next_attribute($this->ldap, $entry)) {
             $values =  @ldap_get_values($this->ldap, $entry, $attr);
