@@ -437,11 +437,21 @@ class ked {
             /* exclude __root__ as everyone have it (or is supposed to have it) */
             if ($tagDn === $this->rootTag['dn']) { continue; }
             /* search entry, documents and tags. We want everything */
+            $filter = $this->buildFilter('(kedRelatedTag=%s)', $tagDn);
             foreach ([$this->base, $this->tagBase] as $base) {
-                $filter = $this->buildFilter('(kedRelatedTag=%s)', $tagDn);
-                foreach ($this->ldap_search($base, $filter, [ 'objectclass' ], $limits) as $object) {
-                    if (isset($objects[$object['dn']])) { continue; }
-                    $objects[$object['dn']] = $object;
+                $res = @ldap_search($this->conn, $base, $filter, ['objectclass'], 0, $limits[0], $limits[1]);
+                if (!$res) { continue; }
+                for ($entry = @ldap_first_entry($this->conn, $res); $entry; $entry = @ldap_next_entry($this->conn, $entry)) {
+                    $dn = @ldap_get_dn($this->conn, $entry);
+                    if (!$dn) { continue; }
+                    if (isset($objects[$dn])) { continue; }
+                    $oc = ldap_get_values($this->conn, $entry, 'objectclass');
+                    if (!$oc) { continue; }
+                    unset($oc['count']);
+                    $objects[$dn] = [
+                        'dn' => $dn,
+                        'objectclass' => $oc
+                    ];
                 }
             }
         }
