@@ -160,6 +160,17 @@ KEDApi.prototype.getUrl = function (url) {
     })
 }
 
+KEDApi.prototype.sanitize = function (json) {
+    for (const k in json) {
+        if (typeof json[k] === 'object' || Array.isArray(json[k])) {
+            json[k] = this.sanitize(json[k])
+        } else if (typeof json[k] === 'string') {
+            json[k] = KEDUtils.sanitize(json[k])
+        }
+    }
+    return json
+}
+
 KEDApi.prototype.post = function(body, offlineStore = false) {
     return new Promise((resolve) => {
         this.fetch(this.uri, {
@@ -198,6 +209,7 @@ KEDApi.prototype.post = function(body, offlineStore = false) {
         })
         .then(result => {
             if (!result) { return }
+            result = this.sanitize(result)
             resolve({
                 ok: true,
                 netError: false,

@@ -10,5 +10,14 @@ const KEDUtils = {
             binary += String.fromCharCode(byte)
         }
         return KEDUtils.base64EncodeString( binary )
+    },
+
+    sanitize: (string) => {
+        return string
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;")
     }
 }
