@@ -709,6 +709,22 @@ class http {
                 
                 $this->ok(json_encode(['can' => $can]));
                 break;
+            case 'set-entry-description':
+                if (empty($body['path'])) { $this->errorBadRequest(); }
+                if (empty($body['description'])) { $this->errorBadRequest(); }
+
+                $dn = $this->ked->pathToDn($body['path'], false);
+                if (!$dn) { $this->errorNotFound(); }
+
+                if (!$this->acl->can($this->user, 'create', $dn)) { $this->errorForbidden(); }
+
+                if (!$this->ked->updateInPlaceAny($dn, ['description' => $body['description']])) { $this->errorUnableToOperate(); }
+                if ($this->msg) {
+                    $path = explode(',', $body['path']);
+                    $this->msg->update($path[count($path) - 2], $this->clientid); 
+                }
+                $this->ok(json_encode(['id' => $body['path']]));
+                break;
         }
     }
 }

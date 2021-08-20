@@ -699,6 +699,7 @@ KEditor.prototype.renderEntry = function (path, entry) {
             }
             htmlnode.classList.add('content')
             htmlnode.dataset.name = EntryName
+            if (entry.description) { htmlnode.dataset.description = entry.description }
             resolve(htmlnode)
         }
 
@@ -1313,6 +1314,25 @@ KEditor.prototype.clear = function () {
     this.clearOnRender = true
 }
 
+KEditor.prototype.descriptionInteract = function (entryId, docId) {
+    return new Promise ((resolve, reject) => {
+        KEDDocument.get(docId)
+        .then(doc => {
+            const form = document.createElement('FORM')
+            form.innerHTML = '<div class="kform-inline"><div class="full"><input type="text" name="description"></div><div class="full"></input><button type="submit">Valider</button><button type="reset">Annuler</button></div></div>'
+            doc.confirm(form, entryId)
+            form.addEventListener('submit', event => {
+                event.preventDefault()
+                const form = new FormData(event.target)
+                resolve(form.get('description'))
+            })
+            form.addEventListener('reset', () => {
+                reject()
+            })
+        })
+    })
+}
+
 KEditor.prototype.handleToolsEvents = function (event) {
     event.stopPropagation()
     let kcontainerNode = event.target
@@ -1321,7 +1341,6 @@ KEditor.prototype.handleToolsEvents = function (event) {
     while (docNode && !docNode.classList.contains('document')) {
         docNode = docNode.parentNode
     }
-
     KEDDocument.get(docNode.id, this.API)
     .then(doc => {
         doc.isLockable(this.API)
@@ -1338,6 +1357,19 @@ KEditor.prototype.handleToolsEvents = function (event) {
             switch(ktoolsNode.dataset.action) {
                 case 'delete-entry':
                     this.deleteEntryInteract(docNode, kcontainerNode.firstElementChild)
+                    break
+                case 'edit-entry-description':
+                    const entryId = kcontainerNode.id.split('-', 2)[1]
+                    this.descriptionInteract(entryId, docNode.id)
+                    .then(msg => {
+                        return this.API.setEntryDescription(entryId, msg)
+                    })
+                    .then(_ => {
+                        this.refreshDocument(docNode.id)
+                    })
+                    .catch(reason => {
+                        // nope
+                    })
                     break;
                 case 'edit-entry':
                     KEDDocument.get(docNode.id, this.API)
@@ -1418,7 +1450,7 @@ KEditor.prototype.toggleEntriesDisplay = function (kedDocument) {
     }
 }
 
-KEditor.prototype.renderSingle = function (doc) {
+KEditor.prototype.renderSingle = function (doc, level) {
     return new Promise((resolve, reject) => {
         (new Promise((resolve, reject) => {
             let htmlnode
@@ -1469,6 +1501,7 @@ KEditor.prototype.renderSingle = function (doc) {
             kedDocument.addEventListener('drop', this.dropEntry.bind(this))
 
             htmlnode = kedDocument.getDomNode()
+            htmlnode.classList.add(level)
             const tagNode = htmlnode.querySelector(`#tag-${kedDocument.getRelativeId()}`)
             for (const tag of doc.tags) {
                 let ktag = this.tags.get(tag)
@@ -1496,7 +1529,7 @@ KEditor.prototype.renderSingle = function (doc) {
                     this.toHighlight = null
                 }, 5000)
             }
-            if ((Array.isArray(doc['+entries']) && doc['+entries'].length >0) || doc['+entries'] > 0) {
+            if ((Array.isArray(doc['+entries']) && doc['+entries'].length > 0) || doc['+entries'] > 0) {
                 htmlnode.classList.add('with-entries')
             }
             const p = []
@@ -1526,10 +1559,12 @@ KEditor.prototype.renderSingle = function (doc) {
                     entryContainer.id = `container-${nodes[i].id}`
                     entryContainer.appendChild(nodes[i])
                     entryContainer.classList.add('kentry-container')
+                    let withDescription = false
                     switch(nodes[i].nodeName) {
                         case 'IMG':
                         case 'VIDEO':
                         case 'A':
+                            withDescription = true
                             if (document.getElementById(entryContainer.id)) {
                                 const p = document.getElementById(entryContainer.id).parentNode
                                 p.removeChild(document.getElementById(entryContainer.id))
@@ -1550,7 +1585,7 @@ KEditor.prototype.renderSingle = function (doc) {
                     }
                     const entryDetails = document.createElement('DIV')
                     entryDetails.classList.add('kentry-details')
-                    entryDetails.innerHTML = `<span class="name">${nodes[i].dataset.name}</span>`
+                    entryDetails.innerHTML = `<span class="name">${(nodes[i].dataset.description || nodes[i].dataset.name) ?? ''}</span>`
                     if (nodes[i].dataset.users) {
                         const users = JSON.parse(nodes[i].dataset.users)
                         for (const userid in users) {
@@ -1561,7 +1596,8 @@ KEditor.prototype.renderSingle = function (doc) {
                     const entryTools = document.createElement('DIV')
                     entryTools.classList.add('kentry-tools')
                     entryTools.innerHTML = `<button class="kui small" data-action="edit-entry"><i class="fas fa-edit"> </i>&nbsp;Éditer</button>`
-                        +`<button class="kui danger small" data-action="delete-entry"><i class="fas fa-trash"></i>&nbsp;Supprimer</button>`
+                        + (withDescription ? '<button class="kui small" data-action="edit-entry-description"><i class="fas fa-sticky-note"> </i>&nbsp;Description</button>' : '')
+                        + `<button class="kui danger small" data-action="delete-entry"><i class="fas fa-trash"></i>&nbsp;Supprimer</button>`
                     entryTools.addEventListener('click', this.handleToolsEvents.bind(this))
                     entryContainer.appendChild(entryTools)
                 }
@@ -1618,33 +1654,58 @@ KEditor.prototype.render = function (root) {
     }
 
     const elementOnPage = []
-    let chain = Promise.resolve()
-    const p = []
-    for (let i = 0; i < root.documents.length; i++) {
-        elementOnPage.push(root.documents[i].abspath)
-        if (root.documents[i]['+class'].indexOf('entry') !== -1) { continue; }
-        KEDDocument.get(root.documents[i].abspath, this.API)
-        .then(kedDoc => {
-            let r
-            if (!kedDoc) {
-                r = Promise.resolve()
-                chain = chain.then(r)
-                return
-            }
-            if (kedDoc.isOpen()) {
-                r = new Promise((resolve, reject) => {
-                    this.API.getDocument(root.documents[i].abspath)
-                    .then(doc => { this.renderSingle(doc).then(node => resolve(node)) })
+    const levels = []
+    new Promise ((resolve) => {
+        const promises = []
+        for (let i = 0; i < root.documents.length; i++) {
+            const level = `level-${root.documents[i].abspath.split(',').length}`
+            if (levels.indexOf(level) === -1) { levels.push(level) }
+
+            elementOnPage.push(root.documents[i].abspath)
+            if (root.documents[i]['+class'].indexOf('entry') !== -1) { continue; }
+
+            promises.push(new Promise((resolve, reject) => {
+                KEDDocument.get(root.documents[i].abspath, this.API)
+                .then(kedDoc => {
+                    let r
+                    if (!kedDoc) {
+                        return
+                    }
+                    if (kedDoc.isOpen()) {
+                        this.API.getDocument(root.documents[i].abspath)
+                        .then(doc => { 
+                            return this.renderSingle(doc, level)
+                        }).then(node => { 
+                            resolve(node)
+                        })
+                        .catch(reason => {
+                            reject(reason)
+                        })
+                    } else {
+                        this.renderSingle(root.documents[i], level)
+                        .then(node => {
+                            resolve(node)
+                        })
+                        .catch(reason => {
+                            reject(reason)
+                        })
+                    }
                 })
-            } else {
-                r = this.renderSingle(root.documents[i])
-            }
-            p.push(r)
-            chain = chain.then(r)
-        })
-    }
-    Promise.all(p)
+                .catch(reason => {
+                    reject(reason)
+                })
+            }))
+        }
+        Promise.allSettled(promises).then(_ => resolve())
+    })
     .then(_ => {
+        let multilevel = false
+        if (levels.length > 1) {
+            this.container.classList.add('multilevel')
+            multilevel = true
+        } else {
+            this.container.classList.remove('multilevel')
+        }
         for (const node of document.getElementsByClassName('document')) {
             if (elementOnPage.indexOf(node.id) === -1) {
                 KEDAnim.push(() => {
@@ -1652,6 +1713,33 @@ KEditor.prototype.render = function (root) {
                 })
             }
         }
+
+        if (multilevel) {
+            for (let i = 1; i < 7; i++) {
+                if (i === 1) {
+                    continue
+                }
+                const nodes = document.getElementsByClassName(`level-${i}`)
+                for (const node of nodes) {
+                    const parts = node.id.split(',')
+                    let parentNode
+                    do {
+                        parts.pop()
+                        if (parts.length === 0) { break }
+                        parentNode = document.getElementById(parts.join(','))
+                    } while (!parentNode)
+                    if (parentNode !== null) {
+                        node.parentNode.removeChild(node)
+                        parentNode.parentNode.insertBefore(node, parentNode.nextElementSibling)
+                    } else {
+                        const p = node.parentNode
+                        node.parentNode.removeChild(node)
+                        p.appendChild(node)
+                    }
+                }
+            }
+        }
+
         this.API.getUsers()
         .then(result => {
             if (!result.ok) { return }

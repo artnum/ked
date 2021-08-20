@@ -19,6 +19,7 @@ KEDPrint.prototype.kdoc = function (kdoc, output) {
             .kimage img { max-width:  100%; }
             .kentry.ktext { border-bottom: 1px solid lightgray; font-family: sans-serif; }
             .description { font-family: monospace; font-size: 8pt; background-color: lightgray; }
+            .kentry .description { background-color: white; font-size: 12pt;}
             .kdates span { margin-right: 1ch; }
         `
         doc.head.appendChild(document.createElement('STYLE'))
@@ -65,6 +66,12 @@ KEDPrint.prototype.kdoc = function (kdoc, output) {
                         div.classList.add('kimage', 'kentry')
                         div.appendChild(img)
                         div.style.setProperty('order', order + 10000)
+                        if (entry.description) {
+                            const desc = document.createElement('DIV')
+                            desc.classList.add('description')
+                            desc.innerHTML = entry.description
+                            div.appendChild(desc)
+                        }
                         grid.appendChild(div)
                     })
                     break

@@ -232,10 +232,10 @@ KEDApi.prototype.getDocument = function (path) {
         operation: 'get-document',
         path
     }
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
         this.post(operation)
         .then(result => {
-            if (!result.ok) { resolve(null); return }
+            if (!result.ok) { reject('Document unavailable'); return }
             resolve(result.data)
         })
     })
@@ -472,6 +472,19 @@ KEDApi.prototype.createDocument = function (name, path, tags = []) {
             path,
             name,
             tags
+        })
+        .then(result => {
+            resolve(result)
+        })
+    })
+}
+
+KEDApi.prototype.setEntryDescription = function (path, description) {
+    return new Promise((resolve, reject) => {
+        this.post({
+            operation: 'set-entry-description',
+            path,
+            description
         })
         .then(result => {
             resolve(result)
