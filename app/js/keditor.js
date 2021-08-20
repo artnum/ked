@@ -1322,7 +1322,7 @@ KEditor.prototype.descriptionInteract = function (entryId, docId) {
             const entry = document.getElementById(entryId)
             if (!entry) { return }
             form.innerHTML = `<div class="kform-inline">
-                    <div class="full"><input type="text" name="description" value=${entry.dataset.description || ''}></div>
+                    <div class="full"><input type="text" name="description" value="${entry.dataset.description || ''}"></div>
                     <div class="full"></input><button type="submit">Valider</button><button type="reset">Annuler</button></div>
                 </div>`
             doc.confirm(form, entryId)
