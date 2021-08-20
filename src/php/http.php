@@ -711,14 +711,19 @@ class http {
                 break;
             case 'set-entry-description':
                 if (empty($body['path'])) { $this->errorBadRequest(); }
-                if (empty($body['description'])) { $this->errorBadRequest(); }
+                if (empty($body['description'])) { 
+                    $delete = true;
+                }
 
                 $dn = $this->ked->pathToDn($body['path'], false);
                 if (!$dn) { $this->errorNotFound(); }
 
                 if (!$this->acl->can($this->user, 'create', $dn)) { $this->errorForbidden(); }
 
-                if (!$this->ked->updateInPlaceAny($dn, ['description' => $body['description']])) { $this->errorUnableToOperate(); }
+                if (!$this->ked->updateInPlaceAny(
+                    $dn, 
+                    $delete ? ['-description' => []] : ['description' => $body['description']])
+                ) { $this->errorUnableToOperate(); }
                 if ($this->msg) {
                     $path = explode(',', $body['path']);
                     $this->msg->update($path[count($path) - 2], $this->clientid); 

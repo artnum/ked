@@ -1319,7 +1319,12 @@ KEditor.prototype.descriptionInteract = function (entryId, docId) {
         KEDDocument.get(docId)
         .then(doc => {
             const form = document.createElement('FORM')
-            form.innerHTML = '<div class="kform-inline"><div class="full"><input type="text" name="description"></div><div class="full"></input><button type="submit">Valider</button><button type="reset">Annuler</button></div></div>'
+            const entry = document.getElementById(entryId)
+            if (!entry) { return }
+            form.innerHTML = `<div class="kform-inline">
+                    <div class="full"><input type="text" name="description" value=${entry.dataset.description || ''}></div>
+                    <div class="full"></input><button type="submit">Valider</button><button type="reset">Annuler</button></div>
+                </div>`
             doc.confirm(form, entryId)
             form.addEventListener('submit', event => {
                 event.preventDefault()
