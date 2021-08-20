@@ -469,45 +469,50 @@ KEDDocument.prototype.compare = function (doc) {
 }
 
 KEDDocument.prototype.closeConfirm = function (eventOrNode) {
-    if (!eventOrNode) { return }
-    if (eventOrNode instanceof HTMLElement) {
-        KEDAnim.push(() => {
-            if (eventOrNode.parentNode) { eventOrNode.parentNode.removeChild(eventOrNode) }
-        })
-        return
-    }
+    return new Promise((resolve) => {
+        if (!eventOrNode) { return }
+        if (eventOrNode instanceof HTMLElement) {
+            KEDAnim.push(() => {
+                if (eventOrNode.parentNode) { eventOrNode.parentNode.removeChild(eventOrNode) }
+            })
+            .then(_ => {resolve() })
+            return
+        }
 
-    let node = eventOrNode.target
-    while (node && !node.classList.contains('kconfirm')) { node = node.parentNode }
-    this.closeConfirm(node)
+        let node = eventOrNode.target
+        while (node && !node.classList?.contains('kconfirm')) { node = node.parentNode }
+        return this.closeConfirm(node)
+    })
 }
 
 KEDDocument.prototype.confirm = function (formNode, entryId = null) {
+    let closePromise = Promise.resolve()
     if (this.currentConfirm) {
         this.currentConfirm.querySelector('form')?.reset()
-        this.closeConfirm(this.currentConfirm)
+        closePromise = this.closeConfirm(this.currentConfirm)
+    }
+    closePromise.then(_ => {
         this.currentConfirm = null
-    }
+        formNode.addEventListener('reset', event => { this.closeConfirm(event) })
+        formNode.addEventListener('submit', event => { this.closeConfirm(event) })
 
-    formNode.addEventListener('reset', event => { this.closeConfirm(event) })
-    formNode.addEventListener('submit', event => { this.closeConfirm(event) })
-
-    this.currentConfirm = document.createElement('DIV')
-    this.currentConfirm.classList.add('kconfirm')
-    this.currentConfirm.appendChild(formNode)
-    if (entryId === null) {
-        const metaNode = this.domNode.querySelector('.kmetadata')
-        KEDAnim.push(() => { metaNode.appendChild(this.currentConfirm) })
-        .then(() => {
-            formNode.querySelector('input')?.focus()
-        })
-    } else {
-        const entryNode = document.getElementById(entryId)
-        KEDAnim.push(() => { entryNode.parentNode.insertBefore(formNode, entryNode.nextElementSibling) })
-        .then(() => {
-            formNode.querySelector('input')?.focus()
-        })
-    }
+        this.currentConfirm = document.createElement('FORM')
+        this.currentConfirm.classList.add('kconfirm')
+        this.currentConfirm.appendChild(formNode)
+        if (entryId === null) {
+            const metaNode = this.domNode.querySelector('.kmetadata')
+            KEDAnim.push(() => { metaNode.appendChild(this.currentConfirm) })
+            .then(() => {
+                formNode.querySelector('input')?.focus()
+            })
+        } else {
+            const entryNode = document.getElementById(entryId)
+            KEDAnim.push(() => { entryNode.parentNode.insertBefore(this.currentConfirm, entryNode.nextElementSibling) })
+            .then(() => {
+                formNode.querySelector('input')?.focus()
+            })
+        }
+    })
 }
 
 KEDDocument.prototype.removeTagInteract = function () {
