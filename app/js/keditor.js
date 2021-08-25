@@ -934,7 +934,7 @@ KEditor.prototype.dropEntry = function (event) {
                 formData.append('operation', 'add-entry')
                 formData.append('file', file)
                 formData.append('_filename', file.name)
-                formData.append('path', this.buildPath(this.cwd, docNode.dataset.pathid))
+                formData.append('path', docNode.id)
                 this.fetch('', formData)
                 .then(_ => {
                     resolve()
@@ -1650,11 +1650,14 @@ KEditor.prototype.render = function (root) {
 
     if (this.cwd === '') {
         KEDAnim.push(() => {
-            this.headerMenu.innerHTML = `<span data-action="history-home" class="back"><i class="fas fa-home"></i></span><span class="kmenu-title">${this.title}</span>${this.headerMenu._tools}`
+            this.headerMenu.innerHTML = `<span data-action="history-home" class="back">
+                                        <i class="fas fa-home"></i></span><span class="kmenu-title">${this.title}</span>${this.headerMenu._tools}`
         })
     } else {
         KEDAnim.push(() => {
-            this.headerMenu.innerHTML = `<span data-action="history-home" class="back"><i class="fas fa-home"></i></span><span data-action="history-back" class="back"><i class="fas fa-arrow-left"></i></span><span class="kmenu-title">${this.title}</span>${this.headerMenu._tools}`
+            this.headerMenu.innerHTML = `<span data-action="history-home" class="back">
+                                        <i class="fas fa-home"></i></span><span data-action="history-back" class="back">
+                                        <i class="fas fa-arrow-left"></i></span><span class="kmenu-title">${this.title}</span>${this.headerMenu._tools}`
         })
     }
 
