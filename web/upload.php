@@ -144,32 +144,33 @@ if (isset($meta['parts'][$chunk['count']])) {
 $meta['parts'][$chunk['count']] = $chunk;
 $meta['current']++;
 
+/* write chunk to file */
 $content = file_get_contents('php://input');
-if (!file_put_contents("$dir/$chunk[count].part", $content)) {
+$outfile = fopen("/tmp/$meta[token]/$meta[filename]", 'c');
+if (!$outfile) {
     unlock($dir);
     fail();
 }
+if (fseek($outfile, $chunk['count'] * $meta['chunksize'], SEEK_SET) === -1) {
+    unlock($dir);
+    fail();
+}
+if (!fwrite($outfile, $content)) {
+    unlock($dir);
+    fail();
+}
+fclose($outfile);
 
 file_put_contents($dir . '/metadata.json', json_encode($meta));
-$done = false;
 if ($meta['current'] === $meta['max']) {
-    $done = true;
-    $out['done'] = true;
-    $outfile = fopen("/tmp/$meta[token]/$meta[filename]", 'w');
-    for ($i = 0; $i < $meta['max']; $i++) {
-        $fp = fopen("/tmp/$meta[token]/$i.part", 'r');
-        while ($d = fread($fp, 4096)) {
-            fwrite($outfile, $d );
-        }
-        fclose($fp);
-        unlink("/tmp/$meta[token]/$i.part");
-    }
-    fclose($outfile);
     $endhash = hash_file('sha256', "/tmp/$meta[token]/$meta[filename]");
     if ($meta['hash'] !== $endhash) {
         unlock($dir);
         error_log("Sent hash : $meta[hash] / Calc hash : $endhash");
+        fail();
     }
+    $out['done'] = true;
 }
+
 unlock($dir);
 ok();

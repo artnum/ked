@@ -34,7 +34,7 @@ user@webserver:/www$ cd ked
 user@webserver:/www/ked$ sudo ldapadd -H ldapi:/// -Y EXTERNAL -f docs/schema/ked.ldif
 ```
 
-Based on your configuration, create the root of your ldap tree and add it to your ldap server (read `test/slapd/conf/init.ldif` to see how it should look like). According my ldif file is at `~/ked-init.ldif` :
+Based on your configurations, create the root of your ldap tree and add it to your ldap server (read `test/slapd/conf/init.ldif` to see how it should look like). According my ldif file is at `~/ked-init.ldif` :
 
 ```shell
 user@webserver:/www/ked$ sudo ldapadd -H ldapi:/// -Y EXTERNAL -f ~/ked-init.ldif
@@ -50,6 +50,10 @@ user@webserver:/www/ked$ yarn
 ```
 
 It should be ready to run.
+
+## Sliced upload
+
+In order to allow uploads from a mobile network, where access can be lost, downgraded, whatever, the web application request for a token, which will serve as authenticator, and slice the file in parts (1mb set in constant) and then upload, via a web worker, each slice. The server receive the slices and reassemble them into the final file.
 
 ## Things to check
 
