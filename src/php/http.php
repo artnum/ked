@@ -730,6 +730,19 @@ class http {
                 }
                 $this->ok(json_encode(['id' => $body['path']]));
                 break;
+            case 'chunk-upload':
+                if (empty($body['path'])) { $this->errorBadRequest(); }
+                if (empty($body['filename'])) { $body['filename'] = 'no name'; }
+
+                $entryDn = $this->ked->pathToDn($body['path'], false);
+                if (!$entryDn) { $this->errorForbidden(); }
+                if (!$this->acl->can($this->user, 'create:entry', $entryDn)) { $this->errorForbidden(); }
+
+                $token = hash_hmac('md5', uniqid('token', true), $entryDn);
+                if (!@mkdir("/tmp/$token")) { $this->errorUnableToOperate(); }
+                
+                $this->ok(json_encode(['token' => $token]));
+                break;
         }
     }
 }

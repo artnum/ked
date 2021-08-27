@@ -491,3 +491,22 @@ KEDApi.prototype.setEntryDescription = function (path, description) {
         })
     })
 }
+
+KEDApi.prototype.upload = function (path, file) {
+    return new Promise((resolve, reject) => {
+        this.post({
+            operation: 'chunk-upload',
+            filename: file.name,
+            path
+        })
+        .then(response => {
+            if (!response.ok) { reject(response); return }
+            return response.data.token
+        })
+        .then(token => {
+            if (!token) { reject(); return }
+            window.KUploader.postMessage({file: file, token: token})
+            resolve(token)
+        })
+    })
+}

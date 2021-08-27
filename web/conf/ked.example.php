@@ -21,6 +21,10 @@ $KEDConfiguration = [
             'max-text-size' => 4096
         ]
     ],
+    'upload' => [
+        'path' => '/tmp',
+        'max-upload-size' => 107374182400
+    ],
     'message' => [
         [
             'address' => '127.0.0.1',

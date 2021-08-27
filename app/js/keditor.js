@@ -5,7 +5,10 @@ function KEditor(container, baseUrl) {
     this.container = container
     this.baseUrl = baseUrl
     this.cwd = ''
-    
+
+    window.KUploader = new Worker('../js/ww/uploader.js')
+    window.KUploader.onmessage = this.handleUploaderMessage
+
     this.title = KED.title ?? 'Sans titre'
     this.pushState('path', '', this.title)
     
@@ -98,6 +101,10 @@ function KEditor(container, baseUrl) {
             wrapAround: true
         })
     }
+}
+
+KEditor.prototype.handleUploaderMessage = function (event) {
+    console.log(event)
 }
 
 KEditor.prototype.formData2Json = function (formData) {
@@ -928,22 +935,11 @@ KEditor.prototype.dropEntry = function (event) {
     let allTransfers = []
     for (let i = 0; i < files.items.length; i++) {
         if (files.items[i].kind === 'file') {
-            allTransfers.push(new Promise ((resolve, reject) => {
-                const formData = new FormData()
-                const file = files.items[i].getAsFile()
-                formData.append('operation', 'add-entry')
-                formData.append('file', file)
-                formData.append('_filename', file.name)
-                formData.append('path', docNode.id)
-                this.fetch('', formData)
-                .then(_ => {
-                    resolve()
-                    getDoc
-                    .then(doc => {
-                        doc.uploadNext()
-                    })
-                })
-            }))
+            this.API
+            .upload(docNode.id, files.items[i].getAsFile())
+            .then(token => {
+                console.log(`upload in progress ${token}`)
+            })
         }
     }
 
@@ -1240,31 +1236,11 @@ KEditor.prototype.uploadFile = function (node, event) {
     })
     let allTransfers = []
     for (let i = 0; i < files.length; i++) {
-        allTransfers.push(new Promise ((resolve, reject) => {
-            const formData = new FormData()
-            formData.append('operation', op)
-            formData.append('_filename', files[i].name)
-            formData.append('path', path)
-            formData.append('file', files[i])
-            this.fetch('', formData)
-            .then(_ => {
-                resolve()
-                getDoc
-                .then(doc => {
-                    doc.uploadNext()
-                })
-            })
-        }))
-    }
-
-    Promise.all(allTransfers)
-    .then(_ => {
-        getDoc
-        .then(doc => {
-            doc.uploadEnd()
+        this.API.upload(path, files[i])
+        .then(token => {
+            console.log(`upload in progress ${token}`)
         })
-        this.refreshDocument(docNode.id)
-    })
+    }
 }
 
 KEditor.prototype.uploadText = function (node, content, type = 'text/plain') {
