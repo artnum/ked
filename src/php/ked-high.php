@@ -522,7 +522,6 @@ class high extends ked {
         
         $hash = $this->hash($file, true);
         if (!$this->moveFile($file, $hash)) { return null; }
-
         return $this->dnToPath($this->createEntry($docDn, null, [ 'type' => $filetype, 'contentRef' => $hash, 'application' => $application ]));
     }
 

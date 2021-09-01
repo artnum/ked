@@ -137,7 +137,7 @@ class ACL {
     function lookupUser (string $user) {
         /* is an uid ? */
         $userObject = $this->ked->getUserByUid($user);
-        if ($userObject) { return new User($this->ked, $userObject); }
+        if ($userObject) { return new FullUser($this->ked, $userObject); }
     
         /* is a group ? */
         $conn = $this->ked->getLdapConn();
@@ -164,11 +164,11 @@ class ACL {
                                 case 'member':
                                     $user = $this->ked->getUserByUid($value[$i]);
                                     if ($user) {
-                                        $users[] = new User($this->ked, $user);
+                                        $users[] = new FullUser($this->ked, $user);
                                     }        
                                     break;
                                 default:
-                                    $user = User::fromDN($this->ked, $value[$i]);
+                                    $user = FullUser::fromDN($this->ked, $value[$i]);
                                     if ($user) {
                                         $users[] = $user;
                                     }
@@ -205,7 +205,7 @@ class ACL {
                 if (isset($object['kedaclmember'])) {
                     $aclMembers = [];
                     foreach ($object['kedaclmember'] as $v) {
-                        $user = User::fromDN($this->ked, $v);
+                        $user = FullUser::fromDN($this->ked, $v);
                         if (!$user) {
                             $user = $this->lookupUser($v);
                         }

@@ -76,7 +76,7 @@ class http {
     }
 
     function setUser($user) {
-        $this->user = new User($this->ked, $user);
+        $this->user = new FullUser($this->ked, $user);
         $this->ked->setCurrentUser($this->user);
     }
 
@@ -740,7 +740,8 @@ class http {
 
                 $token = hash_hmac('md5', uniqid('token', true), $entryDn);
                 if (!@mkdir("/tmp/$token")) { $this->errorUnableToOperate(); }
-                
+                file_put_contents("/tmp/$token/.user", $this->user->getDn());
+
                 $this->ok(json_encode(['token' => $token]));
                 break;
         }

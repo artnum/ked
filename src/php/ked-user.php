@@ -2,7 +2,21 @@
 declare(strict_types=1);
 namespace ked;
 
-class User {
+interface User {
+    function getDn();
+}
+
+class DNUser implements User {
+    function __construct(string $dn) {
+        $this->dn = $dn;
+    }
+
+    function getDn () {
+        return $this->dn;
+    }
+}
+
+class FullUser implements User {
     function __construct(ked $ked, \Menshen\User $user, string $dn = '') {
         $this->ked = $ked;
         $this->user = $user;
@@ -39,7 +53,7 @@ class User {
             /* any value that find a user is the right one */
             for ($i = 0; $i < $values['count']; $i++) {
                 $user = $ked->getUserByUid($values[$i]);
-                if ($user) { return new User($ked, $user, $dn); }
+                if ($user) { return new FullUser($ked, $user, $dn); }
             }
         }
 

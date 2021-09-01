@@ -6,9 +6,6 @@ function KEditor(container, baseUrl) {
     this.baseUrl = baseUrl
     this.cwd = ''
 
-    window.KUploader = new Worker('../js/ww/uploader.js')
-    window.KUploader.onmessage = this.handleUploaderMessage
-
     this.title = KED.title ?? 'Sans titre'
     this.pushState('path', '', this.title)
     
@@ -101,10 +98,6 @@ function KEditor(container, baseUrl) {
             wrapAround: true
         })
     }
-}
-
-KEditor.prototype.handleUploaderMessage = function (event) {
-    console.log(event)
 }
 
 KEditor.prototype.formData2Json = function (formData) {

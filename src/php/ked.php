@@ -661,7 +661,7 @@ class ked {
         if ($this->userStore && !empty($currentEntry['user'])) {
             if (!is_array($currentEntry['user'])) { $currentEntry['user'] = [$currentEntry['user']]; }
             foreach ($currentEntry['user'] as $userid) {
-                $user = User::fromDN($this, $userid);
+                $user = FullUser::fromDN($this, $userid);
                 if ($user) {
                     $users[$user->getUid()] = $user->getDisplayName();
                 }
@@ -697,7 +697,7 @@ class ked {
         if (!$values) { return $users; }
         if ($values['count'] <= 0) { return $users; }
         for ($i = 0; $i < $values['count']; $i++) {
-            $user = User::fromDN($this, $values[$i]);
+            $user = FullUser::fromDN($this, $values[$i]);
             if ($user) { $users[] = $user; }
         }
         return $users;

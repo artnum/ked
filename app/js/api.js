@@ -3,6 +3,8 @@ function KEDApi (uri) {
     this.EvtTarget = new EventTarget()
     this.KeyStore = new MenshenKeyStore()
     this.Menshen = new Menshen({version: 2})
+    this.Uploader = new Worker('../js/ww/slicer.js')
+    this.Uploader.onmessage = this.handleUploaderMessage
 }
 
 KEDApi.prototype.getClientId = function () {
@@ -505,8 +507,14 @@ KEDApi.prototype.upload = function (path, file) {
         })
         .then(token => {
             if (!token) { reject(); return }
-            window.KUploader.postMessage({file: file, token: token})
+            this.Uploader.postMessage({file, token, path})
             resolve(token)
         })
     })
+}
+
+KEDApi.prototype.handleUploaderMessage = function (msg) {
+    const content = msg.data
+
+    
 }

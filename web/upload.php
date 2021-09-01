@@ -10,7 +10,9 @@
  * client side which must keep the unuploaded part.
  */
 
-require('conf/ked.php');
+define('KED', 1);
+require('init.php');
+
 define('MAX_ALLOWED_SIZE', 107374182400); // 100G is quite a lot
 if (!isset($KEDConfiguration['upload'])) {
     $KEDConfiguration['upload'] = [
@@ -48,7 +50,6 @@ function unlock ($dir) {
     return @rmdir($dir . '/.lock');
 }
 
-
 $out = [
     'id' => null,
     'token' => null,
@@ -64,7 +65,8 @@ $MAP = [
     'filesize' => ['HTTP_X_KED_FILESIZE', 'int'],
     'token' => ['HTTP_X_KED_TOKEN', 'tok'],
     'hash' => ['HTTP_X_KED_HASH', 'tok'],
-    'filetype' => ['HTTP_X_KED_FILETYPE', 'str']
+    'filetype' => ['HTTP_X_KED_FILETYPE', 'str'],
+    'path' => ['HTTP_X_KED_PATH', 'str']
 ];
 
 function fail() {
@@ -117,6 +119,7 @@ $meta = [
     'token' => $chunk['token'],
     'filetype' => $chunk['filetype'],
     'hash' => $chunk['hash'],
+    'path' => $chunk['path'],
     'parts' => []
 ];
 
@@ -170,6 +173,13 @@ if ($meta['current'] === $meta['max']) {
         fail();
     }
     $out['done'] = true;
+    error_log(var_export($meta, true));
+    $user = new ked\DNUser(file_get_contents("/tmp/$meta[token]/.user"));
+    $KEDHigh->setCurrentUser($user);
+    $KEDHigh->addBinaryEntry($meta['path'], "/tmp/$meta[token]/$meta[filename]", $meta['filetype'], [
+        'ked:name=' . $meta['filename'],
+        'ked:size=' . $meta['filesize']
+        ] );
 }
 
 unlock($dir);
