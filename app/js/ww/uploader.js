@@ -6,12 +6,16 @@
  * not. A token must be requested before upload, this act as authentication.
  */
 
-const UPLOAD_KEYS = []
 importScripts('lib/cache.js')
 const Kache = new KEDCache()
+const UPLOAD_KEYS = new Map()
 
 function sendChunk (idb, chunkKey) {
     return new Promise((resolve, reject) => {
+
+        if (UPLOAD_KEYS.size > 10) { reject(); return; }
+        UPLOAD_KEYS.set(chunkKey, '1')
+
         const tr = idb.transaction('UploadCache', 'readonly')
         .objectStore('UploadCache')
         .get(chunkKey)
@@ -37,6 +41,7 @@ function sendChunk (idb, chunkKey) {
                 return response.json()
             })
             .then(result => {
+                UPLOAD_KEYS.delete(chunkKey)
                 if (result.id === chunkKey) {
                     resolve([chunk, result])
                     return
@@ -74,6 +79,7 @@ function iterateChunks (idb) {
             })
             cursor.continue()
         } else {
+            setTimeout(() => { iterateChunks(idb)}, 2000) // empty cache
         }
     }
 }
@@ -81,7 +87,6 @@ function iterateChunks (idb) {
 self.onmessage = function (msg) {
     Kache.open()
     .then(idb => {
-        console.log(msg.data)
         sendChunk(idb, msg.data.key)
         .then (([chunk, result]) => {
             console.log(result)
