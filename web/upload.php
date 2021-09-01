@@ -169,11 +169,9 @@ if ($meta['current'] === $meta['max']) {
     $endhash = hash_file('sha256', "/tmp/$meta[token]/$meta[filename]");
     if ($meta['hash'] !== $endhash) {
         unlock($dir);
-        error_log("Sent hash : $meta[hash] / Calc hash : $endhash");
         fail();
     }
     $out['done'] = true;
-    error_log(var_export($meta, true));
     $user = new ked\DNUser(file_get_contents("/tmp/$meta[token]/.user"));
     $KEDHigh->setCurrentUser($user);
     $KEDHigh->addBinaryEntry($meta['path'], "/tmp/$meta[token]/$meta[filename]", $meta['filetype'], [

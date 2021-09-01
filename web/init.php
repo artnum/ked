@@ -11,7 +11,6 @@ require('../src/php/http.php');
 require('../src/php/msg.php');
 require('../../Menshen/php/Menshen.php');
 
-error_log('init');
 header('Content-Type: text/plain'); // start with text plain
 
 $ldap = ldap_connect(
