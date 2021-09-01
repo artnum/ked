@@ -738,7 +738,8 @@ class http {
                 if (!$entryDn) { $this->errorForbidden(); }
                 if (!$this->acl->can($this->user, 'create:entry', $entryDn)) { $this->errorForbidden(); }
 
-                $token = hash_hmac('md5', uniqid('token', true), $entryDn);
+                /* temporary token, don't need strong crypto */
+                $token = hash_hmac('sha1', uniqid('token', true), $entryDn);
                 if (!@mkdir("/tmp/$token")) { $this->errorUnableToOperate(); }
                 file_put_contents("/tmp/$token/.user", $this->user->getDn());
 
