@@ -40,8 +40,8 @@ function forbid ($dir) {
 function lock ($dir) {
     $i = 0;
     while (!@mkdir($dir . '/.lock')) {
-        usleep(50000);
-        if(++$i > 20) { return false; }
+        usleep(25000); // 1/4 of a second
+        if(++$i > 20) {  return false; }
     }
     return true;
 }
@@ -139,12 +139,12 @@ if (is_file($dir . '/metadata.json')) {
 $out['id'] = $chunk['id'];
 $out['token'] = $chunk['token'];
 
-if (isset($meta['parts'][$chunk['count']])) {
+if (isset($meta['parts'][$chunk['id']])) {
     $out['duplicate'] = true;
     unlock($dir);
     ok();
 }
-$meta['parts'][$chunk['count']] = $chunk;
+$meta['parts'][$chunk['id']] = $chunk;
 $meta['current']++;
 
 /* write chunk to file */

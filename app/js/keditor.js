@@ -43,6 +43,8 @@ function KEditor(container, baseUrl) {
         this.edit[k] = this.edit[k].bind(this)
     }
 
+    this.API.addEventListener('uploaded', this.handledUploaded.bind(this))
+
     //this.container.addEventListener('click', this.interact.bind(this))
     window.addEventListener('popstate', event => {
         if (event.state === null) { this.setPath('') }
@@ -98,6 +100,39 @@ function KEditor(container, baseUrl) {
             wrapAround: true
         })
     }
+
+    const pollProgress = function () {
+        const Kache = new KEDCache()
+        Kache.getProgress()
+        .then(files => {
+            this.showUploadStatus(files)
+            setTimeout(pollProgress, 1000)
+        })
+    }.bind(this)
+    pollProgress()
+}
+
+KEditor.prototype.showUploadStatus = function (files) {
+    const upload = document.getElementById('KEDUploadDisplay') || document.createElement('DIV')
+    upload.id = 'KEDUploadDisplay'
+    if (files.length <= 0) {
+        if (upload.parentNode) { upload.parentNode.removeChild(upload) }
+        return
+    }
+    let tot = 0
+    let left = 0
+    for (const f of files) {
+        tot += f.max
+        left += f.left
+    }
+    upload.innerHTML = `${files.length} fichier(s) en cours de chargement (${100 - Math.round(left * 100 / tot)} %)`
+    this.container.appendChild(upload)
+}
+
+KEditor.prototype.handledUploaded = function (event) {
+    const content = event.detail
+
+    this.refreshDocument(content.content.path)
 }
 
 KEditor.prototype.formData2Json = function (formData) {
@@ -921,10 +956,10 @@ KEditor.prototype.dropEntry = function (event) {
         }
     }
     if (itemQty === 0) { return }
-    getDoc
+    /*getDoc
     .then(doc => {
         doc.uploadStart(itemQty)
-    })
+    })*/
     let allTransfers = []
     for (let i = 0; i < files.items.length; i++) {
         if (files.items[i].kind === 'file') {
@@ -939,10 +974,10 @@ KEditor.prototype.dropEntry = function (event) {
     Promise.all(allTransfers)
     .then(_ => {
         this.refreshDocument(docNode.id)
-        getDoc
+        /*getDoc
         .then(doc => {
             doc.uploadEnd()
-        })
+        })*/
     })
 }
 
@@ -1223,11 +1258,10 @@ KEditor.prototype.uploadFile = function (node, event) {
     const op = node.dataset.entryid ? 'update-entry' : 'add-entry'
     const path = op === 'update-entry' ? this.buildPath(docNode.id, node.dataset.entryid) :  docNode.id
     const getDoc = KEDDocument.get(docNode.id, this.API)
-    getDoc
+   /* getDoc
     .then(doc => {
         doc.uploadStart(files.length)
-    })
-    let allTransfers = []
+    })*/
     for (let i = 0; i < files.length; i++) {
         this.API.upload(path, files[i])
         .then(token => {

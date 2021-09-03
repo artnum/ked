@@ -6,7 +6,7 @@
  * not. A token must be requested before upload, this act as authentication.
  */
 
-importScripts('lib/cache.js')
+importScripts('../lib/cache.js')
 const Kache = new KEDCache()
 
 const Uploader = new Worker('uploader.js')
@@ -53,12 +53,16 @@ Uploader.onmessage = function (msg) {
     const content = msg.data
     switch (content.operation) {
         case 'state':
-            if (content.done) {
-                Kache.rmToken(content.token)
-                .then(result => {
-                    self.postMessage({operation: 'uploadDone', token: content.token, path: content.path})
-                })
-            }
+            Kache.hasChunk(content.token)
+            .then(num => {
+                if (num === 0) {
+                    Kache.rmToken(content.token)
+                    .then(tk => {
+                        if (tk === null) { return }
+                        self.postMessage({operation: 'uploadDone', content: tk})
+                    })
+                }
+            })
             break
     }
 }

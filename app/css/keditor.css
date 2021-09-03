@@ -110,6 +110,17 @@
     margin: 20px 20px 0 20px;
 }
 
+#KEDUploadDisplay {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    padding: 4px 0px;
+    margin: 0px 2px;
+    background-color: lightseagreen;
+    color: black;
+}
+
 .kedConnected {
     display: inline-block;
     font-family: sans-serif;

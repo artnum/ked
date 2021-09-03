@@ -6,16 +6,11 @@
  * not. A token must be requested before upload, this act as authentication.
  */
 
-importScripts('lib/cache.js')
+importScripts('../lib/cache.js')
 const Kache = new KEDCache()
-const UPLOAD_KEYS = new Map()
 
 function sendChunk (idb, chunkKey) {
     return new Promise((resolve, reject) => {
-
-        if (UPLOAD_KEYS.size > 10) { reject(); return; }
-        UPLOAD_KEYS.set(chunkKey, '1')
-
         const tr = idb.transaction('UploadCache', 'readonly')
         .objectStore('UploadCache')
         .get(chunkKey)
@@ -41,7 +36,6 @@ function sendChunk (idb, chunkKey) {
                 return response.json()
             })
             .then(result => {
-                UPLOAD_KEYS.delete(chunkKey)
                 if (result.id === chunkKey) {
                     resolve([chunk, result])
                     return
@@ -61,6 +55,7 @@ function sendChunk (idb, chunkKey) {
     })
 }
 
+const UPLOAD_KEYS = new Map()
 function iterateChunks (idb) {
     const tr = idb.transaction('UploadCache', 'readonly')
     .objectStore('UploadCache')
@@ -68,14 +63,23 @@ function iterateChunks (idb) {
     tr.onsuccess = function (event) {
         const cursor = event.target.result
         if (cursor) {
-            sendChunk(idb, cursor.key)
+            const key = cursor.key
+            if (UPLOAD_KEYS.size > 10) { setTimeout(() => { iterateChunks(idb)}, 2000); return; }
+            if (UPLOAD_KEYS.has(key)) { cursor.continue(); return; }
+            UPLOAD_KEYS.set(key, '1')
+            sendChunk(idb, key)
             .then (([chunk, result]) => {
+                UPLOAD_KEYS.delete(key)
                 return Kache.remove(chunk)
             })
             .then(token => {
-                self.postMessage(token)
+                Kache.hasChunk(token)
+                .then(num => {
+                    self.postMessage({operation: 'state', token: token, left: num})
+                })            
             })
             .catch(e => {
+                UPLOAD_KEYS.delete(key)
             })
             cursor.continue()
         } else {
@@ -87,15 +91,24 @@ function iterateChunks (idb) {
 self.onmessage = function (msg) {
     Kache.open()
     .then(idb => {
-        sendChunk(idb, msg.data.key)
+        const key = msg.data.key
+        if (UPLOAD_KEYS.size > 10) { return; }
+        if (UPLOAD_KEYS.has(key)) { return; }
+        UPLOAD_KEYS.set(key, '1')
+        sendChunk(idb, key)
         .then (([chunk, result]) => {
-            console.log(result)
+            UPLOAD_KEYS.delete(key, '1')
             return Kache.remove(chunk)
         })
         .then(token => {
-            self.postMessage(token)
+            Kache.hasChunk(token)
+            .then(num => {
+                self.postMessage({operation: 'state', token: token, left: num})
+            })
         })
+        .then()
         .catch(e => {
+            UPLOAD_KEYS.delete(key)
         })
     })
 }
