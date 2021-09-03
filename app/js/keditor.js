@@ -125,7 +125,10 @@ KEditor.prototype.showUploadStatus = function (files) {
         tot += f.max
         left += f.left
     }
-    upload.innerHTML = `${files.length} fichier(s) en cours de chargement (${100 - Math.round(left * 100 / tot)} %)`
+    const percent = 100 - Math.round(left * 100 / tot)
+    upload.innerHTML = `
+        <span>${files.length} fichier(s) en cours de chargement (${percent} %)</span>
+        <div style="width: ${percent}%">&nbsp</div>`
     this.container.appendChild(upload)
 }
 

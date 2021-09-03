@@ -115,10 +115,23 @@
     bottom: 0;
     left: 0;
     width: 100%;
-    padding: 4px 0px;
-    margin: 0px 2px;
+    padding: 4px 0px 8px 0px;
     background-color: lightseagreen;
     color: black;
+}
+
+#KEDUploadDisplay div {
+    background-color: darkgoldenrod;
+    height: 8px;
+    margin: 0;
+    position: fixed;
+    left: 0px;
+    bottom: 0;
+}
+
+#KEDUploadDisplay span {
+    margin: 0 4px;
+    z-index: 5;
 }
 
 .kedConnected {

@@ -48,7 +48,9 @@ function sendChunk (idb, chunkKey) {
                 reject()
             })
             .catch(e => {
-                console.log(e)
+                if (e instanceof TypeError) {
+                    reject(new Error('NetError'))
+                }
                 reject()
             })
         }
@@ -79,7 +81,12 @@ function iterateChunks (idb) {
                 })            
             })
             .catch(e => {
-                UPLOAD_KEYS.delete(key)
+                UPLOAD_KEYS.delete(key);
+                if (e === undefined) { return }
+                if (e.message === 'NetError') {
+                    setTimeout(() => { iterateChunks(idb)}, 2000) // empty cache
+                    return
+                }
             })
             cursor.continue()
         } else {
