@@ -22,6 +22,7 @@ if (($user = $menshen->check()) !== false) {
     $http->setAclConfiguration($KEDConfiguration['acl']);
     $http->setUser($user);
     $http->setUserStore($credStore);
+    $http->setUpload($KEDConfiguration['upload']['path']);
     $http->run();
 } else {
     http_response_code(403);

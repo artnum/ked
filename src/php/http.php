@@ -15,6 +15,7 @@ class http {
     protected $clientid;
     protected $requestid;
     protected $aclConfiguration = null;
+    protected $upload = '/tmp/';
 
     function __construct(high $ked, msg $msg = null)
     {
@@ -93,6 +94,10 @@ class http {
             case 'text':
                 header('Content-Type: text/plain', true); break;
         }
+    }
+
+    function setUpload ($path) {
+        $this->upload = $path;
     }
 
     function setJsonOut () {
@@ -740,8 +745,8 @@ class http {
 
                 /* temporary token, don't need strong crypto */
                 $token = hash_hmac('sha1', uniqid('token', true), $entryDn);
-                if (!@mkdir("/tmp/$token")) { $this->errorUnableToOperate(); }
-                file_put_contents("/tmp/$token/.user", $this->user->getDn());
+                if (!@mkdir("$this->upload/$token")) { $this->errorUnableToOperate(); }
+                file_put_contents("$this->upload/$token/.user", $this->user->getDn());
 
                 $this->ok(json_encode(['token' => $token]));
                 break;
