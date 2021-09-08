@@ -70,25 +70,27 @@ function iterateChunks (idb) {
             if (UPLOAD_KEYS.has(key)) { cursor.continue(); return; }
             UPLOAD_KEYS.set(key, '1')
             sendChunk(idb, key)
-            .then (([chunk, result]) => {
+            .then (([chunk, result]) => {                 
                 UPLOAD_KEYS.delete(key)
-                return Kache.remove(chunk)
+                if (!result.id) {
+                    return null
+                } else {
+                    return Kache.remove(chunk)
+                }
             })
             .then(token => {
+                if (!token) { cursor.continue(); return }
                 Kache.hasChunk(token)
                 .then(num => {
                     self.postMessage({operation: 'state', token: token, left: num})
                 })            
+                cursor.continue()
             })
             .catch(e => {
-                UPLOAD_KEYS.delete(key);
-                if (e === undefined) { return }
-                if (e.message === 'NetError') {
-                    setTimeout(() => { iterateChunks(idb)}, 2000) // empty cache
-                    return
-                }
+                UPLOAD_KEYS.delete(key)
+                setTimeout(() => { iterateChunks(idb)}, 2000) // empty cache
+                return
             })
-            cursor.continue()
         } else {
             setTimeout(() => { iterateChunks(idb)}, 2000) // empty cache
         }
