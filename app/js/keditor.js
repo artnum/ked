@@ -1774,6 +1774,10 @@ KEditor.prototype.render = function (root) {
                 userDom.innerHTML = `<span class="username">${user.name}</span></span>`
                 KEDAnim.push(() => { footer.appendChild(userDom) })
             }
+            const reloadButton = document.createElement('BUTTON')
+            reloadButton.classList.add('kui')
+            reloadButton.id = 'KEDConfiguration'
+            reloadButton.innerHTML = 'Recharger'
             const configButton = document.createElement('BUTTON')
             configButton.classList.add('kui')
             configButton.id = 'KEDConfiguration'
@@ -1785,9 +1789,13 @@ KEditor.prototype.render = function (root) {
             KEDAnim.push(() => {
                 footer.appendChild(exitButton)
                 footer.appendChild(configButton) 
+                footer.appendChild(reloadButton)
             })
             exitButton.addEventListener('click', () => {
                 this.authStop()
+                window.location.reload()
+            })
+            reloadButton.addEventListener('click', () => {
                 window.location.reload()
             })
         })
