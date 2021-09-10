@@ -11,9 +11,21 @@ const Kache = new KEDCache()
 
 const Uploader = new Worker('uploader.js')
 let NetDown = false
-
+let Cancel = false
 const KChunkSize = 1048576 // 1meg, max nginx post body size
 self.onmessage = function (msg) {
+    Cancel = false
+    if (msg.data.operation) {
+        switch(msg.data.operation) {
+            case 'cancel':
+                Uploader.postMessage({operation: 'cancel'})
+                Cancel = true
+                Kache.clear()
+                break
+        }
+        return
+    }
+
     self.postMessage({operation: 'state', state: 'preparation', files: []})
     const file = msg.data.file
     file.arrayBuffer()
@@ -29,6 +41,7 @@ self.onmessage = function (msg) {
         let partCount = 0;
         const hashStr = Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, '0')).join('')
         for (let i = 0; i < buffer.byteLength; i += KChunkSize) {
+            if (Cancel) { break }
             const chunk = {
                 hash: hashStr,
                 count: partCount,
@@ -45,6 +58,7 @@ self.onmessage = function (msg) {
             ++partCount
             Kache.add(chunk)
         }
+        Cancel = false
     })
 }
 

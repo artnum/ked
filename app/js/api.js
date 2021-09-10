@@ -513,6 +513,10 @@ KEDApi.prototype.upload = function (path, file) {
     })
 }
 
+KEDApi.prototype.cancelUpload = function () {
+    this.Uploader.postMessage({operation: 'cancel'})
+}
+
 KEDApi.prototype.handleUploaderMessage = function (msg) {
     const content = msg.data
     switch(content.operation) {

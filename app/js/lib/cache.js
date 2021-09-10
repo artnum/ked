@@ -279,3 +279,38 @@ KEDCache.prototype.getProgress = function () {
         })
     })
 }
+
+KEDCache.prototype.clear = function () {
+    return new Promise((resolve, reject) => {
+        this.open()
+        .then(idb => {
+            const tr = idb.transaction(['Tokens', 'UploadCache'], 'readwrite')
+            const reqChunk = tr.objectStore('UploadCache')
+                .openCursor()
+
+            reqChunk.onsuccess = function (event) {
+                const tr =  event.target.transaction
+                const cursor = event.target.result
+
+                if (!cursor) {
+                    const reqTk = tr.objectStore('Tokens')
+                        .openCursor()
+                    reqTk.onsuccess = function (event) {
+                        const tr = event.target.transaction
+                        const cursor = event.target.result
+
+                        if (!cursor) {
+                            tr.commit()
+                            return
+                        }
+                        cursor.delete()
+                        cursor.continue()
+                    }
+                    return
+                }
+                cursor.delete()
+                cursor.continue()
+            }
+        })
+    })
+}

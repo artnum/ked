@@ -124,6 +124,9 @@
     background-color: goldenrod;
 }
 
+#KEDUploadDisplay button.kui {
+    max-height: 16px;
+}
 
 #KEDUploadDisplay div {
     background-color: darkgoldenrod;

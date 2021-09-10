@@ -123,6 +123,11 @@ function KEditor(container, baseUrl) {
 
 KEditor.prototype.showUploadStatus = function (state, files) {
     const upload = document.getElementById('KEDUploadDisplay') || document.createElement('DIV')
+    upload.addEventListener('click', event => {
+        switch (event.target?.dataset?.action) {
+            case 'cancel': this.API.cancelUpload(); break
+        }
+    })
     upload.id = 'KEDUploadDisplay'
     if (state === 'none') {
         if (upload.parentNode) { upload.parentNode.removeChild(upload) }
@@ -130,7 +135,7 @@ KEditor.prototype.showUploadStatus = function (state, files) {
     }
     if (state === 'disconnected') {
         upload.innerHTML = `
-            <span>Réseau déconnecté, envoi suspendu</span>
+            <span>Réseau déconnecté, envoi suspendu</span><button class="kui" data-action="cancel">Arrêter</span>
             <div style="width: 0%">&nbsp</div>`
         upload.classList.add('disconnect')
         if (!upload.parentNode) {
@@ -157,7 +162,7 @@ KEditor.prototype.showUploadStatus = function (state, files) {
     }
     const percent = 100 - Math.round(left * 100 / tot)
     upload.innerHTML = `
-        <span>${files.length} fichier${files.length > 1 ? 's' : ''} en cours de chargement (${percent} %)</span>
+        <span>${files.length} fichier${files.length > 1 ? 's' : ''} en cours de chargement (${percent} %)</span><button class="kui" data-action="cancel">Arrêter</span>
         <div style="width: ${percent}%">&nbsp</div>`
     if (!upload.parentNode) {
         this.container.appendChild(upload)

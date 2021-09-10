@@ -8,6 +8,17 @@
 
 importScripts('../lib/cache.js')
 const Kache = new KEDCache()
+let Cancel = false
+
+self.onmessage = function (msg) {
+    const content = msg.data
+
+    switch(content.operation) {
+        case 'cancel':
+            Cancel = true;
+            break
+    }
+}
 
 function sendChunk (idb, chunkKey) {
     return new Promise((resolve, reject) => {
@@ -40,17 +51,9 @@ function sendChunk (idb, chunkKey) {
                     resolve([chunk, result])
                     return
                 }
-                if (chunk.failCount > 10) {
-                    Kache.remove(chunk)
-                } else {
-                    Kache.incFail(chunk.id)
-                }
                 reject()
             })
             .catch(e => {
-                if (e instanceof TypeError) {
-                    reject(new Error('NetError'))
-                }
                 reject()
             })
         }
@@ -59,6 +62,10 @@ function sendChunk (idb, chunkKey) {
 
 function iterateChunks (idb) {
     return new Promise((resolve, reject) => {
+        if (Cancel) {
+            resolve([idb, []])
+            return
+        }
         const UPLOAD_KEYS = []
         const tr = idb.transaction('UploadCache', 'readonly')
         .objectStore('UploadCache')
@@ -92,21 +99,21 @@ function uploadChunks (idb, UPLOAD_KEYS) {
                 sendChunk(idb, key)
                 .then (([chunk, result]) => {       
                     if (!result.id) {
-                        return false
+                        return [false, key]
                     } else {
                         return Kache.remove(chunk)
                     }
                 })
                 .then(token => {
-                    if (!token) { return false }
+                    if (!token) { return [false, key] }
                     return Kache.hasChunk(token) 
                     .then (num => {
                         self.postMessage({operation: 'state', token: token, left: num, net: true})
-                        return true
+                        return [true, key]
                     })
                 })
                 .catch(e => {
-                    return false
+                    return [false, key]
                 })
             )
         }
@@ -115,9 +122,9 @@ function uploadChunks (idb, UPLOAD_KEYS) {
             /* if at least one succeed, we have net connection, else we don't */
             let success = false
             results.forEach(result => {
-                if (result.value) { success = true}
+                if (result.value[0]) { success = true}
             })
-            if(!success && results.length > 0) { self.postMessage({operation: 'state', token: null, left: 0, net: false}) }
+            if(!success && results.length > 0 && !Cancel) { self.postMessage({operation: 'state', token: null, left: 0, net: false}) }
             resolve(success)
         })
     })
@@ -141,7 +148,7 @@ function run () {
     })
     .then(empty => {
         running = false
-        if (empty) { setTimeout(run, 2000) }
+        if (empty) { Cancel = false; setTimeout(run, 2000) }
         else { run() }
     })
     .catch(_ => {
