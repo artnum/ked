@@ -75,15 +75,15 @@ Uploader.onmessage = function (msg) {
 }
 
 function sendState () {
+    if (NetDown) {
+        setTimeout(sendState, 1000)
+        return
+    }
     Kache.isEmpty()
     .then(empty => {
         if (empty) {
             self.postMessage({operation: 'state', state: 'none', files: []})
         } else {
-            if (NetDown) {
-                setTimeout(sendState, 1000)
-                return
-            }
             Kache.getProgress()
             .then(files => {
                 if (files.length === 0) {
