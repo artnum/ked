@@ -10,9 +10,11 @@ importScripts('../lib/cache.js')
 const Kache = new KEDCache()
 
 const Uploader = new Worker('uploader.js')
+let NetDown = false
 
 const KChunkSize = 1048576 // 1meg, max nginx post body size
 self.onmessage = function (msg) {
+    self.postMessage({operation: 'state', state: 'preparation', files: []})
     const file = msg.data.file
     file.arrayBuffer()
     .then(buffer => {
@@ -42,9 +44,6 @@ self.onmessage = function (msg) {
             }
             ++partCount
             Kache.add(chunk)
-            .then(_ => {
-                Uploader.postMessage({operation: 'addChunk', key: chunk.id})
-            })
         }
     })
 }
@@ -53,6 +52,14 @@ Uploader.onmessage = function (msg) {
     const content = msg.data
     switch (content.operation) {
         case 'state':
+            if (!content.net) {
+                NetDown = true
+                self.postMessage({operation: 'state', state: 'disconnected', files: []})
+                return 
+            } else {
+                NetDown = false
+            }
+            sendState()
             Kache.hasChunk(content.token)
             .then(num => {
                 if (num === 0) {
@@ -66,3 +73,28 @@ Uploader.onmessage = function (msg) {
             break
     }
 }
+
+function sendState () {
+    Kache.isEmpty()
+    .then(empty => {
+        if (empty) {
+            self.postMessage({operation: 'state', state: 'none', files: []})
+        } else {
+            if (NetDown) {
+                setTimeout(sendState, 1000)
+                return
+            }
+            Kache.getProgress()
+            .then(files => {
+                if (files.length === 0) {
+                    self.postMessage({operation: 'state', state: 'preparation', files: []})
+                } else {
+                    self.postMessage({operation: 'state', state: 'progress', files: files})
+                }
+                setTimeout(sendState, 1000)
+            })
+        }
+    })
+}
+
+sendState()

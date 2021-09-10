@@ -101,24 +101,54 @@ function KEditor(container, baseUrl) {
         })
     }
 
-    const pollProgress = function () {
-        const Kache = new KEDCache()
-        Kache.getProgress()
-        .then(files => {
-            this.showUploadStatus(files)
-            setTimeout(pollProgress, 1000)
-        })
-    }.bind(this)
-    pollProgress()
+    this.API.addEventListener('upload-state', event => {
+        const upstate = event.detail
+        switch (upstate.state) {
+            default:
+            case 'none': 
+                this.showUploadStatus('none', [])
+                return;
+            case 'progress':
+                this.showUploadStatus('progress', upstate.files)
+                return 
+            case 'preparation':
+                this.showUploadStatus('preparation', [])
+                return
+            case 'disconnected':
+                this.showUploadStatus('disconnected', [])
+                return
+        }
+    })
 }
 
-KEditor.prototype.showUploadStatus = function (files) {
+KEditor.prototype.showUploadStatus = function (state, files) {
     const upload = document.getElementById('KEDUploadDisplay') || document.createElement('DIV')
     upload.id = 'KEDUploadDisplay'
-    if (files.length <= 0) {
+    if (state === 'none') {
         if (upload.parentNode) { upload.parentNode.removeChild(upload) }
         return
     }
+    if (state === 'disconnected') {
+        upload.innerHTML = `
+            <span>Réseau déconnecté, envoi suspendu</span>
+            <div style="width: 0%">&nbsp</div>`
+        upload.classList.add('disconnect')
+        if (!upload.parentNode) {
+            this.container.appendChild(upload)
+        }
+        return 
+    }
+    upload.classList.remove('disconnect')
+    if (state === 'preparation') {
+        upload.innerHTML = `
+            <span>Envoi de fichier(s) en préparation</span>
+            <div style="width: 0%">&nbsp</div>`
+        if (!upload.parentNode) {
+            this.container.appendChild(upload)
+        }
+        return 
+    }
+
     let tot = 0
     let left = 0
     for (const f of files) {
@@ -127,9 +157,11 @@ KEditor.prototype.showUploadStatus = function (files) {
     }
     const percent = 100 - Math.round(left * 100 / tot)
     upload.innerHTML = `
-        <span>${files.length} fichier(s) en cours de chargement (${percent} %)</span>
+        <span>${files.length} fichier${files.length > 1 ? 's' : ''} en cours de chargement (${percent} %)</span>
         <div style="width: ${percent}%">&nbsp</div>`
-    this.container.appendChild(upload)
+    if (!upload.parentNode) {
+        this.container.appendChild(upload)
+    }
 }
 
 KEditor.prototype.handledUploaded = function (event) {

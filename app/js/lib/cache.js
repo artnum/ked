@@ -90,6 +90,24 @@ KEDCache.prototype.add = function (chunk) {
     })
 }
 
+KEDCache.prototype.isEmpty = function () {
+    return new Promise((resolve, reject) => {
+        this.open()
+        .then(idb => {
+            const tr = idb.transaction('UploadCache', 'readonly')
+            const upcache = tr.objectStore('UploadCache')
+                .count()
+
+            upcache.onsuccess = function (event) {
+                resolve(event.target.result === 0)
+            }
+            upcache.onerror = function (event) {
+                resolve(true)
+            }
+        })
+    })
+}
+
 KEDCache.prototype.remove = function (chunk) {
     return new Promise((resolve, reject) => {
         this.open()

@@ -120,6 +120,11 @@
     color: black;
 }
 
+#KEDUploadDisplay.disconnect {
+    background-color: goldenrod;
+}
+
+
 #KEDUploadDisplay div {
     background-color: darkgoldenrod;
     height: 8px;

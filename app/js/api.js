@@ -515,10 +515,16 @@ KEDApi.prototype.upload = function (path, file) {
 
 KEDApi.prototype.handleUploaderMessage = function (msg) {
     const content = msg.data
-    console.log(msg)
     switch(content.operation) {
         case 'uploadDone':
             this.EvtTarget.dispatchEvent(new CustomEvent('uploaded', {detail: content}))
             break
+        case 'state':
+            this.EvtTarget.dispatchEvent(new CustomEvent('upload-state', {
+                detail: {
+                    files: content.files,
+                    state: content.state
+                }
+            }))
     }
 }

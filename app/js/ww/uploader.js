@@ -57,73 +57,97 @@ function sendChunk (idb, chunkKey) {
     })
 }
 
-const UPLOAD_KEYS = new Map()
 function iterateChunks (idb) {
-    const tr = idb.transaction('UploadCache', 'readonly')
-    .objectStore('UploadCache')
-    .openKeyCursor()
-    tr.onsuccess = function (event) {
-        const cursor = event.target.result
-        if (cursor) {
-            const key = cursor.key
-            if (UPLOAD_KEYS.size > 10) { setTimeout(() => { iterateChunks(idb)}, 2000); return; }
-            if (UPLOAD_KEYS.has(key)) { cursor.continue(); return; }
-            UPLOAD_KEYS.set(key, '1')
-            sendChunk(idb, key)
-            .then (([chunk, result]) => {                 
-                UPLOAD_KEYS.delete(key)
-                if (!result.id) {
-                    return null
+    return new Promise((resolve, reject) => {
+        const UPLOAD_KEYS = []
+        const tr = idb.transaction('UploadCache', 'readonly')
+        .objectStore('UploadCache')
+        .openKeyCursor()
+        tr.onsuccess = function (event) {
+            const cursor = event.target.result
+            if (cursor) {
+                const key = cursor.key
+                if (UPLOAD_KEYS.length > 10) { resolve([idb, UPLOAD_KEYS]); return; }
+                if (UPLOAD_KEYS.indexOf(key) !== -1) { cursor.continue(); return; }
+                UPLOAD_KEYS.push(key)
+                if (UPLOAD_KEYS.length < 10) {
+                    cursor.continue()
                 } else {
-                    return Kache.remove(chunk)
+                    resolve([idb, UPLOAD_KEYS])
+                    return
                 }
-            })
-            .then(token => {
-                if (!token) { cursor.continue(); return }
-                Kache.hasChunk(token)
-                .then(num => {
-                    self.postMessage({operation: 'state', token: token, left: num})
-                })            
-                cursor.continue()
-            })
-            .catch(e => {
-                UPLOAD_KEYS.delete(key)
-                setTimeout(() => { iterateChunks(idb)}, 2000) // empty cache
+            } else {
+                resolve([idb, UPLOAD_KEYS])
                 return
-            })
-        } else {
-            setTimeout(() => { iterateChunks(idb)}, 2000) // empty cache
+            }
         }
-    }
+    })
 }
 
-self.onmessage = function (msg) {
-    Kache.open()
-    .then(idb => {
-        const key = msg.data.key
-        if (UPLOAD_KEYS.size > 10) { return; }
-        if (UPLOAD_KEYS.has(key)) { return; }
-        UPLOAD_KEYS.set(key, '1')
-        sendChunk(idb, key)
-        .then (([chunk, result]) => {
-            UPLOAD_KEYS.delete(key, '1')
-            return Kache.remove(chunk)
-        })
-        .then(token => {
-            Kache.hasChunk(token)
-            .then(num => {
-                self.postMessage({operation: 'state', token: token, left: num})
+function uploadChunks (idb, UPLOAD_KEYS) {
+    return new Promise((resolve, reject) => {
+        const uploads = []
+        while(key = UPLOAD_KEYS.pop()) {
+            uploads.push(
+                sendChunk(idb, key)
+                .then (([chunk, result]) => {       
+                    if (!result.id) {
+                        return false
+                    } else {
+                        return Kache.remove(chunk)
+                    }
+                })
+                .then(token => {
+                    if (!token) { return false }
+                    return Kache.hasChunk(token) 
+                    .then (num => {
+                        self.postMessage({operation: 'state', token: token, left: num, net: true})
+                        return true
+                    })
+                })
+                .catch(e => {
+                    return false
+                })
+            )
+        }
+        Promise.allSettled(uploads)
+        .then(results => {
+            /* if at least one succeed, we have net connection, else we don't */
+            let success = false
+            results.forEach(result => {
+                if (result.value) { success = true}
             })
-        })
-        .then()
-        .catch(e => {
-            UPLOAD_KEYS.delete(key)
+            if(!success && results.length > 0) { self.postMessage({operation: 'state', token: null, left: 0, net: false}) }
+            resolve(success)
         })
     })
 }
 
+let running = false
 /* on start, empty */
-Kache.open()
-.then(idb => {
-    iterateChunks(idb)
-})
+function run () {
+    if (running) { setTimeout(run, 2000); return; }
+    running = true
+    Kache.open()
+    .then(idb => {
+        return iterateChunks(idb)
+    })
+    .then(([idb, keys]) => {
+        return uploadChunks(idb, keys)
+    })
+    .then(success => {
+        if (!success) { return true; }
+        return Kache.isEmpty()
+    })
+    .then(empty => {
+        running = false
+        if (empty) { setTimeout(run, 2000) }
+        else { run() }
+    })
+    .catch(_ => {
+        running = false
+        setTimeout(run, 2000)
+    })
+}
+
+run()
