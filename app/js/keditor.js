@@ -260,9 +260,8 @@ KEditor.prototype.setupPage = function () {
 }
 
 KEditor.prototype.sseSetup = function() {
-    const cuEvent = (event) => {
+    const cuEvent = (data) => {
         try {
-            const data = JSON.parse(event.data)
             if (!data.id) { return; }
             new Promise(resolve => {
                 if (data.clientid) {
@@ -301,10 +300,19 @@ KEditor.prototype.sseSetup = function() {
     .then(url => {
         url.searchParams.append('clientid', this.clientid)
         this.sse = new EventSource(url)
-        this.sse.addEventListener('create', event => cuEvent(event))
-        this.sse.addEventListener('update', event => cuEvent(event))        
-        this.sse.addEventListener('lock', event => this.lockUnlock(event))        
-        this.sse.addEventListener('unlock', event => this.lockUnlock(event))        
+        this.sse.onmessage = event => {
+            const message = JSON.parse(event.data)
+            switch (message.operation) {
+                case 'create':
+                case 'update':
+                    cuEvent(message)
+                    break;
+                case 'lock':
+                case 'unlock':
+                    this.lockUnlock(message);
+                    break
+            }
+        }      
         this.sse.addEventListener('error', event => {
             this.sse.close()
             this.sse = null
@@ -435,24 +443,23 @@ KEditor.prototype.authNext = function (username, password) {
     })
 }
 
-KEditor.prototype.lockUnlock = function(event) {
+KEditor.prototype.lockUnlock = function(data) {
     try {
-        const lock = JSON.parse(event.data)
-        if (lock.clientid === this.clientid) { return }
-        const kedDoc = KEDDocument.search(lock.id)
+        if (data.clientid === this.clientid) { return }
+        const kedDoc = KEDDocument.search(data.id)
     
-        switch(event.type) {
+        switch(data.operation) {
             case 'lock': 
                 if (kedDoc) {
-                    kedDoc.receiveLock(lock.clientid);
+                    kedDoc.receiveLock(data.clientid);
                 } else {
-                    this.LockedNotFound.set(lock.id, lock.clientid)
+                    this.LockedNotFound.set(data.id, data.clientid)
                 }
                 break
             case 'unlock':
-                this.LockedNotFound.delete(lock.id)
+                this.LockedNotFound.delete(data.id)
                 if (kedDoc) {
-                    kedDoc.receiveUnlock(lock.clientid);
+                    kedDoc.receiveUnlock(data.clientid);
                 }
                 break
         }

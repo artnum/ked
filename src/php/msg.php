@@ -2,92 +2,76 @@
 
 namespace ked;
 
+require('wesrv/lib/msg.php');
+
 use Exception;
 
 class msg {
-    private $socket;
-    private $address;
-    private $port;
-    private $key;
+    private $message;
 
     function __construct(string $address = '127.0.0.1', int $port = 8531, string $key = 'ked-demo-key') {
-        $this->address = $address;
-        $this->port = $port;
-        $this->auth = new msgAuth($key);
-
-        $this->socket = socket_create(AF_INET, SOCK_DGRAM, SOL_UDP);
-        if (!$this->socket) { throw new Exception('Socket creation failed'); }
-        socket_set_nonblock($this->socket);
-    }
-
-    function __destruct() {
-        socket_close($this->socket);
+        $this->message = new \wesrv\msg($address, $port, $key);
     }
 
     function exit($clientid) {
-        $this->msg('exit:' . $clientid);
+        $this->message->send(
+            json_encode([
+                'operation' => 'exit',
+                'clientid' => $clientid
+            ])
+        );
     }
 
     function lock ($id, $clientid) {
-        $this->msg('lock:' . $id . '\\' . $clientid);
+        $this->message->send(
+            json_encode([
+                'operation' => 'lock',
+                'id' => $id,
+                'clientid' => $clientid
+            ])
+        );
     }
 
     function unlock ($id, $clientid) {
-        $this->msg('unlock:' . $id . '\\' . $clientid);
+        $this->message->send(
+            json_encode([
+                'operation' => 'unlock',
+                'id' => $id,
+                'clientid' => $clientid
+            ])
+        );
     }
 
     function update ($id, $clientid) {
-        if ($clientid === null) {
-            $this->msg('update:' . $id);
-        } else {
-            $this->msg('update:' . $id . '\\' . $clientid);
+        $msg = [
+            'operation' => 'update',
+            'id' => $id
+        ];
+        if ($clientid !== null) {
+            $msg['clientid'] = $clientid;
         }
+        $this->message->send(json_encode($msg));
     }
 
     function delete ($path, $clientid) {
+        $msg = [
+            'operation' => 'delete',
+            'path' => $path
+        ];
         if ($clientid === null) {
-            $this->msg('delete:' . $path);
-        } else {
-            $this->msg('delete:' . $path . '\\' . $clientid);
+            $msg['clientid'] = $clientid;
         }
+        $this->message->send(json_encode($msg));
     }
 
     function create($id, $clientid) {
-        if ($clientid === null) {
-            $this->msg('create:' . $id);
-        } else {
-            $this->msg('create:' . $id . '\\' . $clientid);
+        $msg = [
+            'operation' => 'create',
+            'id' => $id
+        ];
+        if ($clientid !== null) {
+            $msg['clientid'] = $cliendid;
         }
-    }
-
-    function msg($msg) {
-        $msg = $this->auth->sign($msg);
-        socket_sendto($this->socket, $msg, strlen($msg), 0, $this->address, $this->port);
-    }
-}
-
-class  msgAuth {
-    private $key;
-
-    function __construct(string $key) {
-        $this->key = $key;    
-    }
-
-    function sign ($msg) {
-        $length = strlen($msg);
-        $sig = hash_hmac('sha1', $msg, $this->key);
-        return sprintf("%s:%d@%s", $sig, $length, $msg);
-    }
-
-    function verify ($msg) {
-        if (strpos($msg, '@') === -1) { return false; }
-        $parts = explode('@', $msg);
-        if (count($parts) !== 2) { return false; }
-        $sigparts = explode(':', $parts[0]);
-        if (count($sigparts) !== 2) { return false; }
-        $payload = substr($parts[1], 0, intval($sigparts[1]));
-        $sig = $this->sign($payload);
-        if ($sig !== $msg) { return false; }
-        return $payload;
+        $this->message->send(json_encode($msg));
     }
 }
