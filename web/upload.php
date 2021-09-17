@@ -149,7 +149,7 @@ $meta['current']++;
 
 /* write chunk to file */
 $content = file_get_contents('php://input');
-$outfile = fopen("$dir/$meta[filename]", 'c');
+$outfile = fopen("$dir/temp.bin", 'c');
 if (!$outfile) {
     unlock($dir);
     fail();
@@ -166,7 +166,7 @@ fclose($outfile);
 
 file_put_contents($dir . '/metadata.json', json_encode($meta));
 if ($meta['current'] === $meta['max']) {
-    $endhash = hash_file('sha256', "$dir/$meta[filename]");
+    $endhash = hash_file('sha256', "$dir/temp.bin");
     if ($meta['hash'] !== $endhash) {
         unlock($dir);
         fail();
@@ -174,10 +174,11 @@ if ($meta['current'] === $meta['max']) {
     $out['done'] = true;
     $user = new ked\DNUser(file_get_contents("$dir/.user"));
     $KEDHigh->setCurrentUser($user);
-    $KEDHigh->addBinaryEntry($meta['path'], "$dir/$meta[filename]", $meta['filetype'], [
+    $KEDHigh->addBinaryEntry($meta['path'], "$dir/temp.bin", $meta['filetype'], [
         'ked:name=' . $meta['filename'],
         'ked:size=' . $meta['filesize']
         ] );
+    unlink("$dir/temp.bin");
 }
 
 unlock($dir);
