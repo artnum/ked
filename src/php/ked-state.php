@@ -78,8 +78,7 @@ class state {
             error_log(__LINE__ . ' ' . ldap_error($this->ldap));
         }
         /* when client disconnect, remove all locks he helds */
-        $this->rmclientlocks($clientid);
-        return;
+        return $this->rmclientlocks($clientid);
     }
 
     function lock ($clientid, $objectdn, &$currentLock) {
@@ -152,18 +151,39 @@ class state {
         return true; // can't unlock, what can I do ?
     }
 
+    function getobjectid ($dn) {
+        $res = @ldap_read($this->ldap, $dn, '(objectclass=*)', ['kedId']);
+        if (!$res) { return null; }
+        $entry = @ldap_first_entry($this->ldap, $res);
+        if (!$entry) { return null; }
+        $id = @ldap_get_values($this->ldap, $entry, 'kedId');
+        if (!$id) { return null; }
+        if ($id['count'] === 0) { return null; }
+        return $id[0];
+    }
+
     function rmclientlocks ($clientid) {
         $res = @ldap_search(
             $this->ldap,
             $this->base,
             '(&(kedId=' . ldap_escape($clientid, '', LDAP_ESCAPE_FILTER) . ')(kedType=lock))',
-            [ 'dn' ]
+            [ 'dn', 'kedObjectDn' ]
         );
         if (!$res) { return false; }
+        $unlockedObjects = [];
         for ($entry = @ldap_first_entry($this->ldap, $res); $entry; $entry = @ldap_next_entry($this->ldap, $entry)) {
             $dn = @ldap_get_dn($this->ldap, $entry);
+            $objectDn = @ldap_get_values($this->ldap, $entry, 'kedObjectDn');
             if (!$dn) { continue; }
             @ldap_delete($this->ldap, $dn);
+            if (!$objectDn) { continue; }
+            for ($i = 0; $i < $objectDn['count']; $i++) {
+                $id = $this->getobjectid($objectDn[$i]);
+                if ($id) {     
+                    $unlockedObjects[] = $id;
+                }
+            }
         }
+        return $unlockedObjects;
     }
 }
