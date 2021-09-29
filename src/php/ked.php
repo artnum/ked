@@ -1012,6 +1012,10 @@ class ked {
         }
         $res = ldap_mod_replace($this->rwconn, $currentEntry['dn'], $updateCurrenEntry);
         if (!$res) { $this->ldapFail($this->rwconn); return null; }
+        $parentDn = $currentEntry;
+        do {
+            $parentDn = $this->updateParentModTime($parentDn, $updateCurrentEntry['kedModified']);
+        } while($parentDn !== false);
         return $currentEntry['id'];
     }
 
@@ -1035,6 +1039,10 @@ class ked {
         }
         $res = ldap_mod_replace($this->rwconn, $currentEntry['dn'], $updateCurrent);
         if (!$res) { $this->ldapFail($this->rwconn); return null; }
+        $parentDn = $newEntryDn;
+        do {
+            $parentDn = $this->updateParentModTime($parentDn, $updateCurrent['kedModified']);
+        } while($parentDn !== false);
         return $currentEntry['id']; // update do not change the id
     }
 
@@ -1065,6 +1073,10 @@ class ked {
             }
             return null;
         }
+        $parentDn = $newEntryDn;
+        do {
+            $parentDn = $this->updateParentModTime($parentDn, $updateCurrent['kedModified']);
+        } while($parentDn !== false);
         return $newEntryDn;
     }
 
@@ -1089,7 +1101,20 @@ class ked {
         /* we must do replace as, at least, we have modified timestamp to update */
         $res = @ldap_mod_replace($this->rwconn, $dn, $attributes);
         if (!$res) { $this->ldapFail($this->rwconn); return false; }
+        $parentDn = $dn;
+        do {
+            $parentDn = $this->updateParentModTime($parentDn, $attributes['kedModified']);
+        } while($parentDn !== false);
         return true;
+    }
+
+    function updateParentModTime (string $dn, int $time) {
+        $parentDn = $this->getParentDn($dn);
+        if ($parentDn === $this->base) { return false; }
+        $attribute = [ 'kedModified' => $time ];
+        $res = @ldap_mod_replace($this->rwconn, $parentDn, $attribute);
+        if (!$res) { $this->ldapFail($this->rwconn); return false; }
+        return $parentDn;
     }
 
     function addClasses (string $dn, array $classes):bool {

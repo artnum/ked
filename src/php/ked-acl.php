@@ -141,7 +141,7 @@ class ACL {
     
         /* is a group ? */
         $conn = $this->ked->getLdapConn();
-        $res = ldap_read(
+        $res = @ldap_read(
             $conn,
             $user,
             '(objectclass=*)',
@@ -254,7 +254,7 @@ class ACL {
 
     function canAcl($user, $access) {
         $conn = $this->ked->getLdapConn();
-        $res = ldap_read(
+        $res = @ldap_read(
             $conn,
             $this->ked->setAclBase(),
             '(objectClass=*)',

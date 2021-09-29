@@ -70,7 +70,7 @@ class msg {
             'id' => $id
         ];
         if ($clientid !== null) {
-            $msg['clientid'] = $cliendid;
+            $msg['clientid'] = $clientid;
         }
         $this->message->send(json_encode($msg));
     }

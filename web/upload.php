@@ -174,10 +174,17 @@ if ($meta['current'] === $meta['max']) {
     $out['done'] = true;
     $user = new ked\DNUser(file_get_contents("$dir/.user"));
     $KEDHigh->setCurrentUser($user);
-    $KEDHigh->addBinaryEntry($meta['path'], "$dir/temp.bin", $meta['filetype'], [
+    $id = $KEDHigh->addBinaryEntry($meta['path'], "$dir/temp.bin", $meta['filetype'], [
         'ked:name=' . $meta['filename'],
         'ked:size=' . $meta['filesize']
         ] );
+    $msg = new ked\msg(
+        $KEDConfiguration['message'][0]['address'],
+        $KEDConfiguration['message'][0]['port'],
+        $KEDConfiguration['message'][0]['key']
+    );
+    $path = explode(',', $id);
+    $msg->update($path[count($path) - 2], null); 
     unlink("$dir/temp.bin");
 }
 

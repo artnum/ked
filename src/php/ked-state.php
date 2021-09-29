@@ -77,7 +77,8 @@ class state {
         if (!$res) {
             error_log(__LINE__ . ' ' . ldap_error($this->ldap));
         }
-
+        /* when client disconnect, remove all locks he helds */
+        $this->rmclientlocks($clientid);
         return;
     }
 
@@ -149,5 +150,20 @@ class state {
             @ldap_delete($this->ldap, $lockdn);
         }
         return true; // can't unlock, what can I do ?
+    }
+
+    function rmclientlocks ($clientid) {
+        $res = @ldap_search(
+            $this->ldap,
+            $this->base,
+            '(&(kedId=' . ldap_escape($clientid, '', LDAP_ESCAPE_FILTER) . ')(kedType=lock))',
+            [ 'dn' ]
+        );
+        if (!$res) { return false; }
+        for ($entry = @ldap_first_entry($this->ldap, $res); $entry; $entry = @ldap_next_entry($this->ldap, $entry)) {
+            $dn = @ldap_get_dn($this->ldap, $entry);
+            if (!$dn) { continue; }
+            @ldap_delete($this->ldap, $dn);
+        }
     }
 }

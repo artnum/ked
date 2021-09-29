@@ -83,7 +83,7 @@ class FullUser implements User {
     function findUserDn (\Menshen\User $user) {
         $conn = $this->ked->getLdapConn();
         /* db id is a dn */
-        $res = ldap_read($conn, $user->getDbId(), '(objectclass=*)', ['dn']);
+        $res = @ldap_read($conn, $user->getDbId(), '(objectclass=*)', ['dn']);
         if ($res) {
             $entry = ldap_first_entry($conn, $res);
             if ($entry) {
