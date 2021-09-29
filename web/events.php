@@ -44,7 +44,19 @@ if (!($user = $menshen->check())) { exit(); }
 $clientid = $_REQUEST['clientid'];
 $state->connection($_REQUEST['clientid'], $user->getDbId(), get_client_ip());
 
-$client = new \wesrv\client();
+$client = new \wesrv\client(
+    $KEDConfiguration['message'][0]['address'],
+    $KEDConfiguration['message'][0]['port'],
+    $KEDConfiguration['message'][0]['key']
+);
 $client->run();
 
-$state->disconnection($clientid);
+$unlocked = $state->disconnection($clientid);
+$msg = new ked\msg(
+    $KEDConfiguration['message'][0]['address'],
+    $KEDConfiguration['message'][0]['port'],
+    $KEDConfiguration['message'][0]['key']
+);
+foreach($unlocked as $dn) {
+    $msg->unlock($dn, $clientid);
+}
