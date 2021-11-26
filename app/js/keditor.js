@@ -361,7 +361,7 @@ KEditor.prototype.authForm = function (nextTry = false) {
                     const file = data.get('keyfile')
                     if (file) {
                         reader = new FileReader()
-                        reader.addEventListener('load', event => {
+                        reader.addEventListener('loadend', event => {
                             this.API.importAuth(data.get('username'), event.target.result)
                             .then(() => {
                                 this.authNext(data.get('username'), data.get('password'))
@@ -811,6 +811,7 @@ KEditor.prototype.renderEntry = function (path, entry) {
                     htmlnode.dataset.lightbox = `${path}`
                     htmlnode.dataset.title = oname || ''
                     htmlnode.style.backgroundImage = `url('${url2}')`
+                    htmlnode.style.backgroundSize = 'cover'
                     htmlnode.classList.add('klink')
                     htmlnode.dataset.edit = 'file'
                     subresolve(htmlnode)
@@ -875,6 +876,7 @@ KEditor.prototype.renderEntry = function (path, entry) {
                             htmlnode.href = url1
                             htmlnode.target = '_blank'
                             htmlnode.style.backgroundImage = `url('${url2}')`
+                            htmlnode.style.backgroundSize = 'cover'
                             htmlnode.classList.add('klink')
                             htmlnode.dataset.edit = 'file'
                             subresolve(htmlnode)
