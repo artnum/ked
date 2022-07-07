@@ -236,7 +236,7 @@
     height: 400px;
 }
 
-.document .kmetadata {
+.document .kmetadata, .kmetadata a {
     font-family: 'B612 Mono', monospace;
     background-color: var(--bg-color);
     color: var(--white);

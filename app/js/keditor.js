@@ -84,7 +84,9 @@ function KEditor(container, baseUrl) {
         this.pushState('path', '', this.title)
     }
     window.addEventListener('hashchange', event => {
-        this.authStart()
+        if (window.location.hash.startsWith('#menshen-')) {
+            this.authStart()
+        }
     })
 
     /* client id is for each browser */

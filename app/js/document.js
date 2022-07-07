@@ -30,7 +30,9 @@ function KEDDocument (doc, api) {
         kedDocument.domNode.dataset.created = kedDocument.doc.created
         kedDocument.domNode.dataset.modified = kedDocument.doc.modified
         kedDocument.domNode.dataset.childs = kedDocument.doc['+childs']
-     
+        const parentArray = String(kedDocument.doc.abspath).split(',')
+        parentArray.pop()
+        const parent = parentArray.join(',')
         const task = {
             is: kedDocument.doc['+class'].indexOf('task') === -1 ? false : true,
             done: false,
@@ -46,7 +48,7 @@ function KEDDocument (doc, api) {
         kedDocument.domNode.innerHTML = 
             `<div class="kmetadata ${doc['+childs'] > 0 ? 'childs' : 'no-child'}">` +
             `${task.is ? (task.done ? '<i data-action="set-task-undone" class="fas fa-clipboard-check"></i>' : '<i data-action="set-task-done" class="fas fa-clipboard"></i>'): ''}` +
-            `<span id="name-${doc.id}">${doc.name}</span>` +
+            `<span id="name-${doc.id}"><a href="index.html?${parent}#${kedDocument.doc.id}">${doc.name}</a></span>` +
             `<div class="navigation indicator"><span data-action="open-document" class="forward"><i class="fas fa-arrow-right"></i></span></div>` +
             `<div class="indicator"><span data-action="print-document"><i class="fas fa-print"></i></span></div>` +
             `<div class="has-childs indicator"><span data-action="toggle-entries"><i name="open" class="fas fa-folder"></i></span></div>` +
