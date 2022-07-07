@@ -7,7 +7,6 @@ function KEditor(container, baseUrl) {
     this.cwd = ''
 
     this.title = KED.title ?? 'Sans titre'
-    this.pushState('path', '', this.title)
     
     this.previousTitles = []
     this.previousPath = []
@@ -78,8 +77,11 @@ function KEditor(container, baseUrl) {
             }
         }
     })
-    if (!window.location?.hash?.startsWith('#menshen-')) {
-        this.cwd = window.location.hash.substring(1)
+    if (window.location.search !== '') {
+        this.cwd = String(window.location.search).substring(1)
+        this.pushState('path', this.cwd)
+    } else {
+        this.pushState('path', '', this.title)
     }
     window.addEventListener('hashchange', event => {
         this.authStart()
@@ -559,7 +561,7 @@ KEditor.prototype.ls = function () {
                 const cwd = this.cwd
                 this.API.getInfo(cwd)
                 .then(info => {
-                    this.setTitle(info.name)
+                    this.setTitle(info?.name)
                     this.pushState('path', cwd)
                 })
             } else {
@@ -603,8 +605,8 @@ KEditor.prototype.pushState = function (type, content, title = undefined) {
     if (this.popingState) { this.popingState = false; return }
     let url
     if (type === 'path') {
-        path = content || this.cwd
-        url = `${String(window.location).split('#')[0]}${this.cwd === '' ? '' : '#'}${path}`
+        path = (content === undefined || content === null) ? this.cwd : content
+        url = `${String(window.location).split('?')[0]}${this.cwd === '' ? '' : '?'}${path}`
     } else {
         url = String(window.location)
     }
@@ -616,7 +618,7 @@ KEditor.prototype.pushState = function (type, content, title = undefined) {
 }
 
 KEditor.prototype.replaceState = function () {
-    const url = `${String(window.location).split('#')[0]}${this.cwd === '' ? '' : '#'}${this.cwd}`
+    const url = `${String(window.location).split('?')[0]}${this.cwd === '' ? '' : '?'}${this.cwd}`
     history.replaceState({path: this.cwd}, 'KED', url)
 }
 
@@ -635,13 +637,16 @@ KEditor.prototype.renderPath = function () {
 KEditor.prototype.reset = function () {
     this.previousPath = []
     this.previousTitles = []
+    this.pushState('path', '')
     this.renderPath()
 }
 
 KEditor.prototype.backward = function () {
     this.previousTitles.pop()
     this.renderPath()
-    return this.previousPath.pop()
+    const previousPath = this.previousPath.pop() ?? ''
+    if (previousPath === '') { this.pushState('path', '') }
+    return previousPath
 }
 
 KEditor.prototype.forward = function () {
