@@ -525,6 +525,7 @@ KEditor.prototype.highlight = function (id) {
 KEditor.prototype.doHighlight = function (id) {
     const node = document.querySelector(`[data-pathid="${this.toHighlight}"]`) || document.getElementById(this.toHighlight)
     if (node) {
+        node.scrollIntoView()
         KEDAnim.push(() => {
             node.classList.add('highlight')
         })
