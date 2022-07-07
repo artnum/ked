@@ -87,7 +87,14 @@ function KEditor(container, baseUrl) {
         if (window.location.hash.startsWith('#menshen-')) {
             this.authStart()
         }
+        if (window.location.hash.startsWith('#name-')) {
+            this.highlight(String(window.location.hash).split('-')[1])
+        }
     })
+
+    if (window.location.hash.startsWith('#name-')) {
+        this.highlight(String(window.location.hash).split('-')[1])
+    }
 
     /* client id is for each browser */
     this.API.getClientId()
@@ -609,6 +616,9 @@ KEditor.prototype.pushState = function (type, content, title = undefined) {
     if (type === 'path') {
         path = (content === undefined || content === null) ? this.cwd : content
         url = `${String(window.location).split('?')[0]}${this.cwd === '' ? '' : '?'}${path}`
+        if (window.location.hash) {
+            url += String(window.location.hash)
+        }
     } else {
         url = String(window.location)
     }
@@ -637,6 +647,7 @@ KEditor.prototype.renderPath = function () {
 }
 
 KEditor.prototype.reset = function () {
+    if (window.location.hash !== '') { window.location.hash = ''}
     this.previousPath = []
     this.previousTitles = []
     this.pushState('path', '')
@@ -644,6 +655,7 @@ KEditor.prototype.reset = function () {
 }
 
 KEditor.prototype.backward = function () {
+    if (window.location.hash !== '') { window.location.hash = ''}
     this.previousTitles.pop()
     this.renderPath()
     const previousPath = this.previousPath.pop() ?? ''
@@ -652,6 +664,7 @@ KEditor.prototype.backward = function () {
 }
 
 KEditor.prototype.forward = function () {
+    if (window.location.hash !== '') { window.location.hash = ''}
     this.previousPath.push(this.cwd)
     this.previousTitles.push(this.title)
     this.renderPath()
