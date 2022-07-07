@@ -519,6 +519,23 @@ KEditor.prototype.fetch = function (path, content) {
 
 KEditor.prototype.highlight = function (id) {
     this.toHighlight = id
+    this.doHighlight(id)
+}
+
+KEditor.prototype.doHighlight = function (id) {
+    const node = document.querySelector(`[data-pathid="${this.toHighlight}"]`) || document.getElementById(this.toHighlight)
+    if (node) {
+        KEDAnim.push(() => {
+            node.classList.add('highlight')
+        })
+        .then(_ => {
+            setTimeout(() => {
+                KEDAnim.push(() => {
+                    node.classList.remove('highlight')
+                })
+            }, 5000)
+        })
+    }
 }
 
 KEditor.prototype.error = function (data) {
@@ -613,11 +630,13 @@ KEditor.prototype.pushState = function (type, content, title = undefined) {
     /* popstate set this flag, so we avoid pushing the same state when coming from popstate */
     if (this.popingState) { this.popingState = false; return }
     let url
+    
     if (type === 'path') {
         path = (content === undefined || content === null) ? this.cwd : content
         url = `${String(window.location).split('?')[0]}${this.cwd === '' ? '' : '?'}${path}`
         if (window.location.hash) {
-            url += String(window.location.hash)
+            const hash = String(window.location.hash).split('#')[1]
+            url += `#${hash}`
         }
     } else {
         url = String(window.location)
@@ -1599,7 +1618,7 @@ KEditor.prototype.renderSingle = function (doc, level) {
                 }
             }
             if (!refresh) { htmlnode.addEventListener('click', this.submenuEvents.bind(this)) }
-            if (this.toHighlight === doc.id) {
+            if (String(this.toHighlight) === String(doc.id)) {
                 htmlnode.classList.add('highlight')
                 setTimeout(_ => {
                     htmlnode.classList.remove('highlight')
@@ -1818,6 +1837,10 @@ KEditor.prototype.render = function (root) {
                     }
                 }
             }
+        }
+
+        if (this.toHighlight) {
+            this.doHighlight(this.toHighlight)
         }
 
         this.API.getUsers()
