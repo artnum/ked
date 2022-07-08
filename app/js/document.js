@@ -48,7 +48,7 @@ function KEDDocument (doc, api) {
         kedDocument.domNode.innerHTML = 
             `<div class="kmetadata ${doc['+childs'] > 0 ? 'childs' : 'no-child'}">` +
             `${task.is ? (task.done ? '<i data-action="set-task-undone" class="fas fa-clipboard-check"></i>' : '<i data-action="set-task-done" class="fas fa-clipboard"></i>'): ''}` +
-            `<span id="name-${doc.id}"><a href="index.html?${parent}#name-${kedDocument.doc.id}">${doc.name}</a></span>` +
+            `<span id="name-${doc.id}"><a href="index.html?${parent}#name-${kedDocument.doc.id}">${doc.name}</a> <i data-action="edit-title" class="fas fa-pen"></i></span>` +
             `<div class="navigation indicator"><span data-action="open-document" class="forward"><i class="fas fa-arrow-right"></i></span></div>` +
             `<div class="indicator"><span data-action="print-document"><i class="fas fa-print"></i></span></div>` +
             `<div class="has-childs indicator"><span data-action="toggle-entries"><i name="open" class="fas fa-folder"></i></span></div>` +
@@ -72,6 +72,9 @@ function KEDDocument (doc, api) {
         kedDocument.domNode.firstElementChild.addEventListener('dragover', kedDocument.handleDragEvent.bind(kedDocument), {capture: true})
         kedDocument.domNode.firstElementChild.addEventListener('dragleave', kedDocument.handleDragEvent.bind(kedDocument), {capture: true})
         kedDocument.domNode.firstElementChild.addEventListener('drop', kedDocument.handleDropEvent.bind(kedDocument), {capture: true})
+    } else {
+        const title =  kedDocument.domNode.querySelector(`span#name-${kedDocument.doc.id} a`)
+        KEDAnim.push(() => { title.innerHTML = kedDocument.doc.name })
     }
 
     if (doc['+lock']) {

@@ -1405,6 +1405,30 @@ KEditor.prototype.addTextInteract = function (docNode) {
 KEditor.prototype.clear = function () {
     this.clearOnRender = true
 }
+KEditor.prototype.editTitleInteract = function (docNode) {
+    return new Promise ((resolve, reject) => {
+        KEDDocument.get(docNode.id, this.API)
+        .then(doc => {
+            const form = document.createElement('FORM')
+            const entry = docNode
+            if (!entry) { return }
+            form.innerHTML = `<div class="kform-inline">
+                    <div class="title">Modifier le titre</div>
+                    <div class="full"><input type="text" name="description" value="${doc.name || ''}"></div>
+                    <div class="full"></input><button type="submit">Valider</button><button type="reset">Annuler</button></div>
+                </div>`
+            doc.confirm(form)
+            form.addEventListener('submit', event => {
+                event.preventDefault()
+                const form = new FormData(event.target)
+                resolve(form.get('description'))
+            })
+            form.addEventListener('reset', () => {
+                reject()
+            })
+        })
+    })
+}
 
 KEditor.prototype.descriptionInteract = function (entryId, docId) {
     return new Promise ((resolve, reject) => {
@@ -1575,7 +1599,16 @@ KEditor.prototype.renderSingle = function (doc, level) {
                 kedDocument.receiveLock(this.LockedNotFound.get(kedDocument.getRelativeId()))
                 this.LockedNotFound.delete(kedDocument.getRelativeId())
             }
-
+        
+            kedDocument.addEventListener('edit-title', (event) => {
+                this.editTitleInteract(event.detail.target.getDomNode())
+                .then(title => {
+                    return this.API.updateDocument(event.detail.target.getId(), title)
+                })
+                .then(result => {
+                    this.refreshDocument(result.path)
+                })
+            })
             kedDocument.addEventListener('delete-document', (event) => { this.deleteDocumentInteract(event.detail.target.getDomNode()); })
             kedDocument.addEventListener('open-document', (event) => { 
                 this.cd(event.detail.target.getId())

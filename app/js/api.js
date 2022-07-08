@@ -229,6 +229,22 @@ KEDApi.prototype.post = function(body, offlineStore = false) {
     })
 }
 
+KEDApi.prototype.updateDocument = function (path, title) {
+    const operation = {
+        operation: 'update-document',
+        path,
+        name: title
+    }
+    return new Promise((resolve, reject) => {
+        this.post(operation)
+        .then(result => {
+            if (!result.ok) { reject('Modification failed'); return }
+            return resolve(result.data)
+        })
+    })
+
+}
+
 KEDApi.prototype.getDocument = function (path) {
     const operation = {
         operation: 'get-document',
@@ -246,6 +262,20 @@ KEDApi.prototype.getDocument = function (path) {
 KEDApi.prototype.getUser = function () {
     const operation = {
         operation: 'get-user'
+    }
+    return new Promise((resolve) => {
+        this.post(operation)
+        .then(result => {
+            resolve(result)
+        })
+    })
+}
+
+KEDApi.prototype.getInvit = function (user, invit) {
+    const operation = {
+        operation: 'get-invit',
+        user,
+        invit
     }
     return new Promise((resolve) => {
         this.post(operation)

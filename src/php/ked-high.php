@@ -420,6 +420,14 @@ class high extends ked {
         return $this->updateInPlaceAny($docInfo['dn'], $updateValues);
     }
 
+    function updateDocument (string $path, $params):bool {
+        $docInfo = $this->getInfo($path, false);
+        $updateValues = [];
+        if (!empty($params['name'])) { $updateValues['name'] = $params['name']; }
+        else { return false; }
+        return $this->updateInPlaceAny($docInfo['dn'], $updateValues);
+    }
+
     /**** UPDATE and ADD functions should be kind of fuse together ****/
     function updateTextEntry (string $path, string $text, string $type = 'text/plain', $application = null):?string {
         $entryDn = $this->pathToDn($path, false);
