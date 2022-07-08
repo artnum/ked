@@ -1,6 +1,7 @@
 function KEditor(container, baseUrl) {
     this.Print = new KEDPrint(this, window.document.location)
     this.API = new KEDApi(baseUrl)
+    this.Inactivity = new KEDActivity(5)
     this.localLocked = new Map()
     this.container = container
     this.baseUrl = baseUrl
@@ -1509,6 +1510,16 @@ KEditor.prototype.handleToolsEvents = function (event) {
                                     ktoolsNode.innerHTML = '<i class="fas fa-save"> </i>&nbsp;Enregistrer' 
                                     ktoolsNode.parentNode.insertBefore(cancel, ktoolsNode.nextElementSibling)
                                 })
+                                this.Inactivity.set(docNode.id, () => {
+                                    this.edit[kcontainerNode.firstElementChild.dataset.edit](kcontainerNode.firstElementChild, docNode)
+                                    doc.unlock(this.API)
+                                    KEDAnim.push(() => {
+                                        ktoolsNode.innerHTML = '<i class="fas fa-edit"> </i>&nbsp;Éditer' 
+                                        if (ktoolsNode.nextElementSibling.dataset.action === 'stop-edit') {
+                                            ktoolsNode.parentNode.removeChild(ktoolsNode.nextElementSibling)
+                                        }
+                                    })
+                                })
                             } else {
                                 doc.unlock(this.API)
                                 KEDAnim.push(() => {
@@ -1517,6 +1528,7 @@ KEditor.prototype.handleToolsEvents = function (event) {
                                         ktoolsNode.parentNode.removeChild(ktoolsNode.nextElementSibling)
                                     }
                                 })
+                                this.Inactivity.remove(docNode.id)
                             }
                         })
                     })

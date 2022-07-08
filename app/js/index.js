@@ -11,6 +11,7 @@ window.addEventListener('load', (event) => {
         '../js/document.js',
         '../js/utils.js',
         '../js/kprint.js',
+        '../js/activity.js',
         '../js/lib/cache.js',
         '../node_modules/quill/dist/quill.min.js',
         '../node_modules/jsqr/dist/jsQR.js',
